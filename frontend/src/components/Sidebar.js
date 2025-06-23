@@ -6,8 +6,8 @@ const Sidebar = ({
   onAddNeighbor, 
   onDownloadImage,
   availableIcons,
-  currentIcon,
-  setCurrentIcon,
+  currentIconName,
+  setCurrentIconName,
   disabled 
 }) => {
   return (
@@ -18,19 +18,18 @@ const Sidebar = ({
       </button>
       <hr />
 
-      {/* New Icon Selector section */}
       {!disabled && (
         <div className="icon-selector-section">
             <h3>Device Icon</h3>
             <p>Select an icon for the next device you add.</p>
             <select 
                 className="icon-selector"
-                value={currentIcon} 
-                onChange={(e) => setCurrentIcon(e.target.value)}
+                value={currentIconName} 
+                onChange={(e) => setCurrentIconName(e.target.value)}
             >
-                {availableIcons.map(iconFile => (
-                    <option key={iconFile} value={iconFile}>
-                        {iconFile.split('.')[0]} {/* Show filename without extension */}
+                {availableIcons.map(iconName => (
+                    <option key={iconName} value={iconName}>
+                        {iconName}
                     </option>
                 ))}
             </select>

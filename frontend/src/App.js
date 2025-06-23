@@ -2,16 +2,30 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { applyNodeChanges } from 'react-flow-renderer';
 import { toPng } from 'html-to-image';
+
+// Step 1: Import all necessary components and assets
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
 import CustomNode from './components/CustomNode';
 import './App.css';
 
+// Step 2: Import your icons directly from the src folder
+import routerIcon from './assets/icons/router.png';
+import switchIcon from './assets/icons/switch.png';
+import firewallIcon from './assets/icons/firewall.png';
+
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 // --- CONFIGURATION ---
-// Add the filenames of your icons from the `public/icons` folder here.
-const AVAILABLE_ICONS = ['router.png', 'switch.png', 'firewall.png'];
+// Step 3: Create a map of display names to imported icon modules.
+// To add a new icon: import it above, then add it to this object.
+const AVAILABLE_ICONS = {
+  'Router': routerIcon,
+  'Switch': switchIcon,
+  'Firewall': firewallIcon,
+};
+const DEFAULT_ICON_NAME = 'Router';
 // ---------------------
 
 function App() {
@@ -21,7 +35,7 @@ function App() {
   const [neighbors, setNeighbors] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentIcon, setCurrentIcon] = useState(AVAILABLE_ICONS[0]); // Default icon
+  const [currentIconName, setCurrentIconName] = useState(DEFAULT_ICON_NAME);
   
   const initialIpRef = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
@@ -31,11 +45,9 @@ function App() {
     [setNodes]
   );
 
-  const addNode = useCallback((device, position, icon) => {
+  const addNode = useCallback((device, position, iconName) => {
     const existingNode = nodes.find(n => n.id === device.ip);
-    if (existingNode) {
-      return existingNode;
-    }
+    if (existingNode) return existingNode;
 
     const newNode = {
       id: device.ip,
@@ -44,7 +56,7 @@ function App() {
       data: { 
         hostname: device.hostname, 
         ip: device.ip,
-        icon: `/icons/${icon}` // Use the provided icon
+        icon: AVAILABLE_ICONS[iconName] // Use the imported icon module
       },
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
@@ -81,8 +93,7 @@ function App() {
         x: selectedNode.position.x + Math.random() * 200 - 100,
         y: selectedNode.position.y + 120,
     };
-    // Pass the currently selected icon when adding the neighbor
-    addNode(neighborDevice, newPosition, currentIcon);
+    addNode(neighborDevice, newPosition, currentIconName);
     
     const newEdge = { 
       id: `e-${selectedNode.id}-${neighborDevice.ip}`, 
@@ -93,7 +104,7 @@ function App() {
     };
     setEdges(prevEdges => [...prevEdges, newEdge]);
     setNeighbors(prev => prev.filter(n => n.ip !== neighborDevice.ip));
-  }, [addNode, selectedNode, currentIcon]);
+  }, [addNode, selectedNode, currentIconName]);
   
   const handleStart = async (e) => {
     e.preventDefault();
@@ -112,8 +123,7 @@ function App() {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/devices`, { ip });
       const initialDevice = response.data;
-      // Add the first node with the default icon
-      const newNode = addNode(initialDevice, { x: 400, y: 150 }, currentIcon);
+      const newNode = addNode(initialDevice, { x: 400, y: 150 }, currentIconName);
       onNodeClick(null, newNode);
     } catch (err) {
       setError('Failed to find the initial device. Please check the IP and try again.');
@@ -153,9 +163,9 @@ function App() {
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
         onDownloadImage={handleDownloadImage}
-        availableIcons={AVAILABLE_ICONS}
-        currentIcon={currentIcon}
-        setCurrentIcon={setCurrentIcon}
+        availableIcons={Object.keys(AVAILABLE_ICONS)} // Pass only the names
+        currentIconName={currentIconName}
+        setCurrentIconName={setCurrentIconName}
         disabled={nodes.length === 0}
       />
       <div className="main-content">
