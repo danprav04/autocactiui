@@ -1,10 +1,18 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
+import { applyNodeChanges } from 'react-flow-renderer';
+import { toPng } from 'html-to-image';
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
+import CustomNode from './components/CustomNode';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
+
+// --- CONFIGURATION ---
+// Add the filenames of your icons from the `public/icons` folder here.
+const AVAILABLE_ICONS = ['router.png', 'switch.png', 'firewall.png'];
+// ---------------------
 
 function App() {
   const [nodes, setNodes] = useState([]);
@@ -13,12 +21,17 @@ function App() {
   const [neighbors, setNeighbors] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [mapUrl, setMapUrl] = useState('');
+  const [currentIcon, setCurrentIcon] = useState(AVAILABLE_ICONS[0]); // Default icon
   
   const initialIpRef = useRef(null);
+  const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
 
-  const addNode = useCallback((device, position) => {
-    // Prevent adding the same node twice
+  const onNodesChange = useCallback(
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    [setNodes]
+  );
+
+  const addNode = useCallback((device, position, icon) => {
     const existingNode = nodes.find(n => n.id === device.ip);
     if (existingNode) {
       return existingNode;
@@ -26,19 +39,23 @@ function App() {
 
     const newNode = {
       id: device.ip,
-      data: { label: `${device.hostname}\n(${device.ip})` },
-      position: position || { x: Math.random() * 400, y: Math.random() * 400 },
+      type: 'custom',
+      position: position || { x: (Math.random() * 400) + 100, y: (Math.random() * 400) + 50 },
+      data: { 
+        hostname: device.hostname, 
+        ip: device.ip,
+        icon: `/icons/${icon}` // Use the provided icon
+      },
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
     return newNode;
   }, [nodes]);
 
   const handleFetchNeighbors = useCallback(async (ip) => {
+    setIsLoading(true);
+    setError('');
     try {
-      setIsLoading(true);
-      setError('');
       const response = await axios.get(`${API_BASE_URL}/api/devices/${ip}/neighbors`);
-      // Filter out neighbors that are already on the map
       setNeighbors(response.data.filter(n => !nodes.some(node => node.id === n.ip)));
     } catch (err) {
       setError(`Could not fetch neighbors for IP ${ip}.`);
@@ -49,6 +66,7 @@ function App() {
   }, [nodes]);
   
   const onNodeClick = useCallback((event, node) => {
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id })));
     setSelectedNode(node);
     handleFetchNeighbors(node.id);
   }, [handleFetchNeighbors]);
@@ -59,22 +77,23 @@ function App() {
       return;
     }
     
-    // Add the new device as a node
-    addNode(neighborDevice);
+    const newPosition = {
+        x: selectedNode.position.x + Math.random() * 200 - 100,
+        y: selectedNode.position.y + 120,
+    };
+    // Pass the currently selected icon when adding the neighbor
+    addNode(neighborDevice, newPosition, currentIcon);
     
-    // Automatically add the edge between the selected node and its new neighbor
     const newEdge = { 
       id: `e-${selectedNode.id}-${neighborDevice.ip}`, 
       source: selectedNode.id, 
       target: neighborDevice.ip, 
-      animated: true 
+      animated: true,
+      style: { stroke: '#6c757d' }
     };
     setEdges(prevEdges => [...prevEdges, newEdge]);
-    
-    // Remove the newly added neighbor from the list
     setNeighbors(prev => prev.filter(n => n.ip !== neighborDevice.ip));
-
-  }, [addNode, selectedNode]);
+  }, [addNode, selectedNode, currentIcon]);
   
   const handleStart = async (e) => {
     e.preventDefault();
@@ -88,15 +107,14 @@ function App() {
     setError('');
     setNodes([]);
     setEdges([]);
-    setMapUrl('');
     setSelectedNode(null);
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/devices`, { ip });
       const initialDevice = response.data;
-      const newNode = addNode(initialDevice, { x: 250, y: 250 });
-      setSelectedNode(newNode); // Set the first node as selected
-      handleFetchNeighbors(initialDevice.ip);
+      // Add the first node with the default icon
+      const newNode = addNode(initialDevice, { x: 400, y: 150 }, currentIcon);
+      onNodeClick(null, newNode);
     } catch (err) {
       setError('Failed to find the initial device. Please check the IP and try again.');
       setNodes([]);
@@ -105,22 +123,27 @@ function App() {
     }
   };
 
-  const handleGenerateMap = async () => {
-    if (nodes.length === 0) {
-      setError('Cannot generate a map with no devices.');
-      return;
+  const handleDownloadImage = () => {
+    const viewport = document.querySelector('.react-flow__viewport');
+    if (!viewport) {
+        setError('Could not find map to download.');
+        return;
     }
-
-    setIsLoading(true);
-    setError('');
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/maps`, { nodes, edges });
-      setMapUrl(response.data.map_url);
-    } catch (err) {
-      setError('Failed to generate the map image.');
-    } finally {
-      setIsLoading(false);
-    }
+    toPng(viewport, { 
+        cacheBust: true,
+        backgroundColor: '#ffffff',
+        filter: (node) => (node.className !== 'react-flow__controls'),
+    })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = 'network-map.png';
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((err) => {
+          setError('Could not generate map image.');
+          console.error(err);
+      });
   };
 
   return (
@@ -129,31 +152,32 @@ function App() {
         selectedNode={selectedNode}
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
-        onGenerateMap={handleGenerateMap}
+        onDownloadImage={handleDownloadImage}
+        availableIcons={AVAILABLE_ICONS}
+        currentIcon={currentIcon}
+        setCurrentIcon={setCurrentIcon}
         disabled={nodes.length === 0}
       />
       <div className="main-content">
         <h1>Interactive Network Map Creator</h1>
         {nodes.length === 0 ? (
           <form className="start-form" onSubmit={handleStart}>
-            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP (e.g., 189.1.5.5)" defaultValue="189.1.5.5" />
+            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP" defaultValue="189.1.5.5" />
             <button type="submit" disabled={isLoading}>
               {isLoading ? 'Loading...' : 'Start Mapping'}
             </button>
           </form>
         ) : (
-          <Map nodes={nodes} edges={edges} onNodeClick={onNodeClick} />
+          <Map 
+            nodes={nodes} 
+            edges={edges} 
+            onNodeClick={onNodeClick} 
+            onNodesChange={onNodesChange}
+            nodeTypes={nodeTypes} 
+          />
         )}
         {error && <p className="error-message">{error}</p>}
         {isLoading && <p className="loading-message">Loading...</p>}
-
-        {mapUrl && (
-          <div className="map-result">
-            <h2>Generated Map</h2>
-            <img src={mapUrl} alt="Generated Network Map" />
-            <a href={mapUrl} download="network-map.png">Download Map</a>
-          </div>
-        )}
       </div>
     </div>
   );

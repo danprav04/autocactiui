@@ -5,24 +5,20 @@ import ReactFlow, {
   MiniMap,
 } from 'react-flow-renderer';
 
-const Map = ({ nodes, edges, onNodeClick }) => {
+const Map = ({ nodes, edges, onNodeClick, onNodesChange, nodeTypes }) => {
   return (
     <div className="map-view">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodeClick={onNodeClick}
+        onNodesChange={onNodesChange}
+        nodeTypes={nodeTypes}
         fitView
       >
-        <MiniMap nodeColor={n => {
-            if (n.style?.background) return n.style.background;
-            if (n.type === 'input') return '#0041d0';
-            if (n.type === 'output') return '#ff0072';
-            if (n.type === 'default') return '#1a192b';
-            return '#eee';
-        }}/>
+        <MiniMap />
         <Controls />
-        <Background />
+        <Background color="#aaa" gap={16} />
       </ReactFlow>
     </div>
   );

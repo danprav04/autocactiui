@@ -26,6 +26,7 @@ body, html, #root {
 .sidebar h2, .sidebar h3 {
   color: #333;
   margin-top: 0;
+  margin-bottom: 10px;
 }
 
 .sidebar hr {
@@ -56,6 +57,21 @@ body, html, #root {
   cursor: not-allowed;
 }
 
+.icon-selector-section p {
+    font-size: 14px;
+    color: #6c757d;
+    margin-top: 0;
+}
+
+.icon-selector {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    text-transform: capitalize;
+}
+
 .neighbors-section {
     flex-grow: 1;
 }
@@ -67,6 +83,7 @@ body, html, #root {
     font-weight: bold;
     color: #495057;
     margin-bottom: 15px;
+    text-align: center;
 }
 
 .sidebar ul {
@@ -106,6 +123,7 @@ body, html, #root {
   flex-direction: column;
   align-items: center;
   padding: 20px;
+  background-color: #eef0f2;
 }
 
 .start-form {
@@ -140,15 +158,9 @@ body, html, #root {
 
 .map-view {
   width: 100%;
-  height: 60vh;
+  flex-grow: 1;
   border: 1px solid #ddd;
   background-color: #ffffff;
-}
-
-/* Style for the selected node */
-.react-flow__node.selected {
-  border: 2px solid #007bff;
-  box-shadow: 0 0 10px #007bff;
 }
 
 .error-message {
@@ -162,31 +174,46 @@ body, html, #root {
   margin-top: 20px;
 }
 
-.map-result {
-  margin-top: 20px;
-  padding: 20px;
-  border: 1px solid #ddd;
-  background-color: #fff;
-  text-align: center;
-  width: 100%;
+/* Custom Node Styles */
+.custom-node-body {
+    background-color: #fff;
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    min-width: 150px;
 }
 
-.map-result h2 {
-    margin-top: 0;
+.custom-node-body.selected {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
 }
 
-.map-result img {
-  max-width: 100%;
-  max-height: 500px;
-  border: 1px solid #ccc;
-  margin-bottom: 15px;
+.node-icon {
+    width: 32px;
+    height: 32px;
 }
 
-.map-result a {
-    display: inline-block;
-    padding: 10px 20px;
-    background-color: #17a2b8;
-    color: white;
-    text-decoration: none;
-    border-radius: 5px;
+.node-label {
+    display: flex;
+    flex-direction: column;
+}
+
+.node-label strong {
+    font-size: 14px;
+}
+
+.node-label small {
+    font-size: 12px;
+    color: #666;
+}
+
+.custom-handle {
+    width: 8px;
+    height: 8px;
+    background: #555;
+    border-radius: 50%;
 }
