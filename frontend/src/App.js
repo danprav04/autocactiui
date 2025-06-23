@@ -4,9 +4,12 @@ import Map from './components/Map';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
+
 function App() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
   const [neighbors, setNeighbors] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +19,10 @@ function App() {
 
   const addNode = useCallback((device, position) => {
     // Prevent adding the same node twice
-    if (nodes.find(n => n.id === device.ip)) return;
+    const existingNode = nodes.find(n => n.id === device.ip);
+    if (existingNode) {
+      return existingNode;
+    }
 
     const newNode = {
       id: device.ip,
@@ -24,28 +30,51 @@ function App() {
       position: position || { x: Math.random() * 400, y: Math.random() * 400 },
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
+    return newNode;
   }, [nodes]);
 
-  const handleFetchNeighbors = useCallback(async (device) => {
+  const handleFetchNeighbors = useCallback(async (ip) => {
     try {
       setIsLoading(true);
       setError('');
-      const response = await axios.get(`/api/devices/${device.ip}/neighbors`);
-      setNeighbors(response.data);
+      const response = await axios.get(`${API_BASE_URL}/api/devices/${ip}/neighbors`);
+      // Filter out neighbors that are already on the map
+      setNeighbors(response.data.filter(n => !nodes.some(node => node.id === n.ip)));
     } catch (err) {
-      setError(`Could not fetch neighbors for ${device.hostname}.`);
+      setError(`Could not fetch neighbors for IP ${ip}.`);
       setNeighbors([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [nodes]);
+  
+  const onNodeClick = useCallback((event, node) => {
+    setSelectedNode(node);
+    handleFetchNeighbors(node.id);
+  }, [handleFetchNeighbors]);
 
-  const handleAddNeighbor = useCallback((neighborDevice, sourceDeviceIp) => {
-    addNode(neighborDevice, { x: Math.random() * 400, y: Math.random() * 400 });
-    const newEdge = { id: `e-${sourceDeviceIp}-${neighborDevice.ip}`, source: sourceDeviceIp, target: neighborDevice.ip, animated: true };
+  const handleAddNeighbor = useCallback((neighborDevice) => {
+    if (!selectedNode) {
+      setError("Please select a node on the map before adding a neighbor.");
+      return;
+    }
+    
+    // Add the new device as a node
+    addNode(neighborDevice);
+    
+    // Automatically add the edge between the selected node and its new neighbor
+    const newEdge = { 
+      id: `e-${selectedNode.id}-${neighborDevice.ip}`, 
+      source: selectedNode.id, 
+      target: neighborDevice.ip, 
+      animated: true 
+    };
     setEdges(prevEdges => [...prevEdges, newEdge]);
-    handleFetchNeighbors(neighborDevice);
-  }, [addNode, handleFetchNeighbors]);
+    
+    // Remove the newly added neighbor from the list
+    setNeighbors(prev => prev.filter(n => n.ip !== neighborDevice.ip));
+
+  }, [addNode, selectedNode]);
   
   const handleStart = async (e) => {
     e.preventDefault();
@@ -60,12 +89,14 @@ function App() {
     setNodes([]);
     setEdges([]);
     setMapUrl('');
+    setSelectedNode(null);
 
     try {
-      const response = await axios.post('/api/devices', { ip });
+      const response = await axios.post(`${API_BASE_URL}/api/devices`, { ip });
       const initialDevice = response.data;
-      addNode(initialDevice, { x: 250, y: 250 });
-      handleFetchNeighbors(initialDevice);
+      const newNode = addNode(initialDevice, { x: 250, y: 250 });
+      setSelectedNode(newNode); // Set the first node as selected
+      handleFetchNeighbors(initialDevice.ip);
     } catch (err) {
       setError('Failed to find the initial device. Please check the IP and try again.');
       setNodes([]);
@@ -83,7 +114,7 @@ function App() {
     setIsLoading(true);
     setError('');
     try {
-      const response = await axios.post('/api/maps', { nodes, edges });
+      const response = await axios.post(`${API_BASE_URL}/api/maps`, { nodes, edges });
       setMapUrl(response.data.map_url);
     } catch (err) {
       setError('Failed to generate the map image.');
@@ -95,6 +126,7 @@ function App() {
   return (
     <div className="app-container">
       <Sidebar 
+        selectedNode={selectedNode}
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
         onGenerateMap={handleGenerateMap}
@@ -104,16 +136,16 @@ function App() {
         <h1>Interactive Network Map Creator</h1>
         {nodes.length === 0 ? (
           <form className="start-form" onSubmit={handleStart}>
-            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP (e.g., 189.1.5.5)" />
+            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP (e.g., 189.1.5.5)" defaultValue="189.1.5.5" />
             <button type="submit" disabled={isLoading}>
               {isLoading ? 'Loading...' : 'Start Mapping'}
             </button>
           </form>
         ) : (
-          <Map nodes={nodes} edges={edges} setNodes={setNodes} setEdges={setEdges} />
+          <Map nodes={nodes} edges={edges} onNodeClick={onNodeClick} />
         )}
         {error && <p className="error-message">{error}</p>}
-        {isLoading && nodes.length > 0 && <p className="loading-message">Loading...</p>}
+        {isLoading && <p className="loading-message">Loading...</p>}
 
         {mapUrl && (
           <div className="map-result">

@@ -1,35 +1,26 @@
 import React from 'react';
 import ReactFlow, {
-  addEdge,
   Background,
   Controls,
   MiniMap,
 } from 'react-flow-renderer';
 
-const Map = ({ nodes, edges, setNodes, setEdges }) => {
-  const onConnect = (params) => setEdges((els) => addEdge(params, els));
-  const onNodesChange = (changes) => {
-    // This is a simplified way to handle node changes like dragging
-    const updatedNodes = nodes.map(node => {
-        const change = changes.find(c => c.id === node.id && c.type === 'position');
-        if (change && change.position) {
-            return { ...node, position: change.position };
-        }
-        return node;
-    });
-    setNodes(updatedNodes);
-  };
-
+const Map = ({ nodes, edges, onNodeClick }) => {
   return (
     <div className="map-view">
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onConnect={onConnect}
+        onNodeClick={onNodeClick}
         fitView
       >
-        <MiniMap />
+        <MiniMap nodeColor={n => {
+            if (n.style?.background) return n.style.background;
+            if (n.type === 'input') return '#0041d0';
+            if (n.type === 'output') return '#ff0072';
+            if (n.type === 'default') return '#1a192b';
+            return '#eee';
+        }}/>
         <Controls />
         <Background />
       </ReactFlow>
