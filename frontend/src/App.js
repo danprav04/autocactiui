@@ -3,30 +3,24 @@ import axios from 'axios';
 import { applyNodeChanges } from 'react-flow-renderer';
 import { toPng } from 'html-to-image';
 
-// Step 1: Import all necessary components and assets
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
 import CustomNode from './components/CustomNode';
+import { generateCactiConfig } from './services/configGenerator';
 import './App.css';
 
-// Step 2: Import your icons directly from the src folder
 import routerIcon from './assets/icons/router.png';
 import switchIcon from './assets/icons/switch.png';
 import firewallIcon from './assets/icons/firewall.png';
 
-
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
-// --- CONFIGURATION ---
-// Step 3: Create a map of display names to imported icon modules.
-// To add a new icon: import it above, then add it to this object.
 const AVAILABLE_ICONS = {
   'Router': routerIcon,
   'Switch': switchIcon,
   'Firewall': firewallIcon,
 };
 const DEFAULT_ICON_NAME = 'Router';
-// ---------------------
 
 function App() {
   const [nodes, setNodes] = useState([]);
@@ -36,7 +30,9 @@ function App() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentIconName, setCurrentIconName] = useState(DEFAULT_ICON_NAME);
+  const [mapName, setMapName] = useState('My-Network-Map');
   
+  const reactFlowWrapper = useRef(null);
   const initialIpRef = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
 
@@ -56,7 +52,7 @@ function App() {
       data: { 
         hostname: device.hostname, 
         ip: device.ip,
-        icon: AVAILABLE_ICONS[iconName] // Use the imported icon module
+        icon: AVAILABLE_ICONS[iconName]
       },
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
@@ -134,26 +130,62 @@ function App() {
   };
 
   const handleDownloadImage = () => {
-    const viewport = document.querySelector('.react-flow__viewport');
-    if (!viewport) {
+    const mapElement = reactFlowWrapper.current;
+    if (!mapElement) {
         setError('Could not find map to download.');
         return;
     }
-    toPng(viewport, { 
-        cacheBust: true,
-        backgroundColor: '#ffffff',
-        filter: (node) => (node.className !== 'react-flow__controls'),
-    })
-      .then((dataUrl) => {
+
+    // --- Prepare for a clean export ---
+    const originalEdges = edges;
+    // 1. Deselect all nodes
+    setNodes(nds => nds.map(n => ({...n, selected: false})));
+    // 2. Change edges to be straight lines for the export
+    setEdges(eds => eds.map(e => ({...e, type: 'straight', animated: false})));
+    // 3. Add a temporary class to the wrapper to hide UI elements via CSS
+    mapElement.classList.add('exporting');
+    
+    // Use a timeout to allow React to re-render with the changes before capturing
+    setTimeout(() => {
+        toPng(mapElement.querySelector('.react-flow__viewport'), { 
+            cacheBust: true,
+            backgroundColor: '#ffffff',
+            filter: (node) => (node.className !== 'react-flow__controls'),
+        })
+        .then((dataUrl) => {
+            const link = document.createElement('a');
+            link.download = `${mapName}.png`;
+            link.href = dataUrl;
+            link.click();
+        })
+        .catch((err) => {
+            setError('Could not generate map image.');
+            console.error(err);
+        })
+        .finally(() => {
+            // --- Cleanup after export ---
+            // 1. Restore original edges
+            setEdges(originalEdges);
+            // 2. Remove the temporary export class
+            mapElement.classList.remove('exporting');
+        });
+    }, 100);
+  };
+
+  const handleDownloadConfig = () => {
+    try {
+        const configContent = generateCactiConfig(nodes, edges, mapName);
+        const blob = new Blob([configContent], { type: 'text/plain;charset=utf-8' });
         const link = document.createElement('a');
-        link.download = 'network-map.png';
-        link.href = dataUrl;
+        link.href = URL.createObjectURL(blob);
+        link.download = `${mapName}.conf`;
+        document.body.appendChild(link);
         link.click();
-      })
-      .catch((err) => {
-          setError('Could not generate map image.');
-          console.error(err);
-      });
+        document.body.removeChild(link);
+    } catch (err) {
+        setError("Failed to generate config file.");
+        console.error(err);
+    }
   };
 
   return (
@@ -163,12 +195,15 @@ function App() {
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
         onDownloadImage={handleDownloadImage}
-        availableIcons={Object.keys(AVAILABLE_ICONS)} // Pass only the names
+        onDownloadConfig={handleDownloadConfig}
+        availableIcons={Object.keys(AVAILABLE_ICONS)}
         currentIconName={currentIconName}
         setCurrentIconName={setCurrentIconName}
+        mapName={mapName}
+        setMapName={setMapName}
         disabled={nodes.length === 0}
       />
-      <div className="main-content">
+      <div className="main-content" ref={reactFlowWrapper}>
         <h1>Interactive Network Map Creator</h1>
         {nodes.length === 0 ? (
           <form className="start-form" onSubmit={handleStart}>

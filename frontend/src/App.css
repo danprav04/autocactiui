@@ -35,10 +35,28 @@ body, html, #root {
     margin: 20px 0;
 }
 
+.control-group {
+    margin-bottom: 15px;
+}
+
+.control-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.control-group input[type="text"] {
+    width: calc(100% - 16px);
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
 .sidebar button {
   width: 100%;
   padding: 10px;
-  margin-bottom: 10px;
   background-color: #007bff;
   color: white;
   border: none;
@@ -46,15 +64,21 @@ body, html, #root {
   cursor: pointer;
   font-size: 16px;
   transition: background-color 0.2s;
+  margin-bottom: 10px;
+}
+
+.sidebar button.secondary {
+    background-color: #6c757d;
 }
 
 .sidebar button:hover {
-  background-color: #0056b3;
+  opacity: 0.9;
 }
 
 .sidebar button:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+  opacity: 1;
 }
 
 .icon-selector-section p {
@@ -163,6 +187,19 @@ body, html, #root {
   background-color: #ffffff;
 }
 
+/* --- Export and Watermark Styles --- */
+
+/* Hide the React Flow watermark */
+.react-flow__attribution {
+    display: none;
+}
+
+/* When the 'exporting' class is applied, hide connection handles */
+.exporting .react-flow__handle {
+    display: none;
+}
+
+
 .error-message {
   color: #dc3545;
   margin-top: 20px;
@@ -216,4 +253,5 @@ body, html, #root {
     height: 8px;
     background: #555;
     border-radius: 50%;
+    border: 1px solid white;
 }

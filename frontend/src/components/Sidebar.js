@@ -5,17 +5,37 @@ const Sidebar = ({
   neighbors, 
   onAddNeighbor, 
   onDownloadImage,
+  onDownloadConfig,
   availableIcons,
   currentIconName,
   setCurrentIconName,
+  mapName,
+  setMapName,
   disabled 
 }) => {
   return (
     <div className="sidebar">
       <h2>Controls</h2>
-      <button onClick={onDownloadImage} disabled={disabled}>
-        Download as PNG
-      </button>
+
+      <div className="control-group">
+        <label htmlFor="map-name-input">Map Name</label>
+        <input
+            id="map-name-input"
+            type="text"
+            value={mapName}
+            onChange={(e) => setMapName(e.target.value)}
+            disabled={disabled}
+        />
+      </div>
+
+      <div className="control-group">
+        <button onClick={onDownloadImage} disabled={disabled}>
+          Download Map (.png)
+        </button>
+        <button onClick={onDownloadConfig} disabled={disabled} className="secondary">
+          Download Config (.conf)
+        </button>
+      </div>
       <hr />
 
       {!disabled && (
