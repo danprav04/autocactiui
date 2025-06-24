@@ -9,16 +9,20 @@ import CustomNode from './components/CustomNode';
 import { generateCactiConfig } from './services/configGenerator';
 import './App.css';
 
-import routerIcon from './assets/icons/router.png';
-import switchIcon from './assets/icons/switch.png';
-import firewallIcon from './assets/icons/firewall.png';
+// Import new theme-aware icons
+import routerBlackIcon from './assets/icons/router-black.png';
+import routerWhiteIcon from './assets/icons/router-white.png';
+import switchBlackIcon from './assets/icons/switch-black.png';
+import switchWhiteIcon from './assets/icons/switch-white.png';
+import firewallIcon from './assets/icons/firewall.png'; // This icon is used for both themes
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
-const AVAILABLE_ICONS = {
-  'Router': routerIcon,
-  'Switch': switchIcon,
-  'Firewall': firewallIcon,
+// Define a structure for theme-based icons
+const ICONS_BY_THEME = {
+  'Router': { light: routerBlackIcon, dark: routerWhiteIcon },
+  'Switch': { light: switchBlackIcon, dark: switchWhiteIcon },
+  'Firewall': { light: firewallIcon, dark: firewallIcon }, // Fallback to the same icon
 };
 const DEFAULT_ICON_NAME = 'Router';
 
@@ -37,9 +41,30 @@ function App() {
   const initialIpRef = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
 
+  // Effect to apply the theme to the document body
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  // Effect to update node icons when the theme changes
+  useEffect(() => {
+    if (nodes.length > 0) {
+        setNodes(nds =>
+            nds.map(node => {
+                if (node.data.iconType && ICONS_BY_THEME[node.data.iconType]) {
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            icon: ICONS_BY_THEME[node.data.iconType][theme],
+                        },
+                    };
+                }
+                return node;
+            })
+        );
+    }
   }, [theme]);
 
   const toggleTheme = () => {
@@ -62,12 +87,13 @@ function App() {
       data: { 
         hostname: device.hostname, 
         ip: device.ip,
-        icon: AVAILABLE_ICONS[iconName]
+        iconType: iconName, // Store the category, e.g., 'Router'
+        icon: ICONS_BY_THEME[iconName][theme] // Set the initial icon based on the current theme
       },
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
     return newNode;
-  }, [nodes]);
+  }, [nodes, theme]);
 
   const handleFetchNeighbors = useCallback(async (ip) => {
     setIsLoading(true);
@@ -146,15 +172,35 @@ function App() {
         return;
     }
 
+    const wasDarkTheme = theme === 'dark';
+    
+    // Create temporary nodes with light-mode styles for the export
+    const exportNodes = nodes.map(node => ({
+        ...node,
+        selected: false,
+        data: {
+            ...node.data,
+            icon: ICONS_BY_THEME[node.data.iconType].light
+        }
+    }));
+    
+    const originalNodes = nodes;
     const originalEdges = edges;
-    setNodes(nds => nds.map(n => ({...n, selected: false})));
+
+    // Temporarily set state to render the light-mode export version
+    setNodes(exportNodes);
     setEdges(eds => eds.map(e => ({...e, type: 'straight', animated: false})));
     mapElement.classList.add('exporting');
-    
+
+    if (wasDarkTheme) {
+        document.body.setAttribute('data-theme', 'light');
+    }
+
+    // A short delay ensures the DOM has updated before the image is captured
     setTimeout(() => {
         toPng(mapElement.querySelector('.react-flow__viewport'), { 
             cacheBust: true,
-            backgroundColor: theme === 'light' ? '#ffffff' : '#18191a',
+            backgroundColor: '#ffffff', // Always use a white background for the PNG
             filter: (node) => (node.className !== 'react-flow__controls'),
         })
         .then((dataUrl) => {
@@ -168,10 +214,16 @@ function App() {
             console.error(err);
         })
         .finally(() => {
-            setEdges(originalEdges);
+            // Restore the original state
             mapElement.classList.remove('exporting');
+            if (wasDarkTheme) {
+                document.body.setAttribute('data-theme', 'dark');
+            }
+            // Restore the original nodes and edges
+            setNodes(originalNodes);
+            setEdges(originalEdges);
         });
-    }, 100);
+    }, 150);
   };
 
   const handleDownloadConfig = () => {
@@ -206,7 +258,7 @@ function App() {
         onAddNeighbor={handleAddNeighbor}
         onDownloadImage={handleDownloadImage}
         onDownloadConfig={handleDownloadConfig}
-        availableIcons={Object.keys(AVAILABLE_ICONS)}
+        availableIcons={Object.keys(ICONS_BY_THEME)}
         currentIconName={currentIconName}
         setCurrentIconName={setCurrentIconName}
         mapName={mapName}

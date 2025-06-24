@@ -311,44 +311,46 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 .loading-message { background-color: var(--bg-tertiary); color: var(--text-primary); }
 
 /* --- CUSTOM NODE --- */
-.custom-node-body {
-    background-color: var(--node-bg);
-    border: 2px solid var(--node-border);
-    border-radius: 50px; /* Makes it pill-shaped */
-    padding: 8px 16px;
+.custom-node {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 4px; /* Space between icon and text */
+    padding: 10px;
+    border-radius: 8px; /* Slightly rounded corners for selection highlight */
     transition: all 0.2s ease-in-out;
-    box-shadow: 0 2px 5px var(--node-shadow);
-    min-width: 150px;
+    background-color: transparent; /* No background color by default */
+    border: 2px solid transparent; /* Transparent border to prevent layout shift on selection */
+    cursor: pointer;
 }
-.custom-node-body.selected {
+.custom-node.selected {
     border-color: var(--node-selected-border);
-    transform: scale(1.05);
-    box-shadow: 0 0 10px var(--node-selected-border);
+    /* A subtle background on selection using a modern CSS function */
+    background-color: color-mix(in srgb, var(--node-selected-border) 15%, transparent);
 }
 .node-icon {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
 }
 .node-label {
     display: flex;
     flex-direction: column;
-    text-align: left;
+    text-align: center; /* Center the text underneath the icon */
 }
 .node-label strong {
-    font-size: 14px;
+    font-size: 16px; /* Bigger text for hostname */
+    font-weight: 600;
     color: var(--text-primary);
 }
 .node-label small {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 13px; /* Slightly larger for readability */
+    color: var(--text-secondary); /* Dimmer text for IP */
 }
 .custom-handle {
-    width: 10px;
-    height: 10px;
-    background: var(--node-border);
-    border-radius: 50%;
-    border: 2px solid var(--node-bg);
+    width: 1px;
+    height: 1px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    /* This makes the handles invisible while keeping them functional */
 }
