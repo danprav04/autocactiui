@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import { applyNodeChanges } from 'react-flow-renderer';
 import { toPng } from 'html-to-image';
@@ -31,10 +31,20 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentIconName, setCurrentIconName] = useState(DEFAULT_ICON_NAME);
   const [mapName, setMapName] = useState('My-Network-Map');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   
   const reactFlowWrapper = useRef(null);
   const initialIpRef = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+  };
 
   const onNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -136,20 +146,15 @@ function App() {
         return;
     }
 
-    // --- Prepare for a clean export ---
     const originalEdges = edges;
-    // 1. Deselect all nodes
     setNodes(nds => nds.map(n => ({...n, selected: false})));
-    // 2. Change edges to be straight lines for the export
     setEdges(eds => eds.map(e => ({...e, type: 'straight', animated: false})));
-    // 3. Add a temporary class to the wrapper to hide UI elements via CSS
     mapElement.classList.add('exporting');
     
-    // Use a timeout to allow React to re-render with the changes before capturing
     setTimeout(() => {
         toPng(mapElement.querySelector('.react-flow__viewport'), { 
             cacheBust: true,
-            backgroundColor: '#ffffff',
+            backgroundColor: theme === 'light' ? '#ffffff' : '#18191a',
             filter: (node) => (node.className !== 'react-flow__controls'),
         })
         .then((dataUrl) => {
@@ -163,10 +168,7 @@ function App() {
             console.error(err);
         })
         .finally(() => {
-            // --- Cleanup after export ---
-            // 1. Restore original edges
             setEdges(originalEdges);
-            // 2. Remove the temporary export class
             mapElement.classList.remove('exporting');
         });
     }, 100);
@@ -188,6 +190,14 @@ function App() {
     }
   };
 
+  const MoonIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  );
+
+  const SunIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+  );
+
   return (
     <div className="app-container">
       <Sidebar 
@@ -204,14 +214,20 @@ function App() {
         disabled={nodes.length === 0}
       />
       <div className="main-content" ref={reactFlowWrapper}>
-        <h1>Interactive Network Map Creator</h1>
+        <button onClick={toggleTheme} className="theme-toggle-button" title="Toggle Theme">
+          {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+        </button>
+
         {nodes.length === 0 ? (
-          <form className="start-form" onSubmit={handleStart}>
-            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP" defaultValue="10.10.1.3" />
-            <button type="submit" disabled={isLoading}>
-              {isLoading ? 'Loading...' : 'Start Mapping'}
-            </button>
-          </form>
+          <div className="start-container">
+            <h1>Interactive Network Map Creator</h1>
+            <form className="start-form" onSubmit={handleStart}>
+              <input type="text" ref={initialIpRef} placeholder="Enter starting device IP" defaultValue="10.10.1.3" />
+              <button type="submit" disabled={isLoading}>
+                {isLoading ? 'Loading...' : 'Start Mapping'}
+              </button>
+            </form>
+          </div>
         ) : (
           <Map 
             nodes={nodes} 
@@ -219,10 +235,11 @@ function App() {
             onNodeClick={onNodeClick} 
             onNodesChange={onNodesChange}
             nodeTypes={nodeTypes} 
+            theme={theme}
           />
         )}
         {error && <p className="error-message">{error}</p>}
-        {isLoading && <p className="loading-message">Loading...</p>}
+        {isLoading && !error && <p className="loading-message">Loading...</p>}
       </div>
     </div>
   );
