@@ -207,7 +207,7 @@ function App() {
         <h1>Interactive Network Map Creator</h1>
         {nodes.length === 0 ? (
           <form className="start-form" onSubmit={handleStart}>
-            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP" defaultValue="189.1.5.5" />
+            <input type="text" ref={initialIpRef} placeholder="Enter starting device IP" defaultValue="10.10.1.3" />
             <button type="submit" disabled={isLoading}>
               {isLoading ? 'Loading...' : 'Start Mapping'}
             </button>

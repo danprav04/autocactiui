@@ -5,8 +5,8 @@ import uuid
 # Mock Database simulating your network devices and connections
 MOCK_NETWORK = {
     "10.10.1.3": {"hostname": "Core-Router-1", "type": "Router", "neighbors": ["10.10.1.2", "10.10.2.2"]},
-    "10.10.1.2": {"hostname": "Dist-Switch-A", "type": "Switch", "neighbors": ["189.1.5.5", "192.168.1.10", "192.168.1.20"]},
-    "10.10.2.2": {"hostname": "Dist-Switch-B", "type": "Switch", "neighbors": ["189.1.5.5", "192.168.2.10"]},
+    "10.10.1.2": {"hostname": "Dist-Switch-A", "type": "Switch", "neighbors": ["10.10.1.3", "192.168.1.10", "192.168.1.20"]},
+    "10.10.2.2": {"hostname": "Dist-Switch-B", "type": "Switch", "neighbors": ["10.10.1.3", "192.168.2.10"]},
     "192.168.1.10": {"hostname": "Access-SW-A1", "type": "Switch", "neighbors": ["10.10.1.2"]},
     "192.168.1.20": {"hostname": "Access-SW-A2", "type": "Switch", "neighbors": ["10.10.1.2"]},
     "192.168.2.10": {"hostname": "Access-SW-B1", "type": "Switch", "neighbors": ["10.10.2.2", "172.16.10.5"]},
