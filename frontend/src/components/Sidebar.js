@@ -6,12 +6,14 @@ const Sidebar = ({
   onAddNeighbor, 
   onDownloadImage,
   onDownloadConfig,
+  onUploadMap,
   availableIcons,
   currentIconName,
   setCurrentIconName,
   mapName,
   setMapName,
-  disabled 
+  disabled,
+  isUploading
 }) => {
   return (
     <div className="sidebar">
@@ -30,7 +32,10 @@ const Sidebar = ({
         </div>
 
         <div className="control-group">
-          <button onClick={onDownloadImage} disabled={disabled}>
+          <button onClick={onUploadMap} disabled={disabled || isUploading}>
+            {isUploading ? 'Uploading...' : 'Upload to Cacti'}
+          </button>
+          <button onClick={onDownloadImage} disabled={disabled} className="secondary">
             Download Map (.png)
           </button>
           <button onClick={onDownloadConfig} disabled={disabled} className="secondary">
@@ -76,7 +81,7 @@ const Sidebar = ({
                             {neighbors.map(neighbor => (
                                 <li key={neighbor.ip}>
                                 <span>
-                                    {neighbor.hostname}
+                                    {neighbor.neighbor}
                                     <br/>
                                     <small>{neighbor.ip}</small>
                                 </span>

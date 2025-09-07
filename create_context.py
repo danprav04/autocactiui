@@ -49,6 +49,7 @@ IGNORE_EXTENSIONS = [
     '.mp4',
     '.mov',
     '.avi',
+    '.svg',
     '.key' # Explicitly ignore key files as a safeguard
 ]
 
