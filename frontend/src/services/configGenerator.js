@@ -66,6 +66,10 @@ export function generateCactiConfig(nodes, edges, mapName) {
   const nodeInfoMap = new Map(nodes.map(node => [node.id, node]));
   let nodeCounter = 1;
 
+  // Define accurate node dimensions based on App.css for center calculations.
+  const NODE_WIDTH = 150;
+  const NODE_HEIGHT = 110; // Approximate height from visual inspection.
+
   // --- 1. Create Device NODE entries (the visible icons) ---
   for (const node of nodes) {
     const cactiNodeId = `node${String(nodeCounter++).padStart(5, '0')}`;
@@ -85,10 +89,10 @@ export function generateCactiConfig(nodes, edges, mapName) {
             break;
     }
 
-    // React Flow position is top-left. Node component is roughly 100x80.
-    // We position the Cacti node at the visual center.
-    const centerX = Math.round(node.position.x + 50);
-    const centerY = Math.round(node.position.y + 40);
+    // React Flow position is top-left. Cacti Weathermap position is the center.
+    // Calculate the visual center of the node for accurate placement.
+    const centerX = Math.round(node.position.x + (NODE_WIDTH / 2));
+    const centerY = Math.round(node.position.y + (NODE_HEIGHT / 2));
 
     nodeStrings.push(
       DEVICE_NODE_TEMPLATE.replace('{id}', cactiNodeId)
@@ -100,8 +104,9 @@ export function generateCactiConfig(nodes, edges, mapName) {
   }
 
   // --- 2. Create LINKs and their invisible endpoint NODEs ---
-  // Increased offset to ensure lines do not overlap with node labels.
-  const LINK_ENDPOINT_OFFSET = 50; 
+  // This offset pushes the start/end of a link away from the node's center.
+  // Set to 75 to ensure the line's endpoint is visible outside the main node graphic.
+  const LINK_ENDPOINT_OFFSET = 75; 
 
   for (const edge of edges) {
     const sourceNodeInfo = nodeInfoMap.get(edge.source);
@@ -109,11 +114,11 @@ export function generateCactiConfig(nodes, edges, mapName) {
 
     if (!sourceNodeInfo || !targetNodeInfo) continue;
 
-    // Center positions of the connected devices
-    const x1 = sourceNodeInfo.position.x + 50;
-    const y1 = sourceNodeInfo.position.y + 40;
-    const x2 = targetNodeInfo.position.x + 50;
-    const y2 = targetNodeInfo.position.y + 40;
+    // Calculate center positions of the connected devices using accurate dimensions.
+    const x1 = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
+    const y1 = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
+    const x2 = targetNodeInfo.position.x + (NODE_WIDTH / 2);
+    const y2 = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
 
     const dx = x2 - x1;
     const dy = y2 - y1;
