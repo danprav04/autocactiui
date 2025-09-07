@@ -5,8 +5,6 @@ import switchBlackIcon from '../assets/icons/switch-black.png';
 import switchWhiteIcon from '../assets/icons/switch-white.png';
 import firewallIcon from '../assets/icons/firewall.png';
 
-export const API_BASE_URL = process.env.REACT_APP_API_URL || '';
-
 /**
  * Defines the icon assets to be used for each device type, based on the current theme.
  */
