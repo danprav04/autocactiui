@@ -48,11 +48,13 @@ MOCK_NEIGHBORS = {
     ],
     "10.10.1.2": [
         {"interface": "TenGigabitEthernet1/1/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink to Core"},
+        {"interface": "TenGigabitEthernet1/1/2", "neighbor": "Dist-Switch-B", "ip": "10.10.2.2", "description": "VRRP Link to Dist-B"},
         {"interface": "GigabitEthernet2/0/1", "neighbor": "Access-SW-A1", "ip": "192.168.1.10", "description": "To Access-SW-A1"},
         {"interface": "GigabitEthernet2/0/2", "neighbor": "Access-SW-A2", "ip": "192.168.1.20", "description": "To Access-SW-A2"},
     ],
     "10.10.2.2": [
         {"interface": "TenGigabitEthernet1/1/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink to Core"},
+        {"interface": "TenGigabitEthernet1/1/2", "neighbor": "Dist-Switch-A", "ip": "10.10.1.2", "description": "VRRP Link to Dist-A"},
         {"interface": "GigabitEthernet2/0/1", "neighbor": "Access-SW-B1", "ip": "192.168.2.10", "description": "To Access-SW-B1"},
     ],
     "192.168.1.10": [

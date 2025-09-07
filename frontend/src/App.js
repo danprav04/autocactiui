@@ -97,24 +97,22 @@ function App() {
     [setNodes]
   );
 
-  const addNode = useCallback((device, position, iconName) => {
-    const existingNode = nodes.find(n => n.id === device.ip);
-    if (existingNode) return existingNode;
+  const createNodeObject = useCallback((device, position, explicitIconName) => {
+    const iconName = explicitIconName || device.type || DEFAULT_ICON_NAME;
+    const finalIconName = ICONS_BY_THEME[iconName] ? iconName : DEFAULT_ICON_NAME;
 
-    const newNode = {
+    return {
       id: device.ip,
       type: 'custom',
       position: position || { x: (Math.random() * 400) + 100, y: (Math.random() * 400) + 50 },
       data: { 
         hostname: device.hostname, 
         ip: device.ip,
-        iconType: iconName,
-        icon: ICONS_BY_THEME[iconName][theme]
+        iconType: finalIconName,
+        icon: ICONS_BY_THEME[finalIconName][theme]
       },
     };
-    setNodes(prevNodes => [...prevNodes, newNode]);
-    return newNode;
-  }, [nodes, theme]);
+  }, [theme]);
 
   const handleFetchNeighbors = useCallback(async (ip) => {
     setIsLoading(true);
@@ -136,31 +134,83 @@ function App() {
     handleFetchNeighbors(node.id);
   }, [handleFetchNeighbors]);
 
-  const handleAddNeighbor = useCallback((neighbor) => {
+  const handleAddNeighbor = useCallback(async (neighbor) => {
     if (!selectedNode) {
       setError("Please select a node on the map before adding a neighbor.");
       return;
     }
+    if (nodes.some(n => n.id === neighbor.ip)) {
+      return; // Safeguard: don't re-add an existing node.
+    }
     
-    const newPosition = {
-        x: selectedNode.position.x + Math.random() * 200 - 100,
-        y: selectedNode.position.y + 120,
-    };
+    setIsLoading(true);
+    setError('');
 
-    const deviceToAdd = { ip: neighbor.ip, hostname: neighbor.neighbor };
-    addNode(deviceToAdd, newPosition, currentIconName);
-    
-    const newEdge = { 
-      id: `e-${selectedNode.id}-${neighbor.ip}`, 
-      source: selectedNode.id, 
-      target: neighbor.ip, 
-      animated: true,
-      style: { stroke: '#6c757d' },
-      data: { interface: neighbor.interface } // Store interface name from neighbor data
-    };
-    setEdges(prevEdges => [...prevEdges, newEdge]);
-    setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
-  }, [addNode, selectedNode, currentIconName]);
+    try {
+      // 1. Get full device info for the neighbor to determine its type for the icon
+      const deviceResponse = await axios.get(`${API_BASE_URL}/get-device-info/${neighbor.ip}`);
+      if (!deviceResponse.data || deviceResponse.data.error) {
+        throw new Error(`Could not get device info for ${neighbor.ip}`);
+      }
+      const deviceToAdd = deviceResponse.data;
+      
+      // 2. Create the new node object and the initial edge from the source node
+      const newPosition = {
+          x: selectedNode.position.x + (Math.random() * 250 - 125),
+          y: selectedNode.position.y + 150,
+      };
+      const newNode = createNodeObject(deviceToAdd, newPosition);
+
+      const initialEdge = { 
+        id: `e-${selectedNode.id}-${newNode.id}`, 
+        source: selectedNode.id, 
+        target: newNode.id, 
+        animated: true,
+        style: { stroke: '#6c757d' },
+        data: { interface: neighbor.interface }
+      };
+
+      // 3. Fetch neighbors of the NEWLY added node to check for other existing connections
+      const newDeviceNeighborsResponse = await axios.get(`${API_BASE_URL}/get-device-neighbors/${newNode.id}`);
+      const newDeviceNeighbors = newDeviceNeighborsResponse.data.neighbors || [];
+
+      // 4. Find which of the new device's neighbors are already on the map and create edges
+      const edgesToAdd = [];
+      const allNodes = [...nodes, newNode]; // A temporary, up-to-date list of all nodes
+
+      newDeviceNeighbors.forEach(newNeighbor => {
+        const existingNode = allNodes.find(n => n.id === newNeighbor.ip);
+        if (existingNode) {
+          const edgeExists = edges.some(
+            e => (e.source === newNode.id && e.target === existingNode.id) || (e.source === existingNode.id && e.target === newNode.id)
+          );
+          const isInitialEdge = (initialEdge.source === newNode.id && initialEdge.target === existingNode.id) || (initialEdge.source === existingNode.id && initialEdge.target === newNode.id);
+
+          if (!edgeExists && !isInitialEdge) {
+            edgesToAdd.push({
+              id: `e-${newNode.id}-${existingNode.id}`,
+              source: newNode.id,
+              target: existingNode.id,
+              animated: true,
+              style: { stroke: '#6c757d' },
+              data: { interface: newNeighbor.interface }
+            });
+          }
+        }
+      });
+        
+      // 5. Atomically update state
+      setNodes(prevNodes => [...prevNodes, newNode]);
+      setEdges(prevEdges => [...prevEdges, initialEdge, ...edgesToAdd]);
+      setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
+
+    } catch(err) {
+        setError(`Failed to add neighbor ${neighbor.ip}.`);
+        console.error(err);
+    } finally {
+        setIsLoading(false);
+    }
+  }, [createNodeObject, selectedNode, nodes, edges]);
   
   const handleStart = async (e) => {
     e.preventDefault();
@@ -172,18 +222,20 @@ function App() {
     
     setIsLoading(true);
     setError('');
-    setNodes([]);
-    setEdges([]);
     setSelectedNode(null);
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/devices`, { ip });
       const initialDevice = response.data;
-      const newNode = addNode(initialDevice, { x: 400, y: 150 }, currentIconName);
+      const newNode = createNodeObject(initialDevice, { x: 400, y: 150 }, currentIconName);
+      
+      setNodes([newNode]);
+      setEdges([]);
       onNodeClick(null, newNode);
     } catch (err) {
       setError('Failed to find the initial device. Please check the IP and try again.');
       setNodes([]);
+      setEdges([]);
     } finally {
       setIsLoading(false);
     }
