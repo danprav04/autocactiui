@@ -1,31 +1,16 @@
 // frontend/src/App.js
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import axios from 'axios';
 import { applyNodeChanges } from 'react-flow-renderer';
-import { toBlob } from 'html-to-image';
 
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
 import CustomNode from './components/CustomNode';
-import { generateCactiConfig } from './services/configGenerator';
+import StartupScreen from './components/Startup/StartupScreen';
+import ThemeToggleButton from './components/common/ThemeToggleButton';
+import * as api from './services/apiService';
+import { handleUploadProcess } from './services/mapExportService';
+import { ICONS_BY_THEME, DEFAULT_ICON_NAME } from './config/constants';
 import './App.css';
-
-// Import new theme-aware icons
-import routerBlackIcon from './assets/icons/router-black.png';
-import routerWhiteIcon from './assets/icons/router-white.png';
-import switchBlackIcon from './assets/icons/switch-black.png';
-import switchWhiteIcon from './assets/icons/switch-white.png';
-import firewallIcon from './assets/icons/firewall.png'; // This icon is used for both themes
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || '';
-
-// Define a structure for theme-based icons
-const ICONS_BY_THEME = {
-  'Router': { light: routerBlackIcon, dark: routerWhiteIcon },
-  'Switch': { light: switchBlackIcon, dark: switchWhiteIcon },
-  'Firewall': { light: firewallIcon, dark: firewallIcon }, // Fallback to the same icon
-};
-const DEFAULT_ICON_NAME = 'Router';
 
 function App() {
   const [nodes, setNodes] = useState([]);
@@ -42,23 +27,21 @@ function App() {
   const [selectedCactiId, setSelectedCactiId] = useState('');
   
   const reactFlowWrapper = useRef(null);
-  const initialIpRef = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
 
-  // Effect to apply the theme to the document body
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Effect to fetch cacti installations on component mount
   useEffect(() => {
     const fetchCactiInstallations = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/get-all-cacti-installations`);
-            if (response.data.status === 'success' && response.data.data.length > 0) {
-                setCactiInstallations(response.data.data);
-                setSelectedCactiId(response.data.data[0].id);
+            const response = await api.getAllCactiInstallations();
+            const installations = response.data.data;
+            if (response.data.status === 'success' && installations.length > 0) {
+                setCactiInstallations(installations);
+                setSelectedCactiId(installations[0].id);
             }
         } catch (err) {
             setError('Could not fetch Cacti installations.');
@@ -68,39 +51,27 @@ function App() {
     fetchCactiInstallations();
   }, []);
 
-  // Effect to update node icons when the theme changes
   useEffect(() => {
     if (nodes.length > 0) {
         setNodes(nds =>
             nds.map(node => {
-                if (node.data.iconType && ICONS_BY_THEME[node.data.iconType]) {
-                    return {
-                        ...node,
-                        data: {
-                            ...node.data,
-                            icon: ICONS_BY_THEME[node.data.iconType][theme],
-                        },
-                    };
+                const iconType = node.data.iconType;
+                if (iconType && ICONS_BY_THEME[iconType]) {
+                    return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
                 }
                 return node;
             })
         );
     }
-  }, [theme, nodes.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
-  };
-
-  const onNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    [setNodes]
-  );
+  const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+  const onNodesChange = useCallback((changes) => setNodes(nds => applyNodeChanges(changes, nds)), []);
 
   const createNodeObject = useCallback((device, position, explicitIconName) => {
     const iconName = explicitIconName || device.type || DEFAULT_ICON_NAME;
     const finalIconName = ICONS_BY_THEME[iconName] ? iconName : DEFAULT_ICON_NAME;
-
     return {
       id: device.ip,
       type: 'custom',
@@ -118,7 +89,7 @@ function App() {
     setIsLoading(true);
     setError('');
     try {
-      const response = await axios.get(`${API_BASE_URL}/get-device-neighbors/${ip}`);
+      const response = await api.getDeviceNeighbors(ip);
       setNeighbors(response.data.neighbors.filter(n => !nodes.some(node => node.id === n.ip)));
     } catch (err) {
       setError(`Could not fetch neighbors for IP ${ip}.`);
@@ -129,81 +100,38 @@ function App() {
   }, [nodes]);
   
   const onNodeClick = useCallback((event, node) => {
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id })));
+    setNodes(nds => nds.map(n => ({ ...n, selected: n.id === node.id })));
     setSelectedNode(node);
     handleFetchNeighbors(node.id);
   }, [handleFetchNeighbors]);
 
   const handleAddNeighbor = useCallback(async (neighbor) => {
-    if (!selectedNode) {
-      setError("Please select a node on the map before adding a neighbor.");
-      return;
-    }
-    if (nodes.some(n => n.id === neighbor.ip)) {
-      return; // Safeguard: don't re-add an existing node.
-    }
+    if (!selectedNode || nodes.some(n => n.id === neighbor.ip)) return;
     
     setIsLoading(true);
     setError('');
-
     try {
-      // 1. Get full device info for the neighbor to determine its type for the icon
-      const deviceResponse = await axios.get(`${API_BASE_URL}/get-device-info/${neighbor.ip}`);
-      if (!deviceResponse.data || deviceResponse.data.error) {
-        throw new Error(`Could not get device info for ${neighbor.ip}`);
-      }
-      const deviceToAdd = deviceResponse.data;
+      const deviceResponse = await api.getDeviceInfo(neighbor.ip);
+      if (!deviceResponse.data || deviceResponse.data.error) throw new Error(`No info for ${neighbor.ip}`);
       
-      // 2. Create the new node object and the initial edge from the source node
-      const newPosition = {
-          x: selectedNode.position.x + (Math.random() * 250 - 125),
-          y: selectedNode.position.y + 150,
-      };
-      const newNode = createNodeObject(deviceToAdd, newPosition);
+      const newPosition = { x: selectedNode.position.x + (Math.random() * 250 - 125), y: selectedNode.position.y + 150 };
+      const newNode = createNodeObject(deviceResponse.data, newPosition);
 
-      const initialEdge = { 
-        id: `e-${selectedNode.id}-${newNode.id}`, 
-        source: selectedNode.id, 
-        target: newNode.id, 
-        animated: true,
-        style: { stroke: '#6c757d' },
-        data: { interface: neighbor.interface }
-      };
-
-      // 3. Fetch neighbors of the NEWLY added node to check for other existing connections
-      const newDeviceNeighborsResponse = await axios.get(`${API_BASE_URL}/get-device-neighbors/${newNode.id}`);
-      const newDeviceNeighbors = newDeviceNeighborsResponse.data.neighbors || [];
-
-      // 4. Find which of the new device's neighbors are already on the map and create edges
-      const edgesToAdd = [];
-      const allNodes = [...nodes, newNode]; // A temporary, up-to-date list of all nodes
-
-      newDeviceNeighbors.forEach(newNeighbor => {
-        const existingNode = allNodes.find(n => n.id === newNeighbor.ip);
-        if (existingNode) {
-          const edgeExists = edges.some(
-            e => (e.source === newNode.id && e.target === existingNode.id) || (e.source === existingNode.id && e.target === newNode.id)
-          );
-          const isInitialEdge = (initialEdge.source === newNode.id && initialEdge.target === existingNode.id) || (initialEdge.source === existingNode.id && initialEdge.target === newNode.id);
-
-          if (!edgeExists && !isInitialEdge) {
-            edgesToAdd.push({
-              id: `e-${newNode.id}-${existingNode.id}`,
-              source: newNode.id,
-              target: existingNode.id,
-              animated: true,
-              style: { stroke: '#6c757d' },
-              data: { interface: newNeighbor.interface }
-            });
+      const newNeighborsResponse = await api.getDeviceNeighbors(newNode.id);
+      const newDeviceNeighbors = newNeighborsResponse.data.neighbors || [];
+      
+      const allNodes = [...nodes, newNode];
+      const newEdges = newDeviceNeighbors.reduce((acc, newNeighbor) => {
+          const existingNode = allNodes.find(n => n.id === newNeighbor.ip);
+          if (existingNode && !edges.some(e => (e.source === newNode.id && e.target === existingNode.id) || (e.source === existingNode.id && e.target === newNode.id))) {
+              acc.push({ id: `e-${newNode.id}-${existingNode.id}`, source: newNode.id, target: existingNode.id, animated: true, style: { stroke: '#6c757d' } });
           }
-        }
-      });
-        
-      // 5. Atomically update state
-      setNodes(prevNodes => [...prevNodes, newNode]);
-      setEdges(prevEdges => [...prevEdges, initialEdge, ...edgesToAdd]);
-      setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
+          return acc;
+      }, []);
 
+      setNodes(prev => [...prev, newNode]);
+      setEdges(prev => [...prev, ...newEdges]);
+      setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
     } catch(err) {
         setError(`Failed to add neighbor ${neighbor.ip}.`);
         console.error(err);
@@ -212,23 +140,15 @@ function App() {
     }
   }, [createNodeObject, selectedNode, nodes, edges]);
   
-  const handleStart = async (e) => {
-    e.preventDefault();
-    const ip = initialIpRef.current.value;
-    if (!ip) {
-      setError('Please enter a starting IP address.');
-      return;
-    }
+  const handleStart = async (ip) => {
+    if (!ip) { setError('Please enter a starting IP address.'); return; }
     
     setIsLoading(true);
     setError('');
     setSelectedNode(null);
-
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/devices`, { ip });
-      const initialDevice = response.data;
-      const newNode = createNodeObject(initialDevice, { x: 400, y: 150 }, currentIconName);
-      
+      const response = await api.getInitialDevice(ip);
+      const newNode = createNodeObject(response.data, { x: 400, y: 150 }, currentIconName);
       setNodes([newNode]);
       setEdges([]);
       onNodeClick(null, newNode);
@@ -242,144 +162,29 @@ function App() {
   };
 
   const handleUploadMap = async () => {
-    const mapElement = reactFlowWrapper.current;
-    if (!mapElement || nodes.length === 0) {
-        setError('Cannot upload an empty map.');
-        return;
-    }
-    if (!selectedCactiId) {
-        setError('Please select a Cacti installation first.');
-        return;
-    }
+    if (!reactFlowWrapper.current || nodes.length === 0) { setError('Cannot upload an empty map.'); return; }
+    if (!selectedCactiId) { setError('Please select a Cacti installation first.'); return; }
     
     setIsUploading(true);
     setError('');
-
-    const wasDarkTheme = theme === 'dark';
-    const originalNodes = nodes;
-    const originalEdges = edges;
-
-    // Prepare nodes for export: deselected and with light-theme icons
-    const exportNodes = nodes.map(node => ({
-        ...node,
-        selected: false,
-        data: {
-            ...node.data,
-            icon: ICONS_BY_THEME[node.data.iconType].light
-        }
-    }));
-    
-    const exportEdges = edges.map(edge => ({
-        ...edge,
-        animated: false,
-        type: 'straight',
-        style: { stroke: '#000000', strokeWidth: 2 }
-    }));
-
-    setNodes(exportNodes);
-    setEdges(exportEdges);
-    mapElement.classList.add('exporting');
-    if (wasDarkTheme) {
-        document.body.setAttribute('data-theme', 'light');
+    try {
+      await handleUploadProcess({
+        mapElement: reactFlowWrapper.current,
+        nodes,
+        edges,
+        mapName,
+        cactiId: selectedCactiId,
+        theme,
+        setNodes,
+        setEdges
+      });
+    } catch (err) {
+      setError('Failed to upload map to Cacti.');
+      console.error(err);
+    } finally {
+      setIsUploading(false);
     }
-    
-    setTimeout(() => {
-        const viewport = mapElement.querySelector('.react-flow__viewport');
-        if (!viewport) {
-            setError('Could not find map viewport for export.');
-            setIsUploading(false);
-            return;
-        }
-
-        // --- 720p EXPORT DIMENSION & TRANSFORM CALCULATION ---
-        const targetWidth = 1280;
-        const targetHeight = 720;
-        const padding = 80; // Whitespace margin inside the 720p frame
-
-        // Approximate node dimensions from new CSS (.custom-node width + height)
-        const nodeWidth = 150;
-        const nodeHeight = 110;
-
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-        if (originalNodes.length === 0) {
-            // Handle empty map by just taking a blank screenshot
-            minX = 0; minY = 0; maxX = 0; maxY = 0;
-        } else {
-            originalNodes.forEach(node => {
-                minX = Math.min(minX, node.position.x);
-                minY = Math.min(minY, node.position.y);
-                maxX = Math.max(maxX, node.position.x + nodeWidth);
-                maxY = Math.max(maxY, node.position.y + nodeHeight);
-            });
-        }
-        
-        const boundsWidth = (maxX - minX) || 1; // prevent division by zero
-        const boundsHeight = (maxY - minY) || 1; // prevent division by zero
-
-        // Calculate scale to fit bounds within target dimensions + padding
-        const scaleX = (targetWidth - padding * 2) / boundsWidth;
-        const scaleY = (targetHeight - padding * 2) / boundsHeight;
-        const scale = Math.min(scaleX, scaleY, 1); // Use the smaller scale, and don't scale up (max 1)
-
-        // Calculate translation to center the scaled content
-        const scaledBoundsWidth = boundsWidth * scale;
-        const scaledBoundsHeight = boundsHeight * scale;
-
-        const translateX = ((targetWidth - scaledBoundsWidth) / 2) - (minX * scale);
-        const translateY = ((targetHeight - scaledBoundsHeight) / 2) - (minY * scale);
-        
-        const originalTransform = viewport.style.transform;
-        // Apply the new transform for the screenshot
-        viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-
-        toBlob(viewport, { 
-            width: targetWidth,
-            height: targetHeight,
-            backgroundColor: '#ffffff',
-            filter: (node) => (node.className !== 'react-flow__controls'),
-        })
-        .then(async (blob) => {
-            if (!blob) {
-                throw new Error('Failed to create image blob.');
-            }
-            const configContent = generateCactiConfig(originalNodes, originalEdges, mapName);
-            const formData = new FormData();
-            formData.append('map_image', blob, `${mapName}.png`);
-            formData.append('config_content', configContent);
-            formData.append('map_name', mapName);
-            formData.append('cacti_installation_id', selectedCactiId);
-
-            await axios.post(`${API_BASE_URL}/upload-map`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-        })
-        .catch((err) => {
-            setError('Failed to upload map to Cacti.');
-            console.error(err);
-        })
-        .finally(() => {
-            // Restore original state
-            viewport.style.transform = originalTransform;
-            mapElement.classList.remove('exporting');
-            if (wasDarkTheme) {
-                document.body.setAttribute('data-theme', 'dark');
-            }
-            setNodes(originalNodes);
-            setEdges(originalEdges);
-            setIsUploading(false);
-        });
-    }, 200);
   };
-
-
-  const MoonIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-  );
-
-  const SunIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-  );
 
   return (
     <div className="app-container">
@@ -400,20 +205,9 @@ function App() {
         setSelectedCactiId={setSelectedCactiId}
       />
       <div className="main-content" ref={reactFlowWrapper}>
-        <button onClick={toggleTheme} className="theme-toggle-button" title="Toggle Theme">
-          {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-        </button>
-
+        <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
         {nodes.length === 0 ? (
-          <div className="start-container">
-            <h1>Interactive Network Map Creator</h1>
-            <form className="start-form" onSubmit={handleStart}>
-              <input type="text" ref={initialIpRef} placeholder="Enter starting device IP" defaultValue="10.10.1.3" />
-              <button type="submit" disabled={isLoading}>
-                {isLoading ? 'Loading...' : 'Start Mapping'}
-              </button>
-            </form>
-          </div>
+          <StartupScreen onStart={handleStart} isLoading={isLoading} />
         ) : (
           <Map 
             nodes={nodes} 
