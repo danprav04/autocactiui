@@ -57,7 +57,6 @@ function App() {
             const response = await axios.get(`${API_BASE_URL}/get-all-cacti-installations`);
             if (response.data.status === 'success' && response.data.data.length > 0) {
                 setCactiInstallations(response.data.data);
-                // Set a default selection
                 setSelectedCactiId(response.data.data[0].id);
             }
         } catch (err) {
@@ -108,8 +107,8 @@ function App() {
       data: { 
         hostname: device.hostname, 
         ip: device.ip,
-        iconType: iconName, // Store the category, e.g., 'Router'
-        icon: ICONS_BY_THEME[iconName][theme] // Set the initial icon based on the current theme
+        iconType: iconName,
+        icon: ICONS_BY_THEME[iconName][theme]
       },
     };
     setNodes(prevNodes => [...prevNodes, newNode]);
@@ -121,7 +120,6 @@ function App() {
     setError('');
     try {
       const response = await axios.get(`${API_BASE_URL}/get-device-neighbors/${ip}`);
-      // Adapt to the new API response structure: { "neighbors": [...] }
       setNeighbors(response.data.neighbors.filter(n => !nodes.some(node => node.id === n.ip)));
     } catch (err) {
       setError(`Could not fetch neighbors for IP ${ip}.`);
@@ -148,7 +146,6 @@ function App() {
         y: selectedNode.position.y + 120,
     };
 
-    // Adapt to the new neighbor object structure from the API
     const deviceToAdd = { ip: neighbor.ip, hostname: neighbor.neighbor };
     addNode(deviceToAdd, newPosition, currentIconName);
     
@@ -178,7 +175,6 @@ function App() {
     setSelectedNode(null);
 
     try {
-      // Use the endpoint for the initial device
       const response = await axios.post(`${API_BASE_URL}/api/devices`, { ip });
       const initialDevice = response.data;
       const newNode = addNode(initialDevice, { x: 400, y: 150 }, currentIconName);
@@ -194,7 +190,7 @@ function App() {
   const handleUploadMap = async () => {
     const mapElement = reactFlowWrapper.current;
     if (!mapElement) {
-        setError('Could not find map to upload.');
+        setError('Could not find map element to upload.');
         return;
     }
     if (!selectedCactiId) {
@@ -205,32 +201,111 @@ function App() {
     setIsUploading(true);
     setError('');
 
-    try {
-        const imageBlob = await toBlob(mapElement.querySelector('.react-flow__viewport'), {
-            cacheBust: true,
+    const wasDarkTheme = theme === 'dark';
+    const originalNodes = nodes;
+    const originalEdges = edges;
+
+    const exportNodes = nodes.map(node => ({
+        ...node,
+        selected: false,
+        data: {
+            ...node.data,
+            icon: ICONS_BY_THEME[node.data.iconType].light
+        }
+    }));
+    
+    const exportEdges = edges.map(edge => ({
+        ...edge,
+        animated: false,
+        type: 'straight',
+        style: { stroke: '#000000', strokeWidth: 2 }
+    }));
+
+    setNodes(exportNodes);
+    setEdges(exportEdges);
+    mapElement.classList.add('exporting');
+    if (wasDarkTheme) {
+        document.body.setAttribute('data-theme', 'light');
+    }
+    
+    setTimeout(() => {
+        const viewport = mapElement.querySelector('.react-flow__viewport');
+        if (!viewport) {
+            setError('Could not find map viewport for export.');
+            setIsUploading(false);
+            return;
+        }
+
+        const imageWidth = 1920;
+        const imageHeight = 1080;
+        const padding = 150;
+
+        const nodeWidth = 100;
+        const nodeHeight = 80;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        if (originalNodes.length === 0) {
+            minX = 0; minY = 0; maxX = imageWidth; maxY = imageHeight;
+        } else {
+            originalNodes.forEach(node => {
+                minX = Math.min(minX, node.position.x);
+                minY = Math.min(minY, node.position.y);
+                maxX = Math.max(maxX, node.position.x + nodeWidth);
+                maxY = Math.max(maxY, node.position.y + nodeHeight);
+            });
+        }
+
+        const boundsWidth = maxX - minX;
+        const boundsHeight = maxY - minY;
+
+        const scaleX = (imageWidth - padding * 2) / boundsWidth;
+        const scaleY = (imageHeight - padding * 2) / boundsHeight;
+        const scale = Math.min(scaleX, scaleY, 1);
+
+        const scaledWidth = boundsWidth * scale;
+        const scaledHeight = boundsHeight * scale;
+        const translateX = (-minX * scale) + (imageWidth - scaledWidth) / 2;
+        const translateY = (-minY * scale) + (imageHeight - scaledHeight) / 2;
+        
+        const originalTransform = viewport.style.transform;
+        viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+
+        toBlob(viewport, { 
+            width: imageWidth,
+            height: imageHeight,
             backgroundColor: '#ffffff',
             filter: (node) => (node.className !== 'react-flow__controls'),
+        })
+        .then(async (blob) => {
+            if (!blob) {
+                throw new Error('Failed to create image blob.');
+            }
+            const configContent = generateCactiConfig(originalNodes, originalEdges, mapName);
+            const formData = new FormData();
+            formData.append('map_image', blob, `${mapName}.png`);
+            formData.append('config_content', configContent);
+            formData.append('map_name', mapName);
+            formData.append('cacti_installation_id', selectedCactiId);
+
+            await axios.post(`${API_BASE_URL}/upload-map`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+        })
+        .catch((err) => {
+            setError('Failed to upload map to Cacti.');
+            console.error(err);
+        })
+        .finally(() => {
+            viewport.style.transform = originalTransform;
+            mapElement.classList.remove('exporting');
+            if (wasDarkTheme) {
+                document.body.setAttribute('data-theme', 'dark');
+            }
+            setNodes(originalNodes);
+            setEdges(originalEdges);
+            setIsUploading(false);
         });
-
-        const configContent = generateCactiConfig(nodes, edges, mapName);
-
-        const formData = new FormData();
-        formData.append('map_image', imageBlob, `${mapName}.png`);
-        formData.append('config_content', configContent);
-        formData.append('map_name', mapName);
-        formData.append('cacti_installation_id', selectedCactiId);
-
-        await axios.post(`${API_BASE_URL}/upload-map`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        // Optionally, add a success message here
-    } catch (err) {
-        setError('Failed to upload map to Cacti.');
-        console.error(err);
-    } finally {
-        setIsUploading(false);
-    }
+    }, 200);
   };
 
 

@@ -1,5 +1,6 @@
 import os
 import uuid
+from PIL import Image
 
 # Mock Database simulating your network devices and connections based on the new API spec
 MOCK_NETWORK = {
@@ -108,24 +109,26 @@ def get_all_cacti_installations():
     """Retrieves all registered Cacti installations."""
     return {"status": "success", "data": MOCK_CACTI_INSTALLATIONS}
 
-def save_uploaded_map(map_image, config_content, map_name):
-    """Saves the uploaded map image and config file."""
+def save_uploaded_map(map_image_file, config_content, map_name):
+    """Saves the uploaded map image and config file to the designated folders."""
     # Ensure directories exist
     maps_dir = "static/maps"
     configs_dir = "static/configs"
     os.makedirs(maps_dir, exist_ok=True)
     os.makedirs(configs_dir, exist_ok=True)
 
-    # Generate a unique filename to prevent overwrites
+    # Generate a unique filename to prevent overwrites and save the files
     unique_id = uuid.uuid4()
+    
+    # Save Image
     image_filename = f"{map_name}_{unique_id}.png"
-    config_filename = f"{map_name}_{unique_id}.conf"
-
     image_path = os.path.join(maps_dir, image_filename)
+    image = Image.open(map_image_file.stream)
+    image.save(image_path)
+    
+    # Save Config
+    config_filename = f"{map_name}_{unique_id}.conf"
     config_path = os.path.join(configs_dir, config_filename)
-
-    # Save the files
-    map_image.save(image_path)
     with open(config_path, 'w') as f:
         f.write(config_content)
 

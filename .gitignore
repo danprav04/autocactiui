@@ -2,3 +2,4 @@ llm_context.txt
 /backend/__pycache__
 /backend/venv
 frontend/.env
+/backend/static
