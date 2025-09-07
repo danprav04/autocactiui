@@ -186,6 +186,10 @@ button.secondary {
   background-color: var(--accent-secondary);
 }
 
+button.danger {
+  background-color: var(--accent-danger);
+}
+
 button:hover { opacity: 0.85; }
 button:disabled { background-color: var(--accent-secondary); cursor: not-allowed; opacity: 0.5; }
 

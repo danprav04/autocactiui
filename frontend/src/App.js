@@ -161,6 +161,19 @@ function App() {
         setIsLoading(false);
     }
   }, [createNodeObject, selectedNode, nodes, edges]);
+
+  const handleDeleteNode = useCallback(() => {
+    if (!selectedNode) return;
+
+    const nodeIdToDelete = selectedNode.id;
+
+    setNodes(nds => nds.filter(n => n.id !== nodeIdToDelete));
+    setEdges(eds => eds.filter(e => e.source !== nodeIdToDelete && e.target !== nodeIdToDelete));
+    
+    // Clear selection and neighbors list
+    setSelectedNode(null);
+    setNeighbors([]);
+  }, [selectedNode]);
   
   const handleStart = async (ip) => {
     if (!ip) { setError('Please enter a starting IP address.'); return; }
@@ -214,6 +227,7 @@ function App() {
         selectedNode={selectedNode}
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
+        onDeleteNode={handleDeleteNode}
         onUploadMap={handleUploadMap}
         availableIcons={Object.keys(ICONS_BY_THEME)}
         currentIconName={currentIconName}

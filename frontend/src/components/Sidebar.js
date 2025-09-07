@@ -4,6 +4,7 @@ const Sidebar = ({
   selectedNode, 
   neighbors, 
   onAddNeighbor, 
+  onDeleteNode,
   onUploadMap,
   availableIcons,
   currentIconName,
@@ -93,8 +94,15 @@ const Sidebar = ({
             <div className="neighbors-section">
                 {selectedNode ? (
                     <>
-                        <h3>Neighbors for:</h3>
+                        <h3>Device Actions</h3>
                         <p className="selected-device-label">{selectedNode.data.hostname}</p>
+                        <div className="control-group">
+                          <button onClick={onDeleteNode} className="danger">
+                            Delete Device
+                          </button>
+                        </div>
+                        
+                        <h3>Available Neighbors</h3>
                         {neighbors.length > 0 ? (
                             <ul>
                             {neighbors.map(neighbor => (
