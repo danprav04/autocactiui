@@ -20,7 +20,8 @@ IGNORE_DIRS = [
     '.git',
     'build',
     'dist',
-    'cacti_server' 
+    'cacti_server',
+    '.venv' 
 ]
 
 # Patterns for specific files to ignore.

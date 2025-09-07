@@ -154,7 +154,8 @@ function App() {
       source: selectedNode.id, 
       target: neighbor.ip, 
       animated: true,
-      style: { stroke: '#6c757d' }
+      style: { stroke: '#6c757d' },
+      data: { interface: neighbor.interface } // Store interface name from neighbor data
     };
     setEdges(prevEdges => [...prevEdges, newEdge]);
     setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
@@ -207,7 +208,7 @@ function App() {
 
     const exportNodes = nodes.map(node => ({
         ...node,
-        selected: false, // Ensure no node is selected for the export image
+        selected: false,
         data: {
             ...node.data,
             icon: ICONS_BY_THEME[node.data.iconType].light
