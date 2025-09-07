@@ -15,7 +15,7 @@
   --accent-success: #28a745;
   --shadow-color: rgba(0, 0, 0, 0.1);
   --node-bg: #ffffff;
-  --node-border: #6c757d;
+  --node-border: #ced4da;
   --node-selected-border: #007bff;
   --node-shadow: rgba(0, 0, 0, 0.1);
   --map-bg: #f8f9fa;
@@ -38,9 +38,9 @@
   --accent-success: #31a24c;
   --shadow-color: rgba(0, 0, 0, 0.3);
   --node-bg: #3a3b3c;
-  --node-border: #8a8d91;
+  --node-border: #4d4f51;
   --node-selected-border: #0866ff;
-  --node-shadow: rgba(0, 0, 0, 0.3);
+  --node-shadow: rgba(0, 0, 0, 0.4);
   --map-bg: #18191a;
   --map-grid-color: #404040;
   --minimap-mask-color: rgba(36, 37, 38, 0.6);
@@ -312,37 +312,45 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 
 /* --- CUSTOM NODE --- */
 .custom-node {
+    background-color: var(--node-bg);
+    border: 1px solid var(--node-border);
+    border-radius: 12px;
+    padding: 15px;
+    width: 150px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px; /* Space between icon and text */
-    padding: 10px;
-    border-radius: 8px; /* Slightly rounded corners for selection highlight */
-    transition: all 0.2s ease-in-out;
-    background-color: transparent; /* No background color by default */
-    border: 2px solid transparent; /* Transparent border to prevent layout shift on selection */
+    gap: 5px;
+    text-align: center;
     cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 5px var(--node-shadow);
 }
+
 .custom-node.selected {
     border-color: var(--node-selected-border);
-    /* A subtle background on selection using a modern CSS function */
-    background-color: color-mix(in srgb, var(--node-selected-border) 15%, transparent);
+    box-shadow: 0 0 0 2px var(--node-selected-border), 0 4px 12px var(--shadow-color);
 }
+
 .node-icon {
     width: 40px;
     height: 40px;
 }
+
 .node-label {
     display: flex;
     flex-direction: column;
-    text-align: center; /* Center the text underneath the icon */
+    text-align: center;
 }
+
 .node-label strong {
-    font-size: 16px; /* Bigger text for hostname */
+    font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+    word-break: break-word; /* Handle long names */
 }
+
 .node-label small {
-    font-size: 13px; /* Slightly larger for readability */
-    color: var(--text-secondary); /* Dimmer text for IP */
+    font-size: 13px;
+    color: var(--text-secondary);
 }

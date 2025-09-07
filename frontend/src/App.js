@@ -239,37 +239,51 @@ function App() {
             return;
         }
 
-        // --- DYNAMIC DIMENSION CALCULATION ---
-        const padding = 100; // Whitespace margin around the map content
-        const nodeWidth = 100; // Approximate width of a node component
-        const nodeHeight = 80; // Approximate height of a node component
+        // --- 720p EXPORT DIMENSION & TRANSFORM CALCULATION ---
+        const targetWidth = 1280;
+        const targetHeight = 720;
+        const padding = 80; // Whitespace margin inside the 720p frame
+
+        // Approximate node dimensions from new CSS (.custom-node width + height)
+        const nodeWidth = 150;
+        const nodeHeight = 110;
 
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        originalNodes.forEach(node => {
-            minX = Math.min(minX, node.position.x);
-            minY = Math.min(minY, node.position.y);
-            maxX = Math.max(maxX, node.position.x + nodeWidth);
-            maxY = Math.max(maxY, node.position.y + nodeHeight);
-        });
 
-        const boundsWidth = maxX - minX;
-        const boundsHeight = maxY - minY;
+        if (originalNodes.length === 0) {
+            // Handle empty map by just taking a blank screenshot
+            minX = 0; minY = 0; maxX = 0; maxY = 0;
+        } else {
+            originalNodes.forEach(node => {
+                minX = Math.min(minX, node.position.x);
+                minY = Math.min(minY, node.position.y);
+                maxX = Math.max(maxX, node.position.x + nodeWidth);
+                maxY = Math.max(maxY, node.position.y + nodeHeight);
+            });
+        }
+        
+        const boundsWidth = (maxX - minX) || 1; // prevent division by zero
+        const boundsHeight = (maxY - minY) || 1; // prevent division by zero
 
-        // Create an image that fits the content perfectly + padding
-        const imageWidth = Math.round(boundsWidth + padding * 2);
-        const imageHeight = Math.round(boundsHeight + padding * 2);
+        // Calculate scale to fit bounds within target dimensions + padding
+        const scaleX = (targetWidth - padding * 2) / boundsWidth;
+        const scaleY = (targetHeight - padding * 2) / boundsHeight;
+        const scale = Math.min(scaleX, scaleY, 1); // Use the smaller scale, and don't scale up (max 1)
 
-        // Position the map content within the new canvas
-        const translateX = -minX + padding;
-        const translateY = -minY + padding;
+        // Calculate translation to center the scaled content
+        const scaledBoundsWidth = boundsWidth * scale;
+        const scaledBoundsHeight = boundsHeight * scale;
+
+        const translateX = ((targetWidth - scaledBoundsWidth) / 2) - (minX * scale);
+        const translateY = ((targetHeight - scaledBoundsHeight) / 2) - (minY * scale);
         
         const originalTransform = viewport.style.transform;
-        // Apply a transform to position the content correctly for the screenshot
-        viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(1)`;
+        // Apply the new transform for the screenshot
+        viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
 
         toBlob(viewport, { 
-            width: imageWidth,
-            height: imageHeight,
+            width: targetWidth,
+            height: targetHeight,
             backgroundColor: '#ffffff',
             filter: (node) => (node.className !== 'react-flow__controls'),
         })
