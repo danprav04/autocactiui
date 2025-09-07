@@ -1,3 +1,4 @@
+// frontend/src/App.js
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import { applyNodeChanges } from 'react-flow-renderer';
@@ -190,8 +191,8 @@ function App() {
 
   const handleUploadMap = async () => {
     const mapElement = reactFlowWrapper.current;
-    if (!mapElement) {
-        setError('Could not find map element to upload.');
+    if (!mapElement || nodes.length === 0) {
+        setError('Cannot upload an empty map.');
         return;
     }
     if (!selectedCactiId) {
@@ -206,6 +207,7 @@ function App() {
     const originalNodes = nodes;
     const originalEdges = edges;
 
+    // Prepare nodes for export: deselected and with light-theme icons
     const exportNodes = nodes.map(node => ({
         ...node,
         selected: false,
@@ -237,39 +239,33 @@ function App() {
             return;
         }
 
-        const imageWidth = 1920;
-        const imageHeight = 1080;
-        const padding = 75;
+        // --- DYNAMIC DIMENSION CALCULATION ---
+        const padding = 100; // Whitespace margin around the map content
+        const nodeWidth = 100; // Approximate width of a node component
+        const nodeHeight = 80; // Approximate height of a node component
 
-        const nodeWidth = 100;
-        const nodeHeight = 80;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-        if (originalNodes.length === 0) {
-            minX = 0; minY = 0; maxX = imageWidth; maxY = imageHeight;
-        } else {
-            originalNodes.forEach(node => {
-                minX = Math.min(minX, node.position.x);
-                minY = Math.min(minY, node.position.y);
-                maxX = Math.max(maxX, node.position.x + nodeWidth);
-                maxY = Math.max(maxY, node.position.y + nodeHeight);
-            });
-        }
+        originalNodes.forEach(node => {
+            minX = Math.min(minX, node.position.x);
+            minY = Math.min(minY, node.position.y);
+            maxX = Math.max(maxX, node.position.x + nodeWidth);
+            maxY = Math.max(maxY, node.position.y + nodeHeight);
+        });
 
         const boundsWidth = maxX - minX;
         const boundsHeight = maxY - minY;
 
-        const scaleX = (imageWidth - padding * 2) / boundsWidth;
-        const scaleY = (imageHeight - padding * 2) / boundsHeight;
-        const scale = Math.min(scaleX, scaleY, 1);
+        // Create an image that fits the content perfectly + padding
+        const imageWidth = Math.round(boundsWidth + padding * 2);
+        const imageHeight = Math.round(boundsHeight + padding * 2);
 
-        const scaledWidth = boundsWidth * scale;
-        const scaledHeight = boundsHeight * scale;
-        const translateX = (-minX * scale) + (imageWidth - scaledWidth) / 2;
-        const translateY = (-minY * scale) + (imageHeight - scaledHeight) / 2;
+        // Position the map content within the new canvas
+        const translateX = -minX + padding;
+        const translateY = -minY + padding;
         
         const originalTransform = viewport.style.transform;
-        viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        // Apply a transform to position the content correctly for the screenshot
+        viewport.style.transform = `translate(${translateX}px, ${translateY}px) scale(1)`;
 
         toBlob(viewport, { 
             width: imageWidth,
@@ -297,6 +293,7 @@ function App() {
             console.error(err);
         })
         .finally(() => {
+            // Restore original state
             viewport.style.transform = originalTransform;
             mapElement.classList.remove('exporting');
             if (wasDarkTheme) {
@@ -311,11 +308,11 @@ function App() {
 
 
   const MoonIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
   );
 
   const SunIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
   );
 
   return (

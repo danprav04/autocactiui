@@ -346,11 +346,3 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
     font-size: 13px; /* Slightly larger for readability */
     color: var(--text-secondary); /* Dimmer text for IP */
 }
-.custom-handle {
-    width: 1px;
-    height: 1px;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    /* This makes the handles invisible while keeping them functional */
-}

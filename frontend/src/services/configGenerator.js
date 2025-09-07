@@ -1,7 +1,11 @@
-// Template for a Weathermap NODE, now only containing position information.
-const NODE_TEMPLATE = "NODE {id}\n\tPOSITION {x} {y}";
+// frontend/src/services/configGenerator.js
+// Template for a Weathermap NODE representing a device with an icon and label.
+const DEVICE_NODE_TEMPLATE = "NODE {id}\n\tLABEL {hostname}\n\tICON images/devices/{iconFilename}\n\tPOSITION {x} {y}";
 
-// Template for a Weathermap LINK, now including DEVICE and INTERFACE details.
+// Template for a Weathermap NODE used as an invisible anchor for a LINK.
+const DUMMY_NODE_TEMPLATE = "NODE {id}\n\tPOSITION {x} {y}";
+
+// Template for a Weathermap LINK, connecting two (dummy) nodes and specifying the data source.
 const LINK_TEMPLATE = "LINK {id1}-{id2}\n\tDEVICE {hostname} {ip}\n\tINTERFACE {interface}\n\tNODES {id1} {id2}";
 
 // The complete base template for the .conf file, matching the new required format.
@@ -59,41 +63,94 @@ export function generateCactiConfig(nodes, edges, mapName) {
   const nodeStrings = [];
   const linkStrings = [];
 
-  // A map to hold details of each node, keyed by their ID (IP address).
   const nodeInfoMap = new Map(nodes.map(node => [node.id, node]));
-  
-  // A map to translate our application node IDs (IPs) to unique Cacti NODE IDs.
-  const cactiNodeIdMap = new Map();
   let nodeCounter = 1;
 
-  // First, create all NODE entries and map their IDs.
+  // --- 1. Create Device NODE entries (the visible icons) ---
   for (const node of nodes) {
     const cactiNodeId = `node${String(nodeCounter++).padStart(5, '0')}`;
-    cactiNodeIdMap.set(node.id, cactiNodeId);
+    
+    const iconType = node.data.iconType || 'Router';
+    let iconFilename;
+    switch (iconType) {
+        case 'Switch':
+            iconFilename = 'switch-black.png';
+            break;
+        case 'Firewall':
+            iconFilename = 'firewall.png';
+            break;
+        case 'Router':
+        default:
+            iconFilename = 'router-black.png';
+            break;
+    }
+
+    // React Flow position is top-left. Node component is roughly 100x80.
+    // We position the Cacti node at the visual center.
+    const centerX = Math.round(node.position.x + 50);
+    const centerY = Math.round(node.position.y + 40);
 
     nodeStrings.push(
-      NODE_TEMPLATE.replace('{id}', cactiNodeId)
-        .replace('{x}', Math.round(node.position.x))
-        .replace('{y}', Math.round(node.position.y))
+      DEVICE_NODE_TEMPLATE.replace('{id}', cactiNodeId)
+        .replace('{hostname}', node.data.hostname)
+        .replace('{iconFilename}', iconFilename)
+        .replace('{x}', centerX)
+        .replace('{y}', centerY)
     );
   }
 
-  // Next, create all LINK entries using the mapped Cacti NODE IDs.
+  // --- 2. Create LINKs and their invisible endpoint NODEs ---
+  // Increased offset to ensure lines do not overlap with node labels.
+  const LINK_ENDPOINT_OFFSET = 50; 
+
   for (const edge of edges) {
     const sourceNodeInfo = nodeInfoMap.get(edge.source);
     const targetNodeInfo = nodeInfoMap.get(edge.target);
 
-    if (!sourceNodeInfo || !targetNodeInfo) {
-      continue;
-    }
+    if (!sourceNodeInfo || !targetNodeInfo) continue;
 
-    const sourceCactiId = cactiNodeIdMap.get(edge.source);
-    const targetCactiId = cactiNodeIdMap.get(edge.target);
+    // Center positions of the connected devices
+    const x1 = sourceNodeInfo.position.x + 50;
+    const y1 = sourceNodeInfo.position.y + 40;
+    const x2 = targetNodeInfo.position.x + 50;
+    const y2 = targetNodeInfo.position.y + 40;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If nodes are at the same spot, we can't draw a link.
+    if (distance === 0) continue;
+
+    // Calculate the position for the invisible link endpoints (dummy nodes)
+    const ux = dx / distance; // unit vector x
+    const uy = dy / distance; // unit vector y
+
+    const dummy1_x = Math.round(x1 + ux * LINK_ENDPOINT_OFFSET);
+    const dummy1_y = Math.round(y1 + uy * LINK_ENDPOINT_OFFSET);
+    const dummy2_x = Math.round(x2 - ux * LINK_ENDPOINT_OFFSET);
+    const dummy2_y = Math.round(y2 - uy * LINK_ENDPOINT_OFFSET);
+
+    const dummy1_id = `node${String(nodeCounter++).padStart(5, '0')}`;
+    const dummy2_id = `node${String(nodeCounter++).padStart(5, '0')}`;
+
+    // Add the invisible nodes to the config
+    nodeStrings.push(
+      DUMMY_NODE_TEMPLATE.replace('{id}', dummy1_id)
+        .replace('{x}', dummy1_x)
+        .replace('{y}', dummy1_y)
+    );
+    nodeStrings.push(
+      DUMMY_NODE_TEMPLATE.replace('{id}', dummy2_id)
+        .replace('{x}', dummy2_x)
+        .replace('{y}', dummy2_y)
+    );
+
+    // Add the link connecting the invisible nodes
     const interfaceName = edge.data?.interface || 'unknown';
-
     const populatedLink = LINK_TEMPLATE
-      .replace(/{id1}/g, sourceCactiId)
-      .replace(/{id2}/g, targetCactiId)
+      .replace(/{id1}/g, dummy1_id)
+      .replace(/{id2}/g, dummy2_id)
       .replace('{hostname}', sourceNodeInfo.data.hostname)
       .replace('{ip}', sourceNodeInfo.data.ip)
       .replace('{interface}', interfaceName);
