@@ -69,6 +69,23 @@ MOCK_NEIGHBORS = {
     ],
 }
 
+MOCK_CACTI_INSTALLATIONS = [
+    {
+        "id": 1,
+        "hostname": "cacti-main-dc",
+        "ip": "192.168.1.100",
+        "user": "admin",
+        "password": "password123"
+    },
+    {
+        "id": 2,
+        "hostname": "cacti-prod-london",
+        "ip": "10.200.5.10",
+        "user": "cacti_user",
+        "password": "secure_password"
+    }
+]
+
 def get_device_info(ip_address):
     """Fetches device type, model, and hostname by IP address."""
     if ip_address in MOCK_NETWORK:
@@ -86,6 +103,10 @@ def get_device_neighbors(ip_address):
     if ip_address in MOCK_NEIGHBORS:
         return {"neighbors": MOCK_NEIGHBORS[ip_address]}
     return None
+
+def get_all_cacti_installations():
+    """Retrieves all registered Cacti installations."""
+    return {"status": "success", "data": MOCK_CACTI_INSTALLATIONS}
 
 def save_uploaded_map(map_image, config_content, map_name):
     """Saves the uploaded map image and config file."""

@@ -4,8 +4,6 @@ const Sidebar = ({
   selectedNode, 
   neighbors, 
   onAddNeighbor, 
-  onDownloadImage,
-  onDownloadConfig,
   onUploadMap,
   availableIcons,
   currentIconName,
@@ -13,7 +11,10 @@ const Sidebar = ({
   mapName,
   setMapName,
   disabled,
-  isUploading
+  isUploading,
+  cactiInstallations,
+  selectedCactiId,
+  setSelectedCactiId
 }) => {
   return (
     <div className="sidebar">
@@ -32,14 +33,32 @@ const Sidebar = ({
         </div>
 
         <div className="control-group">
-          <button onClick={onUploadMap} disabled={disabled || isUploading}>
+          <label htmlFor="cacti-selector">Cacti Installation</label>
+          <select
+            id="cacti-selector"
+            className="icon-selector"
+            value={selectedCactiId}
+            onChange={(e) => setSelectedCactiId(e.target.value)}
+            disabled={disabled || cactiInstallations.length === 0}
+          >
+            {cactiInstallations.length === 0 ? (
+              <option>Loading installations...</option>
+            ) : (
+              cactiInstallations.map(inst => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.hostname} ({inst.ip})
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+
+        <div className="control-group">
+          <button 
+            onClick={onUploadMap} 
+            disabled={disabled || isUploading || !selectedCactiId}
+          >
             {isUploading ? 'Uploading...' : 'Upload to Cacti'}
-          </button>
-          <button onClick={onDownloadImage} disabled={disabled} className="secondary">
-            Download Map (.png)
-          </button>
-          <button onClick={onDownloadConfig} disabled={disabled} className="secondary">
-            Download Config (.conf)
           </button>
         </div>
       </div>

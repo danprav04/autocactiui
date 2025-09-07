@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import axios from 'axios';
 import { applyNodeChanges } from 'react-flow-renderer';
-import { toPng, toBlob } from 'html-to-image';
+import { toBlob } from 'html-to-image';
 
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
@@ -37,6 +37,8 @@ function App() {
   const [currentIconName, setCurrentIconName] = useState(DEFAULT_ICON_NAME);
   const [mapName, setMapName] = useState('My-Network-Map');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [cactiInstallations, setCactiInstallations] = useState([]);
+  const [selectedCactiId, setSelectedCactiId] = useState('');
   
   const reactFlowWrapper = useRef(null);
   const initialIpRef = useRef(null);
@@ -47,6 +49,24 @@ function App() {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // Effect to fetch cacti installations on component mount
+  useEffect(() => {
+    const fetchCactiInstallations = async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/get-all-cacti-installations`);
+            if (response.data.status === 'success' && response.data.data.length > 0) {
+                setCactiInstallations(response.data.data);
+                // Set a default selection
+                setSelectedCactiId(response.data.data[0].id);
+            }
+        } catch (err) {
+            setError('Could not fetch Cacti installations.');
+            console.error(err);
+        }
+    };
+    fetchCactiInstallations();
+  }, []);
 
   // Effect to update node icons when the theme changes
   useEffect(() => {
@@ -171,61 +191,14 @@ function App() {
     }
   };
 
-  const handleDownloadImage = () => {
-    const mapElement = reactFlowWrapper.current;
-    if (!mapElement) {
-        setError('Could not find map to download.');
-        return;
-    }
-
-    const wasDarkTheme = theme === 'dark';
-    const exportNodes = nodes.map(node => ({ ...node, selected: false, data: { ...node.data, icon: ICONS_BY_THEME[node.data.iconType].light }}));
-    const originalNodes = nodes;
-
-    setNodes(exportNodes);
-    mapElement.classList.add('exporting');
-    if (wasDarkTheme) document.body.setAttribute('data-theme', 'light');
-
-    setTimeout(() => {
-        toPng(mapElement.querySelector('.react-flow__viewport'), { cacheBust: true, backgroundColor: '#ffffff', filter: (node) => (node.className !== 'react-flow__controls')})
-        .then((dataUrl) => {
-            const link = document.createElement('a');
-            link.download = `${mapName}.png`;
-            link.href = dataUrl;
-            link.click();
-        })
-        .catch((err) => {
-            setError('Could not generate map image.');
-            console.error(err);
-        })
-        .finally(() => {
-            mapElement.classList.remove('exporting');
-            if (wasDarkTheme) document.body.setAttribute('data-theme', 'dark');
-            setNodes(originalNodes);
-        });
-    }, 150);
-  };
-
-  const handleDownloadConfig = () => {
-    try {
-        const configContent = generateCactiConfig(nodes, edges, mapName);
-        const blob = new Blob([configContent], { type: 'text/plain;charset=utf-8' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${mapName}.conf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    } catch (err) {
-        setError("Failed to generate config file.");
-        console.error(err);
-    }
-  };
-
   const handleUploadMap = async () => {
     const mapElement = reactFlowWrapper.current;
     if (!mapElement) {
         setError('Could not find map to upload.');
+        return;
+    }
+    if (!selectedCactiId) {
+        setError('Please select a Cacti installation first.');
         return;
     }
     
@@ -245,7 +218,7 @@ function App() {
         formData.append('map_image', imageBlob, `${mapName}.png`);
         formData.append('config_content', configContent);
         formData.append('map_name', mapName);
-        formData.append('cacti_installation_id', '1'); // Example ID
+        formData.append('cacti_installation_id', selectedCactiId);
 
         await axios.post(`${API_BASE_URL}/upload-map`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
@@ -275,8 +248,6 @@ function App() {
         selectedNode={selectedNode}
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
-        onDownloadImage={handleDownloadImage}
-        onDownloadConfig={handleDownloadConfig}
         onUploadMap={handleUploadMap}
         availableIcons={Object.keys(ICONS_BY_THEME)}
         currentIconName={currentIconName}
@@ -285,6 +256,9 @@ function App() {
         setMapName={setMapName}
         disabled={nodes.length === 0}
         isUploading={isUploading}
+        cactiInstallations={cactiInstallations}
+        selectedCactiId={selectedCactiId}
+        setSelectedCactiId={setSelectedCactiId}
       />
       <div className="main-content" ref={reactFlowWrapper}>
         <button onClick={toggleTheme} className="theme-toggle-button" title="Toggle Theme">

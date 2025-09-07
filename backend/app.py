@@ -27,6 +27,12 @@ def get_device_neighbors_endpoint(ip_address):
         return jsonify(neighbors)
     return jsonify({"error": "Device not found or has no neighbors"}), 404
 
+@app.route('/get-all-cacti-installations', methods=['GET'])
+def get_all_cacti_installations_endpoint():
+    """Retrieves all registered Cacti installations."""
+    installations = services.get_all_cacti_installations()
+    return jsonify(installations)
+
 @app.route('/upload-map', methods=['POST'])
 def upload_map_endpoint():
     """Uploads a weathermap image and configuration."""
