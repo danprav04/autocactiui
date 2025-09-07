@@ -117,20 +117,42 @@ function App() {
       const newPosition = { x: selectedNode.position.x + (Math.random() * 250 - 125), y: selectedNode.position.y + 150 };
       const newNode = createNodeObject(deviceResponse.data, newPosition);
 
+      // Create the primary edge between the selected node and the new node, with interface data.
+      const primaryEdgeToAdd = {
+          id: `e-${selectedNode.id}-${newNode.id}`,
+          source: selectedNode.id,
+          target: newNode.id,
+          animated: true,
+          style: { stroke: '#6c757d' },
+          data: { interface: neighbor.interface }
+      };
+      
       const newNeighborsResponse = await api.getDeviceNeighbors(newNode.id);
       const newDeviceNeighbors = newNeighborsResponse.data.neighbors || [];
       
       const allNodes = [...nodes, newNode];
-      const newEdges = newDeviceNeighbors.reduce((acc, newNeighbor) => {
+      // Check for duplicates against current edges AND the primary edge we are about to add.
+      const allCurrentEdges = [...edges, primaryEdgeToAdd]; 
+
+      // Discover and create edges from the new node to other nodes already on the map.
+      const secondaryEdgesToAdd = newDeviceNeighbors.reduce((acc, newNeighbor) => {
           const existingNode = allNodes.find(n => n.id === newNeighbor.ip);
-          if (existingNode && !edges.some(e => (e.source === newNode.id && e.target === existingNode.id) || (e.source === existingNode.id && e.target === newNode.id))) {
-              acc.push({ id: `e-${newNode.id}-${existingNode.id}`, source: newNode.id, target: existingNode.id, animated: true, style: { stroke: '#6c757d' } });
+          
+          if (existingNode && !allCurrentEdges.some(e => (e.source === newNode.id && e.target === existingNode.id) || (e.source === existingNode.id && e.target === newNode.id))) {
+              acc.push({ 
+                  id: `e-${newNode.id}-${existingNode.id}`, 
+                  source: newNode.id, 
+                  target: existingNode.id, 
+                  animated: true, 
+                  style: { stroke: '#6c757d' },
+                  data: { interface: newNeighbor.interface }
+              });
           }
           return acc;
       }, []);
 
       setNodes(prev => [...prev, newNode]);
-      setEdges(prev => [...prev, ...newEdges]);
+      setEdges(prev => [...prev, primaryEdgeToAdd, ...secondaryEdgesToAdd]);
       setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
     } catch(err) {
         setError(`Failed to add neighbor ${neighbor.ip}.`);
