@@ -5,7 +5,8 @@ import switchBlackIcon from '../assets/icons/switch-black.png';
 import switchWhiteIcon from '../assets/icons/switch-white.png';
 import firewallIcon from '../assets/icons/firewall.png';
 import unknownIcon from '../assets/icons/firewall.png'; // Placeholder for unknown type
-import encryptorIcon from '../assets/icons/firewall.png'; // Placeholder for encryptor type
+import encryptorBlackIcon from '../assets/icons/encryptor-black.png';
+import encryptorWhiteIcon from '../assets/icons/encryptor-white.png';
 
 /**
  * Defines the icon assets to be used for each device type, based on the current theme.
@@ -14,7 +15,7 @@ export const ICONS_BY_THEME = {
   'Router': { light: routerBlackIcon, dark: routerWhiteIcon },
   'Switch': { light: switchBlackIcon, dark: switchWhiteIcon },
   'Firewall': { light: firewallIcon, dark: firewallIcon },
-  'Encryptor': { light: encryptorIcon, dark: encryptorIcon },
+  'Encryptor': { light: encryptorBlackIcon, dark: encryptorWhiteIcon },
   'Unknown': {light: unknownIcon, dark: unknownIcon },
 };
 
