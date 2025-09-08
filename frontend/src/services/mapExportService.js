@@ -11,15 +11,27 @@ import { ICONS_BY_THEME } from '../config/constants';
  * @returns {{exportNodes: Array, exportEdges: Array}} An object containing stylized nodes and edges.
  */
 const prepareElementsForExport = (nodes, edges) => {
-    const exportNodes = nodes.map(node => ({
-        ...node,
-        selected: false,
-        data: {
-            ...node.data,
-            // Force light theme icons for consistent backgrounds
-            icon: ICONS_BY_THEME[node.data.iconType].light
+    const exportNodes = nodes.map(node => {
+        // Only process icons for device nodes ('custom' type).
+        // Group nodes do not have icons and should be passed through.
+        if (node.type === 'custom') {
+            return {
+                ...node,
+                selected: false,
+                data: {
+                    ...node.data,
+                    // Force light theme icons for consistent backgrounds
+                    icon: ICONS_BY_THEME[node.data.iconType].light
+                }
+            };
         }
-    }));
+        
+        // For all other node types (like 'group'), just deselect them.
+        return {
+            ...node,
+            selected: false,
+        };
+    });
     
     const exportEdges = edges.map(edge => ({
         ...edge,
@@ -45,14 +57,17 @@ const calculateExportTransform = (nodes) => {
     const nodeWidth = 150;
     const nodeHeight = 110;
 
-    if (nodes.length === 0) {
+    // Filter out groups for bounding box calculation to focus on devices
+    const deviceNodes = nodes.filter(n => n.type === 'custom');
+
+    if (deviceNodes.length === 0) {
         return { transform: 'translate(0,0) scale(1)', width: targetWidth, height: targetHeight };
     }
     
-    const minX = Math.min(...nodes.map(n => n.position.x));
-    const minY = Math.min(...nodes.map(n => n.position.y));
-    const maxX = Math.max(...nodes.map(n => n.position.x + nodeWidth));
-    const maxY = Math.max(...nodes.map(n => n.position.y + nodeHeight));
+    const minX = Math.min(...deviceNodes.map(n => n.position.x));
+    const minY = Math.min(...deviceNodes.map(n => n.position.y));
+    const maxX = Math.max(...deviceNodes.map(n => n.position.x + nodeWidth));
+    const maxY = Math.max(...deviceNodes.map(n => n.position.y + nodeHeight));
 
     const boundsWidth = maxX - minX;
     const boundsHeight = maxY - minY;
