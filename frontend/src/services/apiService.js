@@ -1,10 +1,10 @@
 // frontend/src/services/apiService.js
 import axios from 'axios';
 
-// Create an Axios instance. By leaving baseURL undefined, all requests
-// with a leading slash (e.g., '/get-device-info') will be relative to
-// the origin serving the application, making it environment-agnostic.
-const apiClient = axios.create();
+// Create an Axios instance configured to use the backend URL from environment variables.
+const apiClient = axios.create({
+    baseURL: process.env.REACT_APP_API_URL
+});
 
 /**
  * Fetches detailed information for a single device by its IP address.

@@ -1,0 +1,43 @@
+{
+  "app": {
+    "loading": "Loading...",
+    "errorCacti": "Could not fetch Cacti installations.",
+    "errorStartIp": "Please enter a starting IP address.",
+    "errorInitialDevice": "Failed to find the initial device. Please check the IP and try again.",
+    "errorEmptyMap": "Cannot upload an empty map.",
+    "errorSelectCacti": "Please select a Cacti installation first.",
+    "errorUpload": "Failed to upload map to Cacti.",
+    "errorFetchNeighbors": "Could not fetch neighbors for IP {{ip}}.",
+    "errorAddNeighbor": "Failed to add neighbor {{ip}}."
+  },
+  "sidebar": {
+    "controls": "Controls",
+    "mapName": "Map Name",
+    "mapNamePlaceholder": "e.g., Core-Network",
+    "cactiInstall": "Cacti Installation",
+    "cactiLoading": "Loading installations...",
+    "uploading": "Uploading...",
+    "uploadToCacti": "Upload to Cacti",
+    "placeholderStart": "Start by entering an IP address to begin mapping your network.",
+    "editDevice": "Edit Device",
+    "hostname": "Hostname",
+    "ipAddress": "IP Address (Identifier)",
+    "deviceType": "Device Type",
+    "updateDevice": "Update Device",
+    "deleteDevice": "Delete Device",
+    "availableNeighbors": "Available Neighbors",
+    "add": "Add",
+    "noNeighbors": "No new neighbors to add.",
+    "placeholderClickNode": "Click a device on the map to see its details and neighbors."
+  },
+  "startup": {
+    "title": "Interactive Network Map Creator",
+    "placeholderIp": "Enter starting device IP",
+    "iconSelector": "Use icon: {{iconName}}",
+    "loading": "Loading...",
+    "startMapping": "Start Mapping"
+  },
+  "themeToggle": {
+    "title": "Toggle Theme"
+  }
+}

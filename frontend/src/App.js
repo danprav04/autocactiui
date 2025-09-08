@@ -1,12 +1,14 @@
 // frontend/src/App.js
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { applyNodeChanges } from 'react-flow-renderer';
+import { useTranslation } from 'react-i18next';
 
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
 import CustomNode from './components/CustomNode';
 import StartupScreen from './components/Startup/StartupScreen';
 import ThemeToggleButton from './components/common/ThemeToggleButton';
+import LanguageSwitcher from './components/common/LanguageSwitcher';
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
 import { ICONS_BY_THEME } from './config/constants';
@@ -25,6 +27,7 @@ function App() {
   const [cactiInstallations, setCactiInstallations] = useState([]);
   const [selectedCactiId, setSelectedCactiId] = useState('');
   
+  const { t, i18n } = useTranslation();
   const reactFlowWrapper = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
   const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
@@ -33,6 +36,13 @@ function App() {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = i18n.language;
+    // Set text direction based on the current language
+    const dir = i18n.language === 'he' ? 'rtl' : 'ltr';
+    document.documentElement.dir = dir;
+  }, [i18n.language]);
 
   useEffect(() => {
     const fetchCactiInstallations = async () => {
@@ -44,12 +54,13 @@ function App() {
                 setSelectedCactiId(installations[0].id);
             }
         } catch (err) {
-            setError('Could not fetch Cacti installations.');
+            setError(t('app.errorCacti'));
             console.error(err);
         }
     };
     fetchCactiInstallations();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -97,12 +108,12 @@ function App() {
       const response = await api.getDeviceNeighbors(ip);
       setNeighbors(response.data.neighbors.filter(n => !nodes.some(node => node.id === n.ip)));
     } catch (err) {
-      setError(`Could not fetch neighbors for IP ${ip}.`);
+      setError(t('app.errorFetchNeighbors', { ip }));
       setNeighbors([]);
     } finally {
       setIsLoading(false);
     }
-  }, [nodes]);
+  }, [nodes, t]);
   
   const onNodeClick = useCallback((event, node) => {
     setNodes(nds => nds.map(n => ({ ...n, selected: n.id === node.id })));
@@ -157,12 +168,12 @@ function App() {
       setEdges(prev => [...prev, primaryEdgeToAdd, ...secondaryEdgesToAdd]);
       setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
     } catch(err) {
-        setError(`Failed to add neighbor ${neighbor.ip}.`);
+        setError(t('app.errorAddNeighbor', {ip: neighbor.ip}));
         console.error(err);
     } finally {
         setIsLoading(false);
     }
-  }, [createNodeObject, selectedNode, nodes, edges]);
+  }, [createNodeObject, selectedNode, nodes, edges, t]);
 
   const handleDeleteNode = useCallback(() => {
     if (!selectedNode) return;
@@ -196,7 +207,7 @@ function App() {
   }, [theme, selectedNode]);
 
   const handleStart = async (ip, initialIconName) => {
-    if (!ip) { setError('Please enter a starting IP address.'); return; }
+    if (!ip) { setError(t('app.errorStartIp')); return; }
     
     setIsLoading(true);
     setError('');
@@ -208,7 +219,7 @@ function App() {
       setEdges([]);
       onNodeClick(null, newNode);
     } catch (err) {
-      setError('Failed to find the initial device. Please check the IP and try again.');
+      setError(t('app.errorInitialDevice'));
       setNodes([]);
       setEdges([]);
     } finally {
@@ -217,8 +228,8 @@ function App() {
   };
 
   const handleUploadMap = async () => {
-    if (!reactFlowWrapper.current || nodes.length === 0) { setError('Cannot upload an empty map.'); return; }
-    if (!selectedCactiId) { setError('Please select a Cacti installation first.'); return; }
+    if (!reactFlowWrapper.current || nodes.length === 0) { setError(t('app.errorEmptyMap')); return; }
+    if (!selectedCactiId) { setError(t('app.errorSelectCacti')); return; }
     
     setIsUploading(true);
     setError('');
@@ -234,7 +245,7 @@ function App() {
         setEdges
       });
     } catch (err) {
-      setError('Failed to upload map to Cacti.');
+      setError(t('app.errorUpload'));
       console.error(err);
     } finally {
       setIsUploading(false);
@@ -260,7 +271,10 @@ function App() {
         setSelectedCactiId={setSelectedCactiId}
       />
       <div className="main-content" ref={reactFlowWrapper}>
-        <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+        <div className="top-controls">
+          <LanguageSwitcher />
+          <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+        </div>
         {nodes.length === 0 ? (
           <StartupScreen 
             onStart={handleStart} 
@@ -278,7 +292,7 @@ function App() {
           />
         )}
         {error && <p className="error-message">{error}</p>}
-        {isLoading && !error && <p className="loading-message">Loading...</p>}
+        {isLoading && !error && <p className="loading-message">{t('app.loading')}</p>}
       </div>
     </div>
   );
