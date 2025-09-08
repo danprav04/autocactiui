@@ -39,6 +39,16 @@ MOCK_NETWORK = {
         "type": "Firewall",
         "model": "Palo Alto PA-220",
     },
+    "172.16.20.8": {
+        "hostname": "VPN-Encryptor-1",
+        "type": "Encryptor",
+        "model": "TACLANE-Micro",
+    },
+    "172.16.30.12": {
+        "hostname": "Legacy-Device",
+        "type": "Unknown Type",
+        "model": "Custom Appliance",
+    },
 }
 
 MOCK_NEIGHBORS = {
@@ -56,6 +66,7 @@ MOCK_NEIGHBORS = {
         {"interface": "TenGigabitEthernet1/1/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink to Core"},
         {"interface": "TenGigabitEthernet1/1/2", "neighbor": "Dist-Switch-A", "ip": "10.10.1.2", "description": "VRRP Link to Dist-A"},
         {"interface": "GigabitEthernet2/0/1", "neighbor": "Access-SW-B1", "ip": "192.168.2.10", "description": "To Access-SW-B1"},
+        {"interface": "GigabitEthernet2/0/2", "neighbor": "VPN-Encryptor-1", "ip": "172.16.20.8", "description": "To Encryptor"},
     ],
     "192.168.1.10": [
         {"interface": "GigabitEthernet1/0/1", "neighbor": "Dist-Switch-A", "ip": "10.10.1.2", "description": "Uplink to Dist-A"},
@@ -70,6 +81,13 @@ MOCK_NEIGHBORS = {
     "172.16.10.5": [
         {"interface": "ethernet1/1", "neighbor": "Access-SW-B1", "ip": "192.168.2.10", "description": "To Access-SW-B1"},
     ],
+    "172.16.20.8": [
+        {"interface": "eth0", "neighbor": "Dist-Switch-B", "ip": "10.10.2.2", "description": "Uplink"},
+        {"interface": "eth1", "neighbor": "Legacy-Device", "ip": "172.16.30.12", "description": "To Legacy Device"},
+    ],
+    "172.16.30.12": [
+        {"interface": "eno1", "neighbor": "VPN-Encryptor-1", "ip": "172.16.20.8", "description": "Uplink"},
+    ]
 }
 
 MOCK_CACTI_INSTALLATIONS = [

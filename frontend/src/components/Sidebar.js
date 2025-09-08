@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const Sidebar = ({ 
   selectedNode, 
   neighbors, 
   onAddNeighbor, 
   onDeleteNode,
+  onUpdateNodeType,
   onUploadMap,
   availableIcons,
-  currentIconName,
-  setCurrentIconName,
+  initialIconName,
+  setInitialIconName,
   mapName,
   setMapName,
   disabled,
@@ -17,6 +18,22 @@ const Sidebar = ({
   selectedCactiId,
   setSelectedCactiId
 }) => {
+  const [assignedType, setAssignedType] = useState(availableIcons[0] || '');
+
+  // When the selected node changes, if it's an 'Unknown' type,
+  // reset the dropdown to the first available icon type.
+  useEffect(() => {
+    if (selectedNode && selectedNode.data.iconType === 'Unknown') {
+      setAssignedType(availableIcons[0] || '');
+    }
+  }, [selectedNode, availableIcons]);
+
+  const handleAssignType = () => {
+    if (selectedNode && assignedType) {
+      onUpdateNodeType(selectedNode.id, assignedType);
+    }
+  };
+
   return (
     <div className="sidebar">
       <div>
@@ -73,13 +90,13 @@ const Sidebar = ({
       ) : (
         <>
             <div className="icon-selector-section">
-                <h3>Device Settings</h3>
-                <label htmlFor="icon-selector">Icon for New Devices</label>
+                <h3>Initial Device Settings</h3>
+                <label htmlFor="icon-selector">Icon for First Device</label>
                 <select 
                     id="icon-selector"
                     className="icon-selector"
-                    value={currentIconName} 
-                    onChange={(e) => setCurrentIconName(e.target.value)}
+                    value={initialIconName} 
+                    onChange={(e) => setInitialIconName(e.target.value)}
                 >
                     {availableIcons.map(iconName => (
                         <option key={iconName} value={iconName}>
@@ -87,6 +104,7 @@ const Sidebar = ({
                         </option>
                     ))}
                 </select>
+                <p>This icon is used for the first device you add to the map.</p>
             </div>
             
             <hr />
@@ -96,6 +114,26 @@ const Sidebar = ({
                     <>
                         <h3>Device Actions</h3>
                         <p className="selected-device-label">{selectedNode.data.hostname}</p>
+
+                        {selectedNode.data.iconType === 'Unknown' && (
+                          <div className="control-group">
+                            <label htmlFor="type-assign-selector">Assign Device Type</label>
+                            <select
+                              id="type-assign-selector"
+                              className="icon-selector"
+                              value={assignedType}
+                              onChange={(e) => setAssignedType(e.target.value)}
+                            >
+                              {availableIcons.map(iconName => (
+                                <option key={iconName} value={iconName}>
+                                  {iconName}
+                                </option>
+                              ))}
+                            </select>
+                            <button onClick={handleAssignType} style={{marginTop: '10px'}}>Update Type</button>
+                          </div>
+                        )}
+                        
                         <div className="control-group">
                           <button onClick={onDeleteNode} className="danger">
                             Delete Device
