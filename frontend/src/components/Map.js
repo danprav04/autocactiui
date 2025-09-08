@@ -5,12 +5,14 @@ import ReactFlow, {
   MiniMap,
 } from 'react-flow-renderer';
 
-const Map = ({ nodes, edges, onNodeClick, onNodesChange, nodeTypes, theme }) => {
+const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, nodeTypes, theme }) => {
   
   const minimapNodeColor = (node) => {
     switch (node.type) {
       case 'custom':
         return theme === 'dark' ? '#a8b3cf' : '#6f81a4';
+      case 'group':
+        return node.data.color || '#e9ecef';
       default:
         return '#eee';
     }
@@ -23,6 +25,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, nodeTypes, theme }) => 
         edges={edges}
         onNodeClick={onNodeClick}
         onNodesChange={onNodesChange}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
       >

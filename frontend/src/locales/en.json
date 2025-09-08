@@ -28,7 +28,16 @@
     "availableNeighbors": "Available Neighbors",
     "add": "Add",
     "noNeighbors": "No new neighbors to add.",
-    "placeholderClickNode": "Click a device on the map to see its details and neighbors."
+    "placeholderClickNode": "Click a device on the map to see its details and neighbors.",
+    "editGroup": "Edit Group",
+    "groupLabel": "Group Label",
+    "groupColor": "Color",
+    "width": "Width (px)",
+    "height": "Height (px)",
+    "updateGroup": "Update Group",
+    "deleteGroup": "Delete Group",
+    "mapTools": "Map Tools",
+    "addGroup": "Add Group"
   },
   "startup": {
     "title": "Interactive Network Map Creator",

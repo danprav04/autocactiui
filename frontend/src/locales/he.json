@@ -28,7 +28,16 @@
     "availableNeighbors": "שכנים זמינים",
     "add": "הוסף",
     "noNeighbors": "אין שכנים חדשים להוספה.",
-    "placeholderClickNode": "לחץ על רכיב במפה כדי לראות את פרטיו ושכניו."
+    "placeholderClickNode": "לחץ על רכיב במפה כדי לראות את פרטיו ושכניו.",
+    "editGroup": "ערוך קבוצה",
+    "groupLabel": "תווית קבוצה",
+    "groupColor": "צבע",
+    "width": "רוחב (פיקסל)",
+    "height": "גובה (פיקסל)",
+    "updateGroup": "עדכן קבוצה",
+    "deleteGroup": "מחק קבוצה",
+    "mapTools": "כלי מפה",
+    "addGroup": "הוסף קבוצה"
   },
   "startup": {
     "title": "יוצר מפות רשת אינטראקטיבי",

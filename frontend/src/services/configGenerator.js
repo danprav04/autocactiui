@@ -60,10 +60,13 @@ LINK DEFAULT
  * @returns {string} The full content of the .conf file.
  */
 export function generateCactiConfig(nodes, edges, mapName) {
+  // Filter out visual-only group nodes before generating the config
+  const deviceNodes = nodes.filter(node => node.type !== 'group');
+
   const nodeStrings = [];
   const linkStrings = [];
 
-  const nodeInfoMap = new Map(nodes.map(node => [node.id, node]));
+  const nodeInfoMap = new Map(deviceNodes.map(node => [node.id, node]));
   let nodeCounter = 1;
 
   // Define accurate node dimensions based on App.css for center calculations.
@@ -71,7 +74,7 @@ export function generateCactiConfig(nodes, edges, mapName) {
   const NODE_HEIGHT = 110; // Approximate height from visual inspection.
 
   // --- 1. Create Device NODE entries (the visible icons) ---
-  for (const node of nodes) {
+  for (const node of deviceNodes) {
     const cactiNodeId = `node${String(nodeCounter++).padStart(5, '0')}`;
     
     const iconType = node.data.iconType || 'Router';
@@ -168,10 +171,10 @@ export function generateCactiConfig(nodes, edges, mapName) {
   }
   
   // Calculate map dimensions based on node positions
-  const allX = nodes.map(n => n.position.x);
-  const allY = nodes.map(n => n.position.y);
-  const mapWidth = nodes.length > 0 ? Math.round(Math.max(...allX) + 150) : 800;
-  const mapHeight = nodes.length > 0 ? Math.round(Math.max(...allY) + 150) : 600;
+  const allX = deviceNodes.map(n => n.position.x);
+  const allY = deviceNodes.map(n => n.position.y);
+  const mapWidth = deviceNodes.length > 0 ? Math.round(Math.max(...allX) + 150) : 800;
+  const mapHeight = deviceNodes.length > 0 ? Math.round(Math.max(...allY) + 150) : 600;
 
   // Populate the final configuration template
   let finalConfig = CONFIG_TEMPLATE;

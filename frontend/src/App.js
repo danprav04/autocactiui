@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import Map from './components/Map';
 import Sidebar from './components/Sidebar';
 import CustomNode from './components/CustomNode';
+import GroupNode from './components/GroupNode';
 import StartupScreen from './components/Startup/StartupScreen';
 import ThemeToggleButton from './components/common/ThemeToggleButton';
 import LanguageSwitcher from './components/common/LanguageSwitcher';
@@ -17,7 +18,7 @@ import './App.css';
 function App() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedElement, setSelectedElement] = useState(null);
   const [neighbors, setNeighbors] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +30,7 @@ function App() {
   
   const { t, i18n } = useTranslation();
   const reactFlowWrapper = useRef(null);
-  const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
+  const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode }), []);
   const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
 
   useEffect(() => {
@@ -66,6 +67,7 @@ function App() {
     if (nodes.length > 0) {
         setNodes(nds =>
             nds.map(node => {
+                if (node.type !== 'custom') return node;
                 const iconType = node.data.iconType;
                 if (iconType && ICONS_BY_THEME[iconType]) {
                     return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
@@ -98,6 +100,7 @@ function App() {
         iconType: finalIconName,
         icon: ICONS_BY_THEME[finalIconName][theme]
       },
+      zIndex: 10
     };
   }, [theme]);
 
@@ -117,12 +120,22 @@ function App() {
   
   const onNodeClick = useCallback((event, node) => {
     setNodes(nds => nds.map(n => ({ ...n, selected: n.id === node.id })));
-    setSelectedNode(node);
-    handleFetchNeighbors(node.id);
+    setSelectedElement(node);
+    if (node.type === 'custom') {
+        handleFetchNeighbors(node.id);
+    } else {
+        setNeighbors([]);
+    }
   }, [handleFetchNeighbors]);
 
+  const onPaneClick = useCallback(() => {
+      setNodes(nds => nds.map(n => ({...n, selected: false})));
+      setSelectedElement(null);
+      setNeighbors([]);
+  }, []);
+
   const handleAddNeighbor = useCallback(async (neighbor) => {
-    if (!selectedNode || nodes.some(n => n.id === neighbor.ip)) return;
+    if (!selectedElement || selectedElement.type !== 'custom' || nodes.some(n => n.id === neighbor.ip)) return;
     
     setIsLoading(true);
     setError('');
@@ -130,12 +143,12 @@ function App() {
       const deviceResponse = await api.getDeviceInfo(neighbor.ip);
       if (!deviceResponse.data || deviceResponse.data.error) throw new Error(`No info for ${neighbor.ip}`);
       
-      const newPosition = { x: selectedNode.position.x + (Math.random() * 250 - 125), y: selectedNode.position.y + 150 };
+      const newPosition = { x: selectedElement.position.x + (Math.random() * 250 - 125), y: selectedElement.position.y + 150 };
       const newNode = createNodeObject(deviceResponse.data, newPosition);
 
       const primaryEdgeToAdd = {
-          id: `e-${selectedNode.id}-${newNode.id}`,
-          source: selectedNode.id,
+          id: `e-${selectedElement.id}-${newNode.id}`,
+          source: selectedElement.id,
           target: newNode.id,
           animated: true,
           style: { stroke: '#6c757d' },
@@ -173,45 +186,64 @@ function App() {
     } finally {
         setIsLoading(false);
     }
-  }, [createNodeObject, selectedNode, nodes, edges, t]);
+  }, [createNodeObject, selectedElement, nodes, edges, t]);
 
   const handleDeleteNode = useCallback(() => {
-    if (!selectedNode) return;
-    const nodeIdToDelete = selectedNode.id;
-    setNodes(nds => nds.filter(n => n.id !== nodeIdToDelete));
-    setEdges(eds => eds.filter(e => e.source !== nodeIdToDelete && e.target !== nodeIdToDelete));
-    setSelectedNode(null);
+    if (!selectedElement) return;
+    const elementIdToDelete = selectedElement.id;
+
+    if (selectedElement.type === 'custom') { // It's a device node
+        setEdges(eds => eds.filter(e => e.source !== elementIdToDelete && e.target !== elementIdToDelete));
+    }
+    
+    setNodes(nds => nds.filter(n => n.id !== elementIdToDelete));
+    setSelectedElement(null);
     setNeighbors([]);
-  }, [selectedNode]);
+  }, [selectedElement]);
   
   const handleUpdateNodeData = useCallback((nodeId, updatedData) => {
     setNodes(nds => nds.map(n => {
       if (n.id === nodeId) {
-        const newIconType = updatedData.iconType || n.data.iconType;
-        const updatedNode = {
-          ...n,
-          data: {
-            ...n.data,
-            ...updatedData,
-            icon: ICONS_BY_THEME[newIconType][theme],
-          },
-        };
-        // If the updated node is the currently selected one, update the selection state as well
-        if (selectedNode && selectedNode.id === nodeId) {
-          setSelectedNode(updatedNode);
+        let finalData = { ...n.data, ...updatedData };
+        if (n.type === 'custom') {
+            const newIconType = updatedData.iconType || n.data.iconType;
+            finalData.icon = ICONS_BY_THEME[newIconType][theme];
+        }
+        
+        const updatedNode = { ...n, data: finalData };
+        
+        if (selectedElement && selectedElement.id === nodeId) {
+          setSelectedElement(updatedNode);
         }
         return updatedNode;
       }
       return n;
     }));
-  }, [theme, selectedNode]);
+  }, [theme, selectedElement]);
+  
+  const handleAddGroup = useCallback(() => {
+    const newGroupId = `group_${Date.now()}`;
+    const newGroup = {
+      id: newGroupId,
+      type: 'group',
+      position: { x: 200, y: 200 },
+      data: {
+        label: 'New Group',
+        color: '#cfe2ff', // A light, neutral default color
+        width: 400,
+        height: 300
+      },
+      zIndex: 0 // Ensure groups are rendered behind device nodes
+    };
+    setNodes(nds => [...nds, newGroup]);
+  }, []);
 
   const handleStart = async (ip, initialIconName) => {
     if (!ip) { setError(t('app.errorStartIp')); return; }
     
     setIsLoading(true);
     setError('');
-    setSelectedNode(null);
+    setSelectedElement(null);
     try {
       const response = await api.getInitialDevice(ip);
       const newNode = createNodeObject(response.data, { x: 400, y: 150 }, initialIconName);
@@ -255,12 +287,13 @@ function App() {
   return (
     <div className="app-container">
       <Sidebar 
-        selectedNode={selectedNode}
+        selectedElement={selectedElement}
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
         onDeleteNode={handleDeleteNode}
         onUpdateNodeData={handleUpdateNodeData}
         onUploadMap={handleUploadMap}
+        onAddGroup={handleAddGroup}
         availableIcons={availableIcons}
         mapName={mapName}
         setMapName={setMapName}
@@ -287,6 +320,7 @@ function App() {
             edges={edges} 
             onNodeClick={onNodeClick} 
             onNodesChange={onNodesChange}
+            onPaneClick={onPaneClick}
             nodeTypes={nodeTypes} 
             theme={theme}
           />
