@@ -1,0 +1,43 @@
+{
+  "app": {
+    "loading": "טוען...",
+    "errorCacti": "לא ניתן היה לאחזר התקנות Cacti.",
+    "errorStartIp": "אנא הזן כתובת IP התחלתית.",
+    "errorInitialDevice": "איתור הרכיב הראשוני נכשל. אנא בדוק את כתובת ה-IP ונסה שוב.",
+    "errorEmptyMap": "לא ניתן להעלות מפה ריקה.",
+    "errorSelectCacti": "אנא בחר התקנת Cacti תחילה.",
+    "errorUpload": "העלאת המפה ל-Cacti נכשלה.",
+    "errorFetchNeighbors": "לא ניתן היה לאחזר שכנים עבור כתובת {{ip}}.",
+    "errorAddNeighbor": "הוספת השכן {{ip}} נכשלה."
+  },
+  "sidebar": {
+    "controls": "הגדרות",
+    "mapName": "שם המפה",
+    "mapNamePlaceholder": "לדוגמה, Core-Network",
+    "cactiInstall": "התקנת Cacti",
+    "cactiLoading": "טוען התקנות...",
+    "uploading": "מעלה...",
+    "uploadToCacti": "העלה ל-Cacti",
+    "placeholderStart": "התחל על ידי הזנת כתובת IP כדי למפות את הרשת שלך.",
+    "editDevice": "ערוך רכיב",
+    "hostname": "שם",
+    "ipAddress": "כתובת IP (מזהה)",
+    "deviceType": "סוג רכיב",
+    "updateDevice": "עדכן רכיב",
+    "deleteDevice": "מחק רכיב",
+    "availableNeighbors": "שכנים זמינים",
+    "add": "הוסף",
+    "noNeighbors": "אין שכנים חדשים להוספה.",
+    "placeholderClickNode": "לחץ על רכיב במפה כדי לראות את פרטיו ושכניו."
+  },
+  "startup": {
+    "title": "יוצר מפות רשת אינטראקטיבי",
+    "placeholderIp": "הזן כתובת IP של רכיב התחלתי",
+    "iconSelector": "השתמש בסמל: {{iconName}}",
+    "loading": "טוען...",
+    "startMapping": "התחל מיפוי"
+  },
+  "themeToggle": {
+    "title": "החלף ערכת נושא"
+  }
+}

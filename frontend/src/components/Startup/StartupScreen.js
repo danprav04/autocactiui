@@ -1,10 +1,12 @@
 // frontend/src/components/Startup/StartupScreen.js
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { INITIAL_ICON_NAME } from '../../config/constants';
 
 const StartupScreen = ({ onStart, isLoading, availableIcons }) => {
     const initialIpRef = useRef(null);
     const [initialIconName, setInitialIconName] = useState(INITIAL_ICON_NAME);
+    const { t } = useTranslation();
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -15,12 +17,12 @@ const StartupScreen = ({ onStart, isLoading, availableIcons }) => {
 
     return (
         <div className="start-container">
-            <h1>Interactive Network Map Creator</h1>
+            <h1>{t('startup.title')}</h1>
             <form className="start-form" onSubmit={handleSubmit}>
                 <input
                     type="text"
                     ref={initialIpRef}
-                    placeholder="Enter starting device IP"
+                    placeholder={t('startup.placeholderIp')}
                     defaultValue="10.10.1.3"
                 />
                 <select 
@@ -31,13 +33,13 @@ const StartupScreen = ({ onStart, isLoading, availableIcons }) => {
                 >
                     {availableIcons.map(iconName => (
                         <option key={iconName} value={iconName}>
-                            Use icon: {iconName}
+                            {t('startup.iconSelector', { iconName })}
                         </option>
                     ))}
                 </select>
 
                 <button type="submit" disabled={isLoading}>
-                    {isLoading ? 'Loading...' : 'Start Mapping'}
+                    {isLoading ? t('startup.loading') : t('startup.startMapping')}
                 </button>
             </form>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const Sidebar = ({ 
   selectedNode, 
@@ -18,6 +19,7 @@ const Sidebar = ({
 }) => {
   const [editableHostname, setEditableHostname] = useState('');
   const [editableType, setEditableType] = useState('');
+  const { t } = useTranslation();
 
   // When the selected node changes, update the local state for the input fields.
   useEffect(() => {
@@ -41,21 +43,21 @@ const Sidebar = ({
   return (
     <div className="sidebar">
       <div>
-        <h2>Controls</h2>
+        <h2>{t('sidebar.controls')}</h2>
         <div className="control-group">
-          <label htmlFor="map-name-input">Map Name</label>
+          <label htmlFor="map-name-input">{t('sidebar.mapName')}</label>
           <input
               id="map-name-input"
               type="text"
               value={mapName}
               onChange={(e) => setMapName(e.target.value)}
               disabled={!isMapStarted}
-              placeholder="e.g., Core-Network"
+              placeholder={t('sidebar.mapNamePlaceholder')}
           />
         </div>
 
         <div className="control-group">
-          <label htmlFor="cacti-selector">Cacti Installation</label>
+          <label htmlFor="cacti-selector">{t('sidebar.cactiInstall')}</label>
           <select
             id="cacti-selector"
             className="icon-selector"
@@ -64,7 +66,7 @@ const Sidebar = ({
             disabled={!isMapStarted || cactiInstallations.length === 0}
           >
             {cactiInstallations.length === 0 ? (
-              <option>Loading installations...</option>
+              <option>{t('sidebar.cactiLoading')}</option>
             ) : (
               cactiInstallations.map(inst => (
                 <option key={inst.id} value={inst.id}>
@@ -80,7 +82,7 @@ const Sidebar = ({
             onClick={onUploadMap} 
             disabled={!isMapStarted || isUploading || !selectedCactiId}
           >
-            {isUploading ? 'Uploading...' : 'Upload to Cacti'}
+            {isUploading ? t('sidebar.uploading') : t('sidebar.uploadToCacti')}
           </button>
         </div>
       </div>
@@ -89,15 +91,15 @@ const Sidebar = ({
 
       {!isMapStarted ? (
         <div className="placeholder-message">
-            Start by entering an IP address to begin mapping your network.
+            {t('sidebar.placeholderStart')}
         </div>
       ) : (
         <div className="neighbors-section">
             {selectedNode ? (
                 <>
-                    <h3>Edit Device</h3>
+                    <h3>{t('sidebar.editDevice')}</h3>
                     <div className="control-group">
-                      <label htmlFor="hostname-input">Hostname</label>
+                      <label htmlFor="hostname-input">{t('sidebar.hostname')}</label>
                       <input
                         id="hostname-input"
                         type="text"
@@ -107,7 +109,7 @@ const Sidebar = ({
                     </div>
 
                     <div className="control-group">
-                      <label htmlFor="ip-display">IP Address (Identifier)</label>
+                      <label htmlFor="ip-display">{t('sidebar.ipAddress')}</label>
                       <input
                         id="ip-display"
                         type="text"
@@ -117,7 +119,7 @@ const Sidebar = ({
                     </div>
                     
                     <div className="control-group">
-                      <label htmlFor="type-selector">Device Type</label>
+                      <label htmlFor="type-selector">{t('sidebar.deviceType')}</label>
                       <select
                         id="type-selector"
                         className="icon-selector"
@@ -133,13 +135,13 @@ const Sidebar = ({
                     </div>
 
                     <div className="control-group">
-                      <button onClick={handleUpdate}>Update Device</button>
+                      <button onClick={handleUpdate}>{t('sidebar.updateDevice')}</button>
                       <button onClick={onDeleteNode} className="danger">
-                        Delete Device
+                        {t('sidebar.deleteDevice')}
                       </button>
                     </div>
                     
-                    <h3>Available Neighbors</h3>
+                    <h3>{t('sidebar.availableNeighbors')}</h3>
                     {neighbors.length > 0 ? (
                         <ul>
                         {neighbors.map(neighbor => (
@@ -149,17 +151,17 @@ const Sidebar = ({
                                 <br/>
                                 <small>{neighbor.ip}</small>
                             </span>
-                            <button onClick={() => onAddNeighbor(neighbor)}>Add</button>
+                            <button onClick={() => onAddNeighbor(neighbor)}>{t('sidebar.add')}</button>
                             </li>
                         ))}
                         </ul>
                     ) : (
-                        <p className="no-neighbors-message">No new neighbors to add.</p>
+                        <p className="no-neighbors-message">{t('sidebar.noNeighbors')}</p>
                     )}
                 </>
             ) : (
                 <div className="placeholder-message">
-                    Click a device on the map to see its details and neighbors.
+                    {t('sidebar.placeholderClickNode')}
                 </div>
             )}
         </div>
