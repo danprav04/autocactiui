@@ -1,5 +1,6 @@
 // frontend/src/components/GroupNode.js
 import React, { memo, useState, useEffect, useRef, useContext } from 'react';
+import { useViewport } from 'react-flow-renderer';
 import { NodeContext } from '../App';
 
 // A more intuitive SVG icon for resizing
@@ -13,6 +14,7 @@ const ResizerIcon = () => (
 export default memo(({ id, data, selected }) => {
     const { onUpdateNodeData } = useContext(NodeContext);
     const { label, color, width, height, opacity } = data;
+    const { zoom } = useViewport();
     
     const [isEditing, setIsEditing] = useState(false);
     const [labelText, setLabelText] = useState(label);
@@ -56,8 +58,8 @@ export default memo(({ id, data, selected }) => {
         const startHeight = height;
 
         const doDrag = (e) => {
-            const newWidth = startWidth + e.clientX - startX;
-            const newHeight = startHeight + e.clientY - startY;
+            const newWidth = startWidth + (e.clientX - startX) / zoom;
+            const newHeight = startHeight + (e.clientY - startY) / zoom;
             // Update node data with new dimensions, enforcing a minimum size
             onUpdateNodeData(id, { width: Math.max(newWidth, 100), height: Math.max(newHeight, 80) });
         };

@@ -31,6 +31,7 @@ function App() {
   const [cactiInstallations, setCactiInstallations] = useState([]);
   const [selectedCactiId, setSelectedCactiId] = useState('');
   const [snapLines, setSnapLines] = useState([]);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
   
   const { t, i18n } = useTranslation();
   const reactFlowWrapper = useRef(null);
@@ -74,7 +75,7 @@ function App() {
                 if (node.type !== 'custom') return node;
                 const iconType = node.data.iconType;
                 if (iconType && ICONS_BY_THEME[iconType]) {
-                    return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
+                    return { ...node, data: { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } } };
                 }
                 return node;
             })
@@ -358,6 +359,8 @@ function App() {
     }
   };
 
+  const handleMove = useCallback((_, transform) => setViewport(transform), []);
+
   return (
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
       <div className="app-container">
@@ -384,22 +387,41 @@ function App() {
             <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
           </div>
           {nodes.length === 0 ? (
-            <StartupScreen 
-              onStart={handleStart} 
-              isLoading={isLoading}
-              availableIcons={availableIcons}
-            />
+            <div className="startup-wrapper">
+              <StartupScreen 
+                onStart={handleStart} 
+                isLoading={isLoading}
+                availableIcons={availableIcons}
+              />
+            </div>
           ) : (
-            <Map 
-              nodes={nodes} 
-              edges={edges} 
-              onNodeClick={onNodeClick} 
-              onNodesChange={onNodesChange}
-              onPaneClick={onPaneClick}
-              nodeTypes={nodeTypes} 
-              theme={theme}
-              snapLines={snapLines}
-            />
+            <>
+              <Map 
+                nodes={nodes} 
+                edges={edges} 
+                onNodeClick={onNodeClick} 
+                onNodesChange={onNodesChange}
+                onPaneClick={onPaneClick}
+                nodeTypes={nodeTypes} 
+                theme={theme}
+                onMove={handleMove}
+              />
+              {snapLines.map((line, i) => {
+                const style = {};
+                if (line.type === 'vertical') {
+                  style.left = line.x * viewport.zoom + viewport.x;
+                } else {
+                  style.top = line.y * viewport.zoom + viewport.y;
+                }
+                return (
+                  <div
+                    key={`${line.type}-${i}`}
+                    className={`snap-line ${line.type}`}
+                    style={style}
+                  />
+                );
+              })}
+            </>
           )}
           {error && <p className="error-message">{error}</p>}
           {isLoading && !error && <p className="loading-message">{t('app.loading')}</p>}
