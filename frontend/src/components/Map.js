@@ -16,7 +16,7 @@ const SnapLines = ({ lines }) => {
         {lines.map((line, i) => {
           if (line.type === 'vertical') {
             // Transform the pane-space x-coordinate to screen-space for the overlay SVG
-            const screenX = line.x * zoom + x;
+            const screenX = line.x * zoom + x + 15 * zoom;
             return <line key={i} x1={screenX} y1={0} x2={screenX} y2="100%" />;
           }
           // horizontal
