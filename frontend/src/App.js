@@ -109,17 +109,13 @@ function App() {
 
             const otherPointsX = [
                 otherNode.position.x,
-                otherNode.position.x + otherNodeWidth / 3,
                 otherNode.position.x + otherNodeWidth / 2,
-                otherNode.position.x + otherNodeWidth * 2 / 3,
-                otherNode.position.x + otherNodeWidth
+                otherNode.position.x + otherNodeWidth,
             ];
             const otherPointsY = [
                 otherNode.position.y,
-                otherNode.position.y + otherNodeHeight / 3,
                 otherNode.position.y + otherNodeHeight / 2,
-                otherNode.position.y + otherNodeHeight * 2 / 3,
-                otherNode.position.y + otherNodeHeight
+                otherNode.position.y + otherNodeHeight,
             ];
 
             const draggedPointsX = [newPos.x, newPos.x + NODE_WIDTH / 2, newPos.x + NODE_WIDTH];
