@@ -1,3 +1,4 @@
+// frontend/src/components/Map.js
 import React from 'react';
 import ReactFlow, {
   Background,
@@ -5,7 +6,11 @@ import ReactFlow, {
   MiniMap,
 } from 'react-flow-renderer';
 
-const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, nodeTypes, theme }) => {
+const SnapLine = ({ type, style }) => {
+  return <div className={`snap-line ${type}`} style={style} />;
+};
+
+const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, nodeTypes, theme, snapLines = [] }) => {
   
   const minimapNodeColor = (node) => {
     switch (node.type) {
@@ -32,6 +37,13 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, nodeTypes,
         <MiniMap nodeColor={minimapNodeColor} />
         <Controls />
         <Background color={theme === 'dark' ? '#404040' : '#ddd'} gap={24} />
+        {snapLines.map((line, i) => (
+          <SnapLine 
+            key={`${line.type}-${i}`} 
+            type={line.type} 
+            style={line.type === 'vertical' ? { left: line.x } : { top: line.y }} 
+          />
+        ))}
       </ReactFlow>
     </div>
   );

@@ -23,3 +23,18 @@ export const ICONS_BY_THEME = {
  * The default device type to suggest for the very first node placed on the map.
  */
 export const INITIAL_ICON_NAME = 'Router';
+
+/**
+ * The width of a standard device node in pixels.
+ */
+export const NODE_WIDTH = 150;
+
+/**
+ * The approximate height of a standard device node in pixels.
+ */
+export const NODE_HEIGHT = 110;
+
+/**
+ * The pixel distance within which snapping should occur.
+ */
+export const SNAP_THRESHOLD = 8;

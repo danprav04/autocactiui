@@ -515,3 +515,23 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]::-moz-range-thumb:hover {
     transform: scale(1.1);
 }
+
+/* --- SNAP GUIDES --- */
+.snap-line {
+    position: absolute;
+    background-color: var(--accent-primary);
+    z-index: 9; /* Render below nodes (z-index 10) but above background */
+    opacity: 0.8;
+}
+
+.snap-line.vertical {
+    width: 1px;
+    height: 100%;
+    top: 0;
+}
+
+.snap-line.horizontal {
+    height: 1px;
+    width: 100%;
+    left: 0;
+}

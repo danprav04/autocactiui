@@ -12,7 +12,7 @@ import ThemeToggleButton from './components/common/ThemeToggleButton';
 import LanguageSwitcher from './components/common/LanguageSwitcher';
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
-import { ICONS_BY_THEME } from './config/constants';
+import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT, SNAP_THRESHOLD } from './config/constants';
 import './App.css';
 
 // Create a context to provide the update function directly to node components
@@ -30,6 +30,7 @@ function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [cactiInstallations, setCactiInstallations] = useState([]);
   const [selectedCactiId, setSelectedCactiId] = useState('');
+  const [snapLines, setSnapLines] = useState([]);
   
   const { t, i18n } = useTranslation();
   const reactFlowWrapper = useRef(null);
@@ -83,7 +84,76 @@ function App() {
   }, [theme]);
 
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  const onNodesChange = useCallback((changes) => setNodes(nds => applyNodeChanges(changes, nds)), []);
+  
+  const onNodesChange = useCallback((changes) => {
+    const dragChange = changes.find(c => c.type === 'position' && c.dragging);
+
+    if (dragChange) {
+        const draggedNode = nodes.find(n => n.id === dragChange.id);
+
+        if (!dragChange.position || !draggedNode || draggedNode.type !== 'custom') {
+            setSnapLines([]);
+            setNodes(nds => applyNodeChanges(changes, nds));
+            return;
+        }
+        
+        const newPos = { ...dragChange.position };
+        let bestSnapX = { dist: Infinity };
+        let bestSnapY = { dist: Infinity };
+
+        for (const otherNode of nodes) {
+            if (otherNode.id === draggedNode.id) continue;
+
+            const otherNodeWidth = otherNode.type === 'group' ? otherNode.data.width : NODE_WIDTH;
+            const otherNodeHeight = otherNode.type === 'group' ? otherNode.data.height : NODE_HEIGHT;
+
+            const otherPointsX = [otherNode.position.x, otherNode.position.x + otherNodeWidth / 2, otherNode.position.x + otherNodeWidth];
+            const otherPointsY = [otherNode.position.y, otherNode.position.y + otherNodeHeight / 2, otherNode.position.y + otherNodeHeight];
+
+            const draggedPointsX = [newPos.x, newPos.x + NODE_WIDTH / 2, newPos.x + NODE_WIDTH];
+            const draggedPointsY = [newPos.y, newPos.y + NODE_HEIGHT / 2, newPos.y + NODE_HEIGHT];
+
+            for (let i = 0; i < draggedPointsX.length; i++) {
+                for (const p of otherPointsX) {
+                    const dist = Math.abs(draggedPointsX[i] - p);
+                    if (dist < SNAP_THRESHOLD && dist < bestSnapX.dist) {
+                        bestSnapX = { dist, pos: p, align: i }; // 0=left, 1=center, 2=right
+                    }
+                }
+            }
+            
+            for (let i = 0; i < draggedPointsY.length; i++) {
+                for (const p of otherPointsY) {
+                    const dist = Math.abs(draggedPointsY[i] - p);
+                    if (dist < SNAP_THRESHOLD && dist < bestSnapY.dist) {
+                        bestSnapY = { dist, pos: p, align: i }; // 0=top, 1=center, 2=bottom
+                    }
+                }
+            }
+        }
+        
+        const newSnapLines = [];
+        if (bestSnapX.pos !== undefined) {
+            if (bestSnapX.align === 0) newPos.x = bestSnapX.pos;
+            if (bestSnapX.align === 1) newPos.x = bestSnapX.pos - NODE_WIDTH / 2;
+            if (bestSnapX.align === 2) newPos.x = bestSnapX.pos - NODE_WIDTH;
+            newSnapLines.push({ type: 'vertical', x: bestSnapX.pos });
+        }
+        if (bestSnapY.pos !== undefined) {
+            if (bestSnapY.align === 0) newPos.y = bestSnapY.pos;
+            if (bestSnapY.align === 1) newPos.y = bestSnapY.pos - NODE_HEIGHT / 2;
+            if (bestSnapY.align === 2) newPos.y = bestSnapY.pos - NODE_HEIGHT;
+            newSnapLines.push({ type: 'horizontal', y: bestSnapY.pos });
+        }
+
+        dragChange.position = newPos;
+        setSnapLines(newSnapLines);
+    } else if (changes.some(c => c.type === 'position' && !c.dragging)) {
+        setSnapLines([]);
+    }
+
+    setNodes(nds => applyNodeChanges(changes, nds));
+  }, [nodes]);
 
   const createNodeObject = useCallback((device, position, explicitIconName) => {
     const discoveredType = device.type;
@@ -328,6 +398,7 @@ function App() {
               onPaneClick={onPaneClick}
               nodeTypes={nodeTypes} 
               theme={theme}
+              snapLines={snapLines}
             />
           )}
           {error && <p className="error-message">{error}</p>}
