@@ -32,14 +32,14 @@ const prepareElementsForExport = (nodes, edges) => {
 };
 
 /**
- * Calculates the optimal transform (zoom and pan) to fit all nodes within a 720p frame.
+ * Calculates the optimal transform (zoom and pan) to fit all nodes within a 1080p frame.
  * @param {Array} nodes - The array of nodes to be framed.
  * @returns {{transform: string, width: number, height: number}} The CSS transform string and target dimensions.
  */
 const calculateExportTransform = (nodes) => {
-    const targetWidth = 1280;
-    const targetHeight = 720;
-    const padding = 80; // Margin within the 720p frame
+    const targetWidth = 1920; // Full HD Resolution Width
+    const targetHeight = 1080; // Full HD Resolution Height
+    const padding = 80; // Increased margin for the higher resolution frame
 
     // Dimensions based on .custom-node CSS
     const nodeWidth = 150;
