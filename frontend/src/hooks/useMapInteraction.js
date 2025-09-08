@@ -183,17 +183,27 @@ export const useMapInteraction = (theme) => {
 
       const secondaryEdges = neighborsOfNewNode.reduce((acc, newNeighbor) => {
           const existingNode = currentNodes.find(n => n.id === newNeighbor.ip);
-          const edgeExists = currentEdges.some(e => (e.source === newNode.id && e.target === existingNode.id) || (e.source === existingNode.id && e.target === newNode.id));
           
-          if (existingNode && !edgeExists) {
-              acc.push({ 
-                  id: `e-${newNode.id}-${existingNode.id}`, 
-                  source: newNode.id, 
-                  target: existingNode.id, 
-                  animated: true, 
-                  style: { stroke: '#6c757d' },
-                  data: { interface: newNeighbor.interface }
-              });
+          // **THE FIX IS HERE**
+          // First, check if the neighbor node already exists on the map.
+          if (existingNode) {
+              // Only if it exists, check if an edge already connects them.
+              const edgeExists = currentEdges.some(e => 
+                  (e.source === newNode.id && e.target === existingNode.id) || 
+                  (e.source === existingNode.id && e.target === newNode.id)
+              );
+              
+              // If the node exists but an edge doesn't, create the new edge.
+              if (!edgeExists) {
+                  acc.push({ 
+                      id: `e-${newNode.id}-${existingNode.id}`, 
+                      source: newNode.id, 
+                      target: existingNode.id, 
+                      animated: true, 
+                      style: { stroke: '#6c757d' },
+                      data: { interface: newNeighbor.interface }
+                  });
+              }
           }
           return acc;
       }, []);
