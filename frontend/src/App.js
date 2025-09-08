@@ -91,6 +91,7 @@ function App() {
     if (dragChange) {
         const draggedNode = nodes.find(n => n.id === dragChange.id);
 
+        // We only implement snapping for 'custom' nodes for now.
         if (!dragChange.position || !draggedNode || draggedNode.type !== 'custom') {
             setSnapLines([]);
             setNodes(nds => applyNodeChanges(changes, nds));
@@ -118,6 +119,14 @@ function App() {
                 otherNode.position.y + otherNodeHeight,
             ];
 
+            // Add thirds for group nodes, enhancing alignment possibilities.
+            if (otherNode.type === 'group') {
+                otherPointsX.push(otherNode.position.x + otherNodeWidth / 3);
+                otherPointsX.push(otherNode.position.x + (otherNodeWidth * 2) / 3);
+                otherPointsY.push(otherNode.position.y + otherNodeHeight / 3);
+                otherPointsY.push(otherNode.position.y + (otherNodeHeight * 2) / 3);
+            }
+
             const draggedPointsX = [newPos.x, newPos.x + NODE_WIDTH / 2, newPos.x + NODE_WIDTH];
             const draggedPointsY = [newPos.y, newPos.y + NODE_HEIGHT / 2, newPos.y + NODE_HEIGHT];
 
@@ -142,21 +151,22 @@ function App() {
         
         const newSnapLines = [];
         if (bestSnapX.pos !== undefined) {
-            if (bestSnapX.align === 0) newPos.x = bestSnapX.pos;
-            if (bestSnapX.align === 1) newPos.x = bestSnapX.pos - NODE_WIDTH / 2;
-            if (bestSnapX.align === 2) newPos.x = bestSnapX.pos - NODE_WIDTH;
+            if (bestSnapX.align === 0) newPos.x = bestSnapX.pos; // Align left of dragged to snap line
+            if (bestSnapX.align === 1) newPos.x = bestSnapX.pos - NODE_WIDTH / 2; // Align center of dragged to snap line
+            if (bestSnapX.align === 2) newPos.x = bestSnapX.pos - NODE_WIDTH; // Align right of dragged to snap line
             newSnapLines.push({ type: 'vertical', x: bestSnapX.pos });
         }
         if (bestSnapY.pos !== undefined) {
-            if (bestSnapY.align === 0) newPos.y = bestSnapY.pos;
-            if (bestSnapY.align === 1) newPos.y = bestSnapY.pos - NODE_HEIGHT / 2;
-            if (bestSnapY.align === 2) newPos.y = bestSnapY.pos - NODE_HEIGHT;
+            if (bestSnapY.align === 0) newPos.y = bestSnapY.pos; // Align top of dragged to snap line
+            if (bestSnapY.align === 1) newPos.y = bestSnapY.pos - NODE_HEIGHT / 2; // Align middle of dragged to snap line
+            if (bestSnapY.align === 2) newPos.y = bestSnapY.pos - NODE_HEIGHT; // Align bottom of dragged to snap line
             newSnapLines.push({ type: 'horizontal', y: bestSnapY.pos });
         }
 
         dragChange.position = newPos;
         setSnapLines(newSnapLines);
     } else if (changes.some(c => c.type === 'position' && !c.dragging)) {
+        // Clear snap lines when dragging stops
         setSnapLines([]);
     }
 
