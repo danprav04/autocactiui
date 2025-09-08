@@ -524,21 +524,18 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 /* --- SNAP GUIDES --- */
-.snap-line {
+.snap-line-svg {
     position: absolute;
-    background-color: var(--accent-primary);
-    z-index: 9; /* Render below nodes (z-index 10) but above background */
-    opacity: 0.8;
-}
-
-.snap-line.vertical {
-    width: 1px;
-    height: 100%;
     top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Make sure SVG doesn't capture mouse events */
+    z-index: 9;
 }
 
-.snap-line.horizontal {
-    height: 1px;
-    width: 100%;
-    left: 0;
+.snap-line-svg line {
+    stroke: var(--accent-primary);
+    stroke-width: 1px;
+    stroke-opacity: 0.8;
 }

@@ -37,4 +37,4 @@ export const NODE_HEIGHT = 110;
 /**
  * The pixel distance within which snapping should occur.
  */
-export const SNAP_THRESHOLD = 8;
+export const SNAP_THRESHOLD = 12;

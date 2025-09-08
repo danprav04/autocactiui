@@ -1,6 +1,6 @@
 // frontend/src/App.js
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { applyNodeChanges } from 'react-flow-renderer';
+import { applyNodeChanges, ReactFlowProvider } from 'react-flow-renderer';
 import { useTranslation } from 'react-i18next';
 
 import Map from './components/Map';
@@ -31,7 +31,6 @@ function App() {
   const [cactiInstallations, setCactiInstallations] = useState([]);
   const [selectedCactiId, setSelectedCactiId] = useState('');
   const [snapLines, setSnapLines] = useState([]);
-  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
   
   const { t, i18n } = useTranslation();
   const reactFlowWrapper = useRef(null);
@@ -75,7 +74,7 @@ function App() {
                 if (node.type !== 'custom') return node;
                 const iconType = node.data.iconType;
                 if (iconType && ICONS_BY_THEME[iconType]) {
-                    return { ...node, data: { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } } };
+                    return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
                 }
                 return node;
             })
@@ -108,8 +107,20 @@ function App() {
             const otherNodeWidth = otherNode.type === 'group' ? otherNode.data.width : NODE_WIDTH;
             const otherNodeHeight = otherNode.type === 'group' ? otherNode.data.height : NODE_HEIGHT;
 
-            const otherPointsX = [otherNode.position.x, otherNode.position.x + otherNodeWidth / 2, otherNode.position.x + otherNodeWidth];
-            const otherPointsY = [otherNode.position.y, otherNode.position.y + otherNodeHeight / 2, otherNode.position.y + otherNodeHeight];
+            const otherPointsX = [
+                otherNode.position.x,
+                otherNode.position.x + otherNodeWidth / 3,
+                otherNode.position.x + otherNodeWidth / 2,
+                otherNode.position.x + otherNodeWidth * 2 / 3,
+                otherNode.position.x + otherNodeWidth
+            ];
+            const otherPointsY = [
+                otherNode.position.y,
+                otherNode.position.y + otherNodeHeight / 3,
+                otherNode.position.y + otherNodeHeight / 2,
+                otherNode.position.y + otherNodeHeight * 2 / 3,
+                otherNode.position.y + otherNodeHeight
+            ];
 
             const draggedPointsX = [newPos.x, newPos.x + NODE_WIDTH / 2, newPos.x + NODE_WIDTH];
             const draggedPointsY = [newPos.y, newPos.y + NODE_HEIGHT / 2, newPos.y + NODE_HEIGHT];
@@ -359,8 +370,6 @@ function App() {
     }
   };
 
-  const handleMove = useCallback((_, transform) => setViewport(transform), []);
-
   return (
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
       <div className="app-container">
@@ -395,7 +404,7 @@ function App() {
               />
             </div>
           ) : (
-            <>
+            <ReactFlowProvider>
               <Map 
                 nodes={nodes} 
                 edges={edges} 
@@ -404,24 +413,9 @@ function App() {
                 onPaneClick={onPaneClick}
                 nodeTypes={nodeTypes} 
                 theme={theme}
-                onMove={handleMove}
+                snapLines={snapLines}
               />
-              {snapLines.map((line, i) => {
-                const style = {};
-                if (line.type === 'vertical') {
-                  style.left = line.x * viewport.zoom + viewport.x;
-                } else {
-                  style.top = line.y * viewport.zoom + viewport.y;
-                }
-                return (
-                  <div
-                    key={`${line.type}-${i}`}
-                    className={`snap-line ${line.type}`}
-                    style={style}
-                  />
-                );
-              })}
-            </>
+            </ReactFlowProvider>
           )}
           {error && <p className="error-message">{error}</p>}
           {isLoading && !error && <p className="loading-message">{t('app.loading')}</p>}
