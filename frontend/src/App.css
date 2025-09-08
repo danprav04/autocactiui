@@ -380,6 +380,7 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 .node-icon {
     width: 40px;
     height: 40px;
+    object-fit: contain; /* Prevents icon images from being stretched or squashed */
 }
 
 .node-label {
