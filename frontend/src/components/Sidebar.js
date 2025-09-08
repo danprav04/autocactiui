@@ -5,32 +5,36 @@ const Sidebar = ({
   neighbors, 
   onAddNeighbor, 
   onDeleteNode,
-  onUpdateNodeType,
+  onUpdateNodeData,
   onUploadMap,
   availableIcons,
-  initialIconName,
-  setInitialIconName,
   mapName,
   setMapName,
-  disabled,
+  isMapStarted,
   isUploading,
   cactiInstallations,
   selectedCactiId,
   setSelectedCactiId
 }) => {
-  const [assignedType, setAssignedType] = useState(availableIcons[0] || '');
+  const [editableHostname, setEditableHostname] = useState('');
+  const [editableType, setEditableType] = useState('');
 
-  // When the selected node changes, if it's an 'Unknown' type,
-  // reset the dropdown to the first available icon type.
+  // When the selected node changes, update the local state for the input fields.
   useEffect(() => {
-    if (selectedNode && selectedNode.data.iconType === 'Unknown') {
-      setAssignedType(availableIcons[0] || '');
+    if (selectedNode) {
+      setEditableHostname(selectedNode.data.hostname);
+      // Ensure that if a node has an "Unknown" type, the dropdown still shows a valid, selectable type.
+      const currentType = selectedNode.data.iconType;
+      setEditableType(availableIcons.includes(currentType) ? currentType : availableIcons[0]);
     }
   }, [selectedNode, availableIcons]);
 
-  const handleAssignType = () => {
-    if (selectedNode && assignedType) {
-      onUpdateNodeType(selectedNode.id, assignedType);
+  const handleUpdate = () => {
+    if (selectedNode) {
+      onUpdateNodeData(selectedNode.id, {
+        hostname: editableHostname,
+        iconType: editableType
+      });
     }
   };
 
@@ -45,7 +49,7 @@ const Sidebar = ({
               type="text"
               value={mapName}
               onChange={(e) => setMapName(e.target.value)}
-              disabled={disabled}
+              disabled={!isMapStarted}
               placeholder="e.g., Core-Network"
           />
         </div>
@@ -57,7 +61,7 @@ const Sidebar = ({
             className="icon-selector"
             value={selectedCactiId}
             onChange={(e) => setSelectedCactiId(e.target.value)}
-            disabled={disabled || cactiInstallations.length === 0}
+            disabled={!isMapStarted || cactiInstallations.length === 0}
           >
             {cactiInstallations.length === 0 ? (
               <option>Loading installations...</option>
@@ -74,7 +78,7 @@ const Sidebar = ({
         <div className="control-group">
           <button 
             onClick={onUploadMap} 
-            disabled={disabled || isUploading || !selectedCactiId}
+            disabled={!isMapStarted || isUploading || !selectedCactiId}
           >
             {isUploading ? 'Uploading...' : 'Upload to Cacti'}
           </button>
@@ -83,88 +87,82 @@ const Sidebar = ({
       
       <hr />
 
-      {disabled ? (
+      {!isMapStarted ? (
         <div className="placeholder-message">
             Start by entering an IP address to begin mapping your network.
         </div>
       ) : (
-        <>
-            <div className="icon-selector-section">
-                <h3>Initial Device Settings</h3>
-                <label htmlFor="icon-selector">Icon for First Device</label>
-                <select 
-                    id="icon-selector"
-                    className="icon-selector"
-                    value={initialIconName} 
-                    onChange={(e) => setInitialIconName(e.target.value)}
-                >
-                    {availableIcons.map(iconName => (
-                        <option key={iconName} value={iconName}>
-                            {iconName}
-                        </option>
-                    ))}
-                </select>
-                <p>This icon is used for the first device you add to the map.</p>
-            </div>
-            
-            <hr />
-            
-            <div className="neighbors-section">
-                {selectedNode ? (
-                    <>
-                        <h3>Device Actions</h3>
-                        <p className="selected-device-label">{selectedNode.data.hostname}</p>
-
-                        {selectedNode.data.iconType === 'Unknown' && (
-                          <div className="control-group">
-                            <label htmlFor="type-assign-selector">Assign Device Type</label>
-                            <select
-                              id="type-assign-selector"
-                              className="icon-selector"
-                              value={assignedType}
-                              onChange={(e) => setAssignedType(e.target.value)}
-                            >
-                              {availableIcons.map(iconName => (
-                                <option key={iconName} value={iconName}>
-                                  {iconName}
-                                </option>
-                              ))}
-                            </select>
-                            <button onClick={handleAssignType} style={{marginTop: '10px'}}>Update Type</button>
-                          </div>
-                        )}
-                        
-                        <div className="control-group">
-                          <button onClick={onDeleteNode} className="danger">
-                            Delete Device
-                          </button>
-                        </div>
-                        
-                        <h3>Available Neighbors</h3>
-                        {neighbors.length > 0 ? (
-                            <ul>
-                            {neighbors.map(neighbor => (
-                                <li key={neighbor.ip}>
-                                <span>
-                                    {neighbor.neighbor}
-                                    <br/>
-                                    <small>{neighbor.ip}</small>
-                                </span>
-                                <button onClick={() => onAddNeighbor(neighbor)}>Add</button>
-                                </li>
-                            ))}
-                            </ul>
-                        ) : (
-                            <p className="no-neighbors-message">No new neighbors to add.</p>
-                        )}
-                    </>
-                ) : (
-                    <div className="placeholder-message">
-                        Click a device on the map to see its available neighbors.
+        <div className="neighbors-section">
+            {selectedNode ? (
+                <>
+                    <h3>Edit Device</h3>
+                    <div className="control-group">
+                      <label htmlFor="hostname-input">Hostname</label>
+                      <input
+                        id="hostname-input"
+                        type="text"
+                        value={editableHostname}
+                        onChange={(e) => setEditableHostname(e.target.value)}
+                      />
                     </div>
-                )}
-            </div>
-        </>
+
+                    <div className="control-group">
+                      <label htmlFor="ip-display">IP Address (Identifier)</label>
+                      <input
+                        id="ip-display"
+                        type="text"
+                        value={selectedNode.data.ip}
+                        disabled={true} // IP is the unique ID and should not be changed
+                      />
+                    </div>
+                    
+                    <div className="control-group">
+                      <label htmlFor="type-selector">Device Type</label>
+                      <select
+                        id="type-selector"
+                        className="icon-selector"
+                        value={editableType}
+                        onChange={(e) => setEditableType(e.target.value)}
+                      >
+                        {availableIcons.map(iconName => (
+                          <option key={iconName} value={iconName}>
+                            {iconName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="control-group">
+                      <button onClick={handleUpdate}>Update Device</button>
+                      <button onClick={onDeleteNode} className="danger">
+                        Delete Device
+                      </button>
+                    </div>
+                    
+                    <h3>Available Neighbors</h3>
+                    {neighbors.length > 0 ? (
+                        <ul>
+                        {neighbors.map(neighbor => (
+                            <li key={neighbor.ip}>
+                            <span>
+                                {neighbor.neighbor}
+                                <br/>
+                                <small>{neighbor.ip}</small>
+                            </span>
+                            <button onClick={() => onAddNeighbor(neighbor)}>Add</button>
+                            </li>
+                        ))}
+                        </ul>
+                    ) : (
+                        <p className="no-neighbors-message">No new neighbors to add.</p>
+                    )}
+                </>
+            ) : (
+                <div className="placeholder-message">
+                    Click a device on the map to see its details and neighbors.
+                </div>
+            )}
+        </div>
       )}
     </div>
   );

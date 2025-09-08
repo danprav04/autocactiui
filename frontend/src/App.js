@@ -9,7 +9,7 @@ import StartupScreen from './components/Startup/StartupScreen';
 import ThemeToggleButton from './components/common/ThemeToggleButton';
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
-import { ICONS_BY_THEME, INITIAL_ICON_NAME } from './config/constants';
+import { ICONS_BY_THEME } from './config/constants';
 import './App.css';
 
 function App() {
@@ -20,7 +20,6 @@ function App() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [initialIconName, setInitialIconName] = useState(INITIAL_ICON_NAME);
   const [mapName, setMapName] = useState('My-Network-Map');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [cactiInstallations, setCactiInstallations] = useState([]);
@@ -28,6 +27,7 @@ function App() {
   
   const reactFlowWrapper = useRef(null);
   const nodeTypes = useMemo(() => ({ custom: CustomNode }), []);
+  const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
 
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
@@ -70,13 +70,10 @@ function App() {
   const onNodesChange = useCallback((changes) => setNodes(nds => applyNodeChanges(changes, nds)), []);
 
   const createNodeObject = useCallback((device, position, explicitIconName) => {
-    // If an explicit icon name is provided (from the initial dropdown), use it.
-    // Otherwise, determine the icon type from the device data.
     const discoveredType = device.type;
     let finalIconName = explicitIconName;
 
     if (!finalIconName) {
-      // If the discovered type is a key in our icon map, use it. Otherwise, mark as 'Unknown'.
       finalIconName = ICONS_BY_THEME[discoveredType] ? discoveredType : 'Unknown';
     }
     
@@ -176,18 +173,19 @@ function App() {
     setNeighbors([]);
   }, [selectedNode]);
   
-  const handleUpdateNodeType = useCallback((nodeId, newType) => {
+  const handleUpdateNodeData = useCallback((nodeId, updatedData) => {
     setNodes(nds => nds.map(n => {
       if (n.id === nodeId) {
+        const newIconType = updatedData.iconType || n.data.iconType;
         const updatedNode = {
           ...n,
           data: {
             ...n.data,
-            iconType: newType,
-            icon: ICONS_BY_THEME[newType][theme],
+            ...updatedData,
+            icon: ICONS_BY_THEME[newIconType][theme],
           },
         };
-        // If the updated node is the currently selected one, update the selection as well
+        // If the updated node is the currently selected one, update the selection state as well
         if (selectedNode && selectedNode.id === nodeId) {
           setSelectedNode(updatedNode);
         }
@@ -197,7 +195,7 @@ function App() {
     }));
   }, [theme, selectedNode]);
 
-  const handleStart = async (ip) => {
+  const handleStart = async (ip, initialIconName) => {
     if (!ip) { setError('Please enter a starting IP address.'); return; }
     
     setIsLoading(true);
@@ -205,7 +203,6 @@ function App() {
     setSelectedNode(null);
     try {
       const response = await api.getInitialDevice(ip);
-      // The explicit icon name from the dropdown is used only for the very first device
       const newNode = createNodeObject(response.data, { x: 400, y: 150 }, initialIconName);
       setNodes([newNode]);
       setEdges([]);
@@ -251,14 +248,12 @@ function App() {
         neighbors={neighbors}
         onAddNeighbor={handleAddNeighbor}
         onDeleteNode={handleDeleteNode}
-        onUpdateNodeType={handleUpdateNodeType}
+        onUpdateNodeData={handleUpdateNodeData}
         onUploadMap={handleUploadMap}
-        availableIcons={Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown')}
-        initialIconName={initialIconName}
-        setInitialIconName={setInitialIconName}
+        availableIcons={availableIcons}
         mapName={mapName}
         setMapName={setMapName}
-        disabled={nodes.length === 0}
+        isMapStarted={nodes.length > 0}
         isUploading={isUploading}
         cactiInstallations={cactiInstallations}
         selectedCactiId={selectedCactiId}
@@ -267,7 +262,11 @@ function App() {
       <div className="main-content" ref={reactFlowWrapper}>
         <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
         {nodes.length === 0 ? (
-          <StartupScreen onStart={handleStart} isLoading={isLoading} />
+          <StartupScreen 
+            onStart={handleStart} 
+            isLoading={isLoading}
+            availableIcons={availableIcons}
+          />
         ) : (
           <Map 
             nodes={nodes} 

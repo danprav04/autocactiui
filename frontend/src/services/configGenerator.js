@@ -83,6 +83,10 @@ export function generateCactiConfig(nodes, edges, mapName) {
         case 'Firewall':
             iconFilename = 'firewall.png';
             break;
+        case 'Encryptor':
+            // Assuming an 'encryptor.png' icon exists in Cacti. Using firewall as fallback.
+            iconFilename = 'firewall.png'; 
+            break;
         case 'Router':
         default:
             iconFilename = 'router-black.png';
