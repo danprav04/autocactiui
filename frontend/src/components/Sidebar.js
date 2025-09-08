@@ -56,26 +56,57 @@ const Sidebar = ({
     }
   }, [selectedElement, availableIcons]);
 
-  const handleDeviceUpdate = () => {
-    if (selectedElement?.type === 'custom') {
-      onUpdateNodeData(selectedElement.id, {
-        hostname: editableHostname,
-        iconType: editableType
-      });
+  // Debounced effect for updating device nodes
+  useEffect(() => {
+    if (!selectedElement || selectedElement.type !== 'custom') return;
+
+    // Prevents running on initial form population
+    if (editableHostname === selectedElement.data.hostname && editableType === selectedElement.data.iconType) {
+        return;
     }
-  };
-  
-  const handleGroupUpdate = () => {
-    if (selectedElement?.type === 'group') {
-      onUpdateNodeData(selectedElement.id, {
-        label: groupLabel,
-        color: groupColor,
-        width: parseInt(groupWidth, 10) || 400,
-        height: parseInt(groupHeight, 10) || 300,
-        opacity: parseFloat(groupOpacity)
-      });
+    
+    const handler = setTimeout(() => {
+        onUpdateNodeData(selectedElement.id, {
+            hostname: editableHostname,
+            iconType: editableType
+        });
+    }, 500); // 500ms debounce delay
+
+    return () => clearTimeout(handler);
+  }, [editableHostname, editableType, selectedElement, onUpdateNodeData]);
+
+  // Debounced effect for updating group nodes
+  useEffect(() => {
+    if (!selectedElement || selectedElement.type !== 'group') return;
+    
+    const parsedWidth = parseInt(groupWidth, 10);
+    const parsedHeight = parseInt(groupHeight, 10);
+    const parsedOpacity = parseFloat(groupOpacity);
+
+    // Prevents running on initial form population
+    if (
+        groupLabel === selectedElement.data.label &&
+        groupColor === selectedElement.data.color &&
+        parsedWidth === selectedElement.data.width &&
+        parsedHeight === selectedElement.data.height &&
+        parsedOpacity === selectedElement.data.opacity
+    ) {
+        return;
     }
-  };
+
+    const handler = setTimeout(() => {
+        onUpdateNodeData(selectedElement.id, {
+            label: groupLabel,
+            color: groupColor,
+            width: parsedWidth || 400,
+            height: parsedHeight || 300,
+            opacity: parsedOpacity
+        });
+    }, 500); // 500ms debounce delay
+
+    return () => clearTimeout(handler);
+  }, [groupLabel, groupColor, groupWidth, groupHeight, groupOpacity, selectedElement, onUpdateNodeData]);
+
 
   const renderEditForm = () => {
     if (!selectedElement) {
@@ -121,7 +152,6 @@ const Sidebar = ({
                 />
               </div>
               <div className="control-group">
-                <button onClick={handleGroupUpdate}>{t('sidebar.updateGroup')}</button>
                 <button onClick={onDeleteNode} className="danger">{t('sidebar.deleteGroup')}</button>
               </div>
           </>
@@ -147,7 +177,6 @@ const Sidebar = ({
               </select>
             </div>
             <div className="control-group">
-              <button onClick={handleDeviceUpdate}>{t('sidebar.updateDevice')}</button>
               <button onClick={onDeleteNode} className="danger">{t('sidebar.deleteDevice')}</button>
             </div>
             
@@ -212,6 +241,7 @@ const Sidebar = ({
             {renderEditForm()}
         </div>
       )}
+
     </div>
   );
 };
