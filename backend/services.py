@@ -1,5 +1,6 @@
 import os
 import uuid
+import re
 from PIL import Image
 
 # Mock Database simulating your network devices and connections based on the new API spec
@@ -146,10 +147,23 @@ def save_uploaded_map(map_image_file, config_content, map_name):
     image = Image.open(map_image_file.stream)
     image.save(image_path)
     
+    # --- MODIFICATION ---
+    # The config file needs to point to the *actual* image file we just saved.
+    # We will replace the placeholder BACKGROUND line with the correct relative path.
+    # This path is relative from the config file's location (`static/configs`) 
+    # to the image's location (`static/maps`).
+    cacti_image_path = f"../maps/{image_filename}"
+    modified_config_content = re.sub(
+        r'^(BACKGROUND\s+).*$', 
+        fr'\1{cacti_image_path}', 
+        config_content, 
+        flags=re.MULTILINE
+    )
+
     # Save Config
     config_filename = f"{map_name}_{unique_id}.conf"
     config_path = os.path.join(configs_dir, config_filename)
     with open(config_path, 'w') as f:
-        f.write(config_content)
+        f.write(modified_config_content)
 
     return {"image_path": image_path, "config_path": config_path}

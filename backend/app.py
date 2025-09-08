@@ -1,15 +1,17 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, url_for
 from flask_cors import CORS
 import services
 import os
+import map_renderer
 
 app = Flask(__name__)
 # In production, you should restrict the origins to your frontend's domain
 CORS(app)
 
-# Ensure the directories for storing maps and configs exist
+# Ensure the directories for storing maps, configs, and final outputs exist
 os.makedirs('static/maps', exist_ok=True)
 os.makedirs('static/configs', exist_ok=True)
+os.makedirs('static/final_maps', exist_ok=True)
 
 @app.route('/get-device-info/<ip_address>', methods=['GET'])
 def get_device_info_endpoint(ip_address):
@@ -35,7 +37,10 @@ def get_all_cacti_installations_endpoint():
 
 @app.route('/upload-map', methods=['POST'])
 def upload_map_endpoint():
-    """Uploads a weathermap image and configuration."""
+    """
+    Uploads a weathermap image and config, then renders and saves a final
+    composite image with lines drawn on it.
+    """
     if 'map_image' not in request.files:
         return jsonify({"error": "Map image is required"}), 400
     
@@ -48,16 +53,32 @@ def upload_map_endpoint():
         return jsonify({"error": "Missing required form data: cacti_installation_id, map_name, or config_content"}), 400
 
     try:
+        # Step 1: Save the uploaded background image and the modified .conf file
         saved_paths = services.save_uploaded_map(map_image, config_content, map_name)
+        config_path = saved_paths['config_path']
+        
+        # Step 2: Define the output path for the final rendered map
+        config_filename = os.path.basename(config_path)
+        final_map_filename = config_filename.replace('.conf', '.png')
+        final_map_path = os.path.join('static/final_maps', final_map_filename)
+
+        # Step 3: Render the final map by drawing lines on the background and save it
+        map_renderer.render_and_save_map(config_path, final_map_path)
+
+        # Step 4: Generate a URL for the newly created final map
+        # Use url_for for proper URL generation, pointing to the static file
+        final_map_url = url_for('static', filename=f'final_maps/{final_map_filename}', _external=True)
+
         return jsonify({
             "success": True,
-            "message": f"Map '{map_name}' and its configuration have been saved successfully.",
+            "message": f"Map '{map_name}' processed and final image saved successfully.",
             "map_name": map_name,
-            "paths": saved_paths
+            "paths": saved_paths,
+            "final_map_url": final_map_url
         })
     except Exception as e:
-        print(f"Error saving uploaded map: {e}")
-        return jsonify({"error": "An internal error occurred while saving the map"}), 500
+        print(f"Error during map upload and rendering process: {e}")
+        return jsonify({"error": "An internal error occurred while processing the map"}), 500
 
 # This endpoint is kept for the frontend's initial device fetch logic,
 # which uses a POST request to start a new map.
