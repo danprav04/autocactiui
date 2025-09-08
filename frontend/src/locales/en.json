@@ -37,7 +37,8 @@
     "updateGroup": "Update Group",
     "deleteGroup": "Delete Group",
     "mapTools": "Map Tools",
-    "addGroup": "Add Group"
+    "addGroup": "Add Group",
+    "opacity": "Opacity"
   },
   "startup": {
     "title": "Interactive Network Map Creator",

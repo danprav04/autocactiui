@@ -402,6 +402,17 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 }
 
 /* --- GROUP NODE --- */
+
+/* Fix the background block artifact from React Flow's default styling */
+.react-flow__node-group, .react-flow__node-group:hover {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.react-flow__node-group .react-flow__handle {
+    display: none; /* Groups should not have connection handles */
+}
+
 .group-node {
   border-radius: 8px;
   padding: 15px;
@@ -410,8 +421,9 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  transition: border 0.2s ease;
-  pointer-events: all; /* Make sure group is selectable */
+  transition: border 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+  position: relative;
+  cursor: move;
 }
 
 .group-label {
@@ -421,8 +433,76 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
     padding: 4px 8px;
     border-radius: 4px;
     background-color: rgba(255, 255, 255, 0.7);
+    cursor: text;
+    user-select: none; /* Prevent text selection on double click */
 }
 [data-theme="dark"] .group-label {
     background-color: rgba(0, 0, 0, 0.4);
     color: var(--text-primary);
+}
+
+.group-label-input {
+    font-size: 16px;
+    font-weight: 600;
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--accent-primary);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.group-resizer {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+    background-image:
+        linear-gradient(135deg, var(--border-color) 25%, transparent 25%),
+        linear-gradient(225deg, var(--border-color) 25%, transparent 25%);
+    background-size: 10px 10px;
+    background-repeat: no-repeat;
+    background-position: bottom 2px right 2px;
+}
+
+/* --- SIDEBAR STYLES --- */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 5px;
+    outline: none;
+    padding: 0;
+    border: 1px solid var(--border-color);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: transform 0.1s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border-radius: 50%;
+    border: none;
+    transition: transform 0.1s ease;
+}
+input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.1);
 }

@@ -15,6 +15,9 @@ import { handleUploadProcess } from './services/mapExportService';
 import { ICONS_BY_THEME } from './config/constants';
 import './App.css';
 
+// Create a context to provide the update function directly to node components
+export const NodeContext = React.createContext(null);
+
 function App() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -231,7 +234,8 @@ function App() {
         label: 'New Group',
         color: '#cfe2ff', // A light, neutral default color
         width: 400,
-        height: 300
+        height: 300,
+        opacity: 0.6 // Default opacity
       },
       zIndex: 0 // Ensure groups are rendered behind device nodes
     };
@@ -285,50 +289,52 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      <Sidebar 
-        selectedElement={selectedElement}
-        neighbors={neighbors}
-        onAddNeighbor={handleAddNeighbor}
-        onDeleteNode={handleDeleteNode}
-        onUpdateNodeData={handleUpdateNodeData}
-        onUploadMap={handleUploadMap}
-        onAddGroup={handleAddGroup}
-        availableIcons={availableIcons}
-        mapName={mapName}
-        setMapName={setMapName}
-        isMapStarted={nodes.length > 0}
-        isUploading={isUploading}
-        cactiInstallations={cactiInstallations}
-        selectedCactiId={selectedCactiId}
-        setSelectedCactiId={setSelectedCactiId}
-      />
-      <div className="main-content" ref={reactFlowWrapper}>
-        <div className="top-controls">
-          <LanguageSwitcher />
-          <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+    <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
+      <div className="app-container">
+        <Sidebar 
+          selectedElement={selectedElement}
+          neighbors={neighbors}
+          onAddNeighbor={handleAddNeighbor}
+          onDeleteNode={handleDeleteNode}
+          onUpdateNodeData={handleUpdateNodeData}
+          onUploadMap={handleUploadMap}
+          onAddGroup={handleAddGroup}
+          availableIcons={availableIcons}
+          mapName={mapName}
+          setMapName={setMapName}
+          isMapStarted={nodes.length > 0}
+          isUploading={isUploading}
+          cactiInstallations={cactiInstallations}
+          selectedCactiId={selectedCactiId}
+          setSelectedCactiId={setSelectedCactiId}
+        />
+        <div className="main-content" ref={reactFlowWrapper}>
+          <div className="top-controls">
+            <LanguageSwitcher />
+            <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+          </div>
+          {nodes.length === 0 ? (
+            <StartupScreen 
+              onStart={handleStart} 
+              isLoading={isLoading}
+              availableIcons={availableIcons}
+            />
+          ) : (
+            <Map 
+              nodes={nodes} 
+              edges={edges} 
+              onNodeClick={onNodeClick} 
+              onNodesChange={onNodesChange}
+              onPaneClick={onPaneClick}
+              nodeTypes={nodeTypes} 
+              theme={theme}
+            />
+          )}
+          {error && <p className="error-message">{error}</p>}
+          {isLoading && !error && <p className="loading-message">{t('app.loading')}</p>}
         </div>
-        {nodes.length === 0 ? (
-          <StartupScreen 
-            onStart={handleStart} 
-            isLoading={isLoading}
-            availableIcons={availableIcons}
-          />
-        ) : (
-          <Map 
-            nodes={nodes} 
-            edges={edges} 
-            onNodeClick={onNodeClick} 
-            onNodesChange={onNodesChange}
-            onPaneClick={onPaneClick}
-            nodeTypes={nodeTypes} 
-            theme={theme}
-          />
-        )}
-        {error && <p className="error-message">{error}</p>}
-        {isLoading && !error && <p className="loading-message">{t('app.loading')}</p>}
       </div>
-    </div>
+    </NodeContext.Provider>
   );
 }
 

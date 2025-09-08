@@ -36,6 +36,7 @@ const Sidebar = ({
   const [groupColor, setGroupColor] = useState(GROUP_COLORS[0].value);
   const [groupWidth, setGroupWidth] = useState(400);
   const [groupHeight, setGroupHeight] = useState(300);
+  const [groupOpacity, setGroupOpacity] = useState(0.6);
 
   const { t } = useTranslation();
 
@@ -50,6 +51,7 @@ const Sidebar = ({
         setGroupColor(selectedElement.data.color);
         setGroupWidth(selectedElement.data.width);
         setGroupHeight(selectedElement.data.height);
+        setGroupOpacity(selectedElement.data.opacity);
       }
     }
   }, [selectedElement, availableIcons]);
@@ -70,6 +72,7 @@ const Sidebar = ({
         color: groupColor,
         width: parseInt(groupWidth, 10) || 400,
         height: parseInt(groupHeight, 10) || 300,
+        opacity: parseFloat(groupOpacity)
       });
     }
   };
@@ -104,6 +107,18 @@ const Sidebar = ({
               <div className="control-group">
                 <label htmlFor="group-height-input">{t('sidebar.height')}</label>
                 <input id="group-height-input" type="number" value={groupHeight} onChange={(e) => setGroupHeight(e.target.value)} />
+              </div>
+              <div className="control-group">
+                <label htmlFor="group-opacity-slider">{t('sidebar.opacity')} ({Math.round(groupOpacity * 100)}%)</label>
+                <input
+                  id="group-opacity-slider"
+                  type="range"
+                  min="0.1"
+                  max="1"
+                  step="0.05"
+                  value={groupOpacity}
+                  onChange={(e) => setGroupOpacity(e.target.value)}
+                />
               </div>
               <div className="control-group">
                 <button onClick={handleGroupUpdate}>{t('sidebar.updateGroup')}</button>

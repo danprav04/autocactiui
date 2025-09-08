@@ -37,7 +37,8 @@
     "updateGroup": "עדכן קבוצה",
     "deleteGroup": "מחק קבוצה",
     "mapTools": "כלי מפה",
-    "addGroup": "הוסף קבוצה"
+    "addGroup": "הוסף קבוצה",
+    "opacity": "שקיפות"
   },
   "startup": {
     "title": "יוצר מפות רשת אינטראקטיבי",
