@@ -32,14 +32,17 @@ const prepareElementsForExport = (nodes, edges) => {
 
 /**
  * Calculates the exact bounding box of all nodes and the transform to position content for capture.
+ * Ensures the final output is at least Full HD (1920x1080).
  * @param {Array} nodes - The array of all nodes on the map.
  * @returns {{width: number, height: number, transform: string, minX: number, minY: number, padding: number}}
  */
 const calculateBoundsAndTransform = (nodes) => {
-    const padding = 50; 
+    const padding = 50;
+    const MIN_WIDTH = 1920;
+    const MIN_HEIGHT = 1080;
 
     if (nodes.length === 0) {
-        return { width: 800, height: 600, transform: 'translate(0,0)', minX: 0, minY: 0, padding };
+        return { width: MIN_WIDTH, height: MIN_HEIGHT, transform: 'translate(0,0)', minX: 0, minY: 0, padding };
     }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -57,10 +60,15 @@ const calculateBoundsAndTransform = (nodes) => {
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
 
-    const finalWidth = Math.round(contentWidth + padding * 2);
-    const finalHeight = Math.round(contentHeight + padding * 2);
+    // Determine the final canvas size, ensuring it's at least HD resolution.
+    const finalWidth = Math.max(contentWidth + padding * 2, MIN_WIDTH);
+    const finalHeight = Math.max(contentHeight + padding * 2, MIN_HEIGHT);
 
-    const transform = `translate(${-minX + padding}px, ${-minY + padding}px)`;
+    // Calculate offsets to center the content within the (potentially larger) canvas.
+    const offsetX = (finalWidth - contentWidth) / 2;
+    const offsetY = (finalHeight - contentHeight) / 2;
+
+    const transform = `translate(${-minX + offsetX}px, ${-minY + offsetY}px)`;
 
     return {
         width: finalWidth,
@@ -83,7 +91,7 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         throw new Error('Could not find map viewport for export.');
     }
 
-    const { transform, width, height, minX, minY, padding } = calculateBoundsAndTransform(nodes);
+    const { transform, width, height, minX, minY } = calculateBoundsAndTransform(nodes);
     const originalTransform = viewport.style.transform;
     viewport.style.transform = transform; 
 
@@ -98,14 +106,21 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         if (!blob) {
             throw new Error('Failed to create image blob.');
         }
+        
+        // Calculate the offsets needed to center the content in the final image.
+        const contentWidth = (nodes.reduce((max, n) => Math.max(max, n.position.x + (n.type === 'group' ? n.data.width : NODE_WIDTH)), 0) - minX);
+        const contentHeight = (nodes.reduce((max, n) => Math.max(max, n.position.y + (n.type === 'group' ? n.data.height : NODE_HEIGHT)), 0) - minY);
+        const offsetX = (width - contentWidth) / 2;
+        const offsetY = (height - contentHeight) / 2;
+
 
         // Create a new set of nodes with their positions transformed into the coordinate
-        // system of the final PNG image. This simplifies the config generator.
+        // system of the final PNG image, including the centering offset.
         const nodesForConfig = nodes.map(node => ({
             ...node,
             position: {
-                x: node.position.x - minX + padding,
-                y: node.position.y - minY + padding,
+                x: node.position.x - minX + offsetX,
+                y: node.position.y - minY + offsetY,
             },
         }));
         
@@ -151,9 +166,6 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
-        // FIX: Pass the visually prepared `exportNodes` and `exportEdges` to the export function.
-        // This ensures the data used for screenshotting and config generation is identical,
-        // resolving any coordinate mismatches.
         await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: exportEdges, mapName, cactiId });
     } finally {
         mapElement.classList.remove('exporting');
