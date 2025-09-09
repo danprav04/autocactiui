@@ -6,12 +6,37 @@ import * as api from '../services/apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT, SNAP_THRESHOLD } from '../config/constants';
 
 export const useMapInteraction = (theme) => {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
+  const [nodes, setNodes] = useState(() => {
+    try {
+      const savedNodes = localStorage.getItem('mapNodes');
+      return savedNodes ? JSON.parse(savedNodes) : [];
+    } catch (error) {
+      console.error("Failed to parse nodes from localStorage", error);
+      return [];
+    }
+  });
+  const [edges, setEdges] = useState(() => {
+    try {
+      const savedEdges = localStorage.getItem('mapEdges');
+      return savedEdges ? JSON.parse(savedEdges) : [];
+    } catch (error) {
+      console.error("Failed to parse edges from localStorage", error);
+      return [];
+    }
+  });
   const [selectedElement, setSelectedElement] = useState(null);
   const [neighbors, setNeighbors] = useState([]);
   const [snapLines, setSnapLines] = useState([]);
   const { t } = useTranslation();
+
+  // Effect to save map state to localStorage whenever nodes or edges change
+  useEffect(() => {
+    if (nodes.length > 0) {
+      localStorage.setItem('mapNodes', JSON.stringify(nodes));
+      localStorage.setItem('mapEdges', JSON.stringify(edges));
+    }
+    // If nodes are cleared, the resetMap function will handle clearing localStorage
+  }, [nodes, edges]);
 
   // Effect to update node icons automatically when the theme changes
   useEffect(() => {
@@ -274,6 +299,8 @@ export const useMapInteraction = (theme) => {
     setEdges([]);
     setSelectedElement(null);
     setNeighbors([]);
+    localStorage.removeItem('mapNodes');
+    localStorage.removeItem('mapEdges');
   };
 
   return {

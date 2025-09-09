@@ -37,7 +37,9 @@
     "mapTools": "Map Tools",
     "addGroup": "Add Group",
     "newGroupName": "New Group",
-    "opacity": "Opacity"
+    "opacity": "Opacity",
+    "clearMap": "Clear Map",
+    "confirmReset": "Are you sure you want to clear the entire map? This action cannot be undone."
   },
   "startup": {
     "title": "Interactive Network Map Creator",

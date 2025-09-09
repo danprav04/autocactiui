@@ -121,6 +121,7 @@ function App() {
           onUpdateNodeData={handleUpdateNodeData}
           onUploadMap={handleUploadMap}
           onAddGroup={handleAddGroup}
+          onResetMap={resetMap}
           availableIcons={availableIcons}
           mapName={mapName}
           setMapName={setMapName}

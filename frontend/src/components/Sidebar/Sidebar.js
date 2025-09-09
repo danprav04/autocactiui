@@ -14,6 +14,7 @@ const Sidebar = ({
   onUpdateNodeData,
   onUploadMap,
   onAddGroup,
+  onResetMap,
   availableIcons,
   mapName,
   setMapName,
@@ -24,6 +25,12 @@ const Sidebar = ({
   setSelectedCactiId
 }) => {
   const { t } = useTranslation();
+
+  const handleResetClick = () => {
+    if (window.confirm(t('sidebar.confirmReset'))) {
+      onResetMap();
+    }
+  };
 
   const renderEditor = () => {
     if (!selectedElement) {
@@ -75,6 +82,11 @@ const Sidebar = ({
           <h3>{t('sidebar.mapTools')}</h3>
           <div className="control-group">
             <button onClick={onAddGroup} className="secondary">{t('sidebar.addGroup')}</button>
+          </div>
+          <div className="control-group">
+            <button onClick={handleResetClick} className="danger" disabled={!isMapStarted}>
+              {t('sidebar.clearMap')}
+            </button>
           </div>
           <hr />
         </div>
