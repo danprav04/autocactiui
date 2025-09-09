@@ -2,7 +2,7 @@
 import { toBlob } from 'html-to-image';
 import { generateCactiConfig } from './configGenerator';
 import { uploadMap } from './apiService';
-import { ICONS_BY_THEME } from '../config/constants';
+import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
 /**
  * Prepares nodes and edges for a clean export by applying specific styles.
@@ -11,27 +11,14 @@ import { ICONS_BY_THEME } from '../config/constants';
  * @returns {{exportNodes: Array, exportEdges: Array}} An object containing stylized nodes and edges.
  */
 const prepareElementsForExport = (nodes, edges) => {
-    const exportNodes = nodes.map(node => {
-        // Only process icons for device nodes ('custom' type).
-        // Group nodes do not have icons and should be passed through.
-        if (node.type === 'custom') {
-            return {
-                ...node,
-                selected: false,
-                data: {
-                    ...node.data,
-                    // Force light theme icons for consistent backgrounds
-                    icon: ICONS_BY_THEME[node.data.iconType].light
-                }
-            };
+    const exportNodes = nodes.map(node => ({
+        ...node,
+        selected: false,
+        data: {
+            ...node.data,
+            icon: node.type === 'custom' ? ICONS_BY_THEME[node.data.iconType].light : node.data.icon
         }
-        
-        // For all other node types (like 'group'), just deselect them.
-        return {
-            ...node,
-            selected: false,
-        };
-    });
+    }));
     
     const exportEdges = edges.map(edge => ({
         ...edge,
@@ -44,57 +31,51 @@ const prepareElementsForExport = (nodes, edges) => {
 };
 
 /**
- * Calculates the optimal transform (zoom and pan) to fit all nodes within a 1080p frame.
- * @param {Array} nodes - The array of nodes to be framed.
- * @returns {{transform: string, width: number, height: number}} The CSS transform string and target dimensions.
+ * Calculates the exact bounding box of all nodes and the transform to position content for capture.
+ * @param {Array} nodes - The array of all nodes on the map.
+ * @returns {{width: number, height: number, transform: string, minX: number, minY: number, padding: number}}
  */
-const calculateExportTransform = (nodes) => {
-    const targetWidth = 1920; // Full HD Resolution Width
-    const targetHeight = 1080; // Full HD Resolution Height
-    const padding = 80; // Increased margin for the higher resolution frame
+const calculateBoundsAndTransform = (nodes) => {
+    const padding = 50; 
 
-    // Dimensions based on .custom-node CSS
-    const nodeWidth = 150;
-    const nodeHeight = 110;
-
-    // Filter out groups for bounding box calculation to focus on devices
-    const deviceNodes = nodes.filter(n => n.type === 'custom');
-
-    if (deviceNodes.length === 0) {
-        return { transform: 'translate(0,0) scale(1)', width: targetWidth, height: targetHeight };
+    if (nodes.length === 0) {
+        return { width: 800, height: 600, transform: 'translate(0,0)', minX: 0, minY: 0, padding };
     }
-    
-    const minX = Math.min(...deviceNodes.map(n => n.position.x));
-    const minY = Math.min(...deviceNodes.map(n => n.position.y));
-    const maxX = Math.max(...deviceNodes.map(n => n.position.x + nodeWidth));
-    const maxY = Math.max(...deviceNodes.map(n => n.position.y + nodeHeight));
 
-    const boundsWidth = maxX - minX;
-    const boundsHeight = maxY - minY;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-    const scaleX = (targetWidth - padding * 2) / boundsWidth;
-    const scaleY = (targetHeight - padding * 2) / boundsHeight;
-    const scale = Math.min(scaleX, scaleY, 1); // Do not scale up beyond 100%
+    nodes.forEach(node => {
+        const nodeWidth = node.type === 'group' ? node.data.width : NODE_WIDTH;
+        const nodeHeight = node.type === 'group' ? node.data.height : NODE_HEIGHT;
 
-    const translateX = ((targetWidth - (boundsWidth * scale)) / 2) - (minX * scale);
-    const translateY = ((targetHeight - (boundsHeight * scale)) / 2) - (minY * scale);
-    
+        minX = Math.min(minX, node.position.x);
+        minY = Math.min(minY, node.position.y);
+        maxX = Math.max(maxX, node.position.x + nodeWidth);
+        maxY = Math.max(maxY, node.position.y + nodeHeight);
+    });
+
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+
+    const finalWidth = Math.round(contentWidth + padding * 2);
+    const finalHeight = Math.round(contentHeight + padding * 2);
+
+    const transform = `translate(${-minX + padding}px, ${-minY + padding}px)`;
+
     return {
-        transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
-        width: targetWidth,
-        height: targetHeight,
+        width: finalWidth,
+        height: finalHeight,
+        transform: transform,
+        minX,
+        minY,
+        padding
     };
 };
 
 /**
- * Captures the current map view as a blob, generates a config, and uploads both to Cacti.
+ * Captures the map view, generates a config, and uploads both to Cacti.
  * @param {object} params - The export parameters.
- * @param {HTMLElement} params.mapElement - The React Flow wrapper element.
- * @param {Array} params.nodes - The current nodes.
- * @param {Array} params.edges - The current edges.
- * @param {string} params.mapName - The name of the map.
- * @param {string} params.cactiId - The ID of the target Cacti installation.
- * @returns {Promise<void>} A promise that resolves on success or rejects on failure.
+ * @returns {Promise<void>}
  */
 export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiId }) => {
     const viewport = mapElement.querySelector('.react-flow__viewport');
@@ -102,16 +83,16 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         throw new Error('Could not find map viewport for export.');
     }
 
-    const { transform, width, height } = calculateExportTransform(nodes);
+    // THE FIX: Get the calculated offsets (minX, minY) and padding from the bounds calculation.
+    const { transform, width, height, minX, minY, padding } = calculateBoundsAndTransform(nodes);
     const originalTransform = viewport.style.transform;
-    viewport.style.transform = transform; // Apply calculated transform for capturing
+    viewport.style.transform = transform; 
 
     try {
         const blob = await toBlob(viewport, {
             width: width,
             height: height,
             backgroundColor: '#ffffff',
-            // Filter out the React Flow controls from the captured image
             filter: (node) => (node.className !== 'react-flow__controls'),
         });
 
@@ -119,7 +100,18 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
             throw new Error('Failed to create image blob.');
         }
 
-        const configContent = generateCactiConfig(nodes, edges, mapName);
+        // THE FIX: Pass all necessary data to the config generator to create relative coordinates.
+        const configContent = generateCactiConfig({
+            nodes, 
+            edges, 
+            mapName, 
+            mapWidth: width, 
+            mapHeight: height, 
+            offsetX: minX, 
+            offsetY: minY,
+            padding
+        });
+        
         const formData = new FormData();
         formData.append('map_image', blob, `${mapName}.png`);
         formData.append('config_content', configContent);
@@ -129,24 +121,20 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         await uploadMap(formData);
 
     } finally {
-        // Always restore the original transform after capturing
         viewport.style.transform = originalTransform;
     }
 };
 
 /**
  * A wrapper function that handles the entire map upload process, including temporary state changes.
- * @param {object} params - The export parameters, same as exportAndUploadMap.
- * @param {function} params.setNodes - React state setter for nodes.
- * @param {function} params.setEdges - React state setter for edges.
- * @returns {Promise<void>} A promise that resolves on success or rejects on failure.
+ * @param {object} params - The export parameters, plus state setters.
+ * @returns {Promise<void>}
  */
 export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, cactiId, theme, setNodes, setEdges }) => {
     const originalNodes = [...nodes];
     const originalEdges = [...edges];
     const wasDarkTheme = theme === 'dark';
 
-    // Prepare UI for export
     const { exportNodes, exportEdges } = prepareElementsForExport(nodes, edges);
     setNodes(exportNodes);
     setEdges(exportEdges);
@@ -155,13 +143,11 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
         document.body.setAttribute('data-theme', 'light');
     }
 
-    // A short timeout allows React to re-render with the export styles before we take the screenshot.
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
         await exportAndUploadMap({ mapElement, nodes: originalNodes, edges: originalEdges, mapName, cactiId });
     } finally {
-        // Restore original UI state
         mapElement.classList.remove('exporting');
         if (wasDarkTheme) {
             document.body.setAttribute('data-theme', 'dark');
