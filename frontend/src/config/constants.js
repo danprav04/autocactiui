@@ -26,13 +26,17 @@ export const INITIAL_ICON_NAME = 'Router';
 
 /**
  * The width of a standard device node in pixels.
+ * This must match the total rendered width from CSS for accurate map exports.
+ * CSS (.custom-node): width(150px) + padding(15px*2) + border(1px*2) = 182px.
  */
-export const NODE_WIDTH = 150;
+export const NODE_WIDTH = 182;
 
 /**
  * The approximate height of a standard device node in pixels.
+ * This must match the total rendered height from CSS for accurate map exports.
+ * CSS (.custom-node): padding(15px*2) + border(1px*2) + icon(40px) + gap(5px) + text(~35px) = 112px.
  */
-export const NODE_HEIGHT = 110;
+export const NODE_HEIGHT = 112;
 
 /**
  * The pixel distance within which snapping should occur.

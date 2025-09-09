@@ -1,4 +1,6 @@
 // frontend/src/services/configGenerator.js
+import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
+
 // Template for a Weathermap NODE representing a device with an icon and label.
 const DEVICE_NODE_TEMPLATE = "NODE {id}\n\tLABEL {hostname}\n\tICON images/devices/{iconFilename}\n\tPOSITION {x} {y}";
 
@@ -65,9 +67,6 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
   const nodeInfoMap = new Map(deviceNodes.map(node => [node.id, node]));
   let nodeCounter = 1;
 
-  const NODE_WIDTH = 150;
-  const NODE_HEIGHT = 110; 
-
   // Function to convert absolute map coordinates to coordinates relative to the exported image
   const toRelativePosition = (absolutePos) => {
       return {
@@ -88,7 +87,8 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
         case 'Router': default: iconFilename = 'router-black.png'; break;
     }
     
-    // THE FIX: Convert absolute node positions to relative positions for the config file
+    // Convert absolute node positions to relative positions for the config file.
+    // The position in the config corresponds to the center of the node's bounding box.
     const relativePos = toRelativePosition(node.position);
     const centerX = Math.round(relativePos.x + (NODE_WIDTH / 2));
     const centerY = Math.round(relativePos.y + (NODE_HEIGHT / 2));
@@ -102,6 +102,8 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
     );
   }
 
+  // The offset for link endpoints from the node's center. This is based on
+  // half the content width of the node (150px), not the total bounding box width.
   const LINK_ENDPOINT_OFFSET = 75; 
 
   for (const edge of edges) {
@@ -110,7 +112,7 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
 
     if (!sourceNodeInfo || !targetNodeInfo) continue;
     
-    // THE FIX: Use relative coordinates for link endpoint calculations
+    // Use relative coordinates for link endpoint calculations, starting from the node's center.
     const relSourcePos = toRelativePosition(sourceNodeInfo.position);
     const relTargetPos = toRelativePosition(targetNodeInfo.position);
 
