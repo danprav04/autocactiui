@@ -3,12 +3,15 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as api from '../services/apiService';
 
-export const useCacti = (setError) => {
+export const useCacti = (setError, token) => {
   const [cactiInstallations, setCactiInstallations] = useState([]);
   const [selectedCactiId, setSelectedCactiId] = useState('');
   const { t } = useTranslation();
 
   useEffect(() => {
+    // Only fetch data if the user is authenticated (token exists)
+    if (!token) return;
+
     const fetchCactiInstallations = async () => {
       try {
         const response = await api.getAllCactiInstallations();
@@ -23,7 +26,7 @@ export const useCacti = (setError) => {
       }
     };
     fetchCactiInstallations();
-  }, [t, setError]);
+  }, [t, setError, token]);
 
   return { cactiInstallations, selectedCactiId, setSelectedCactiId };
 };

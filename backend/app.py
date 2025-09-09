@@ -3,9 +3,18 @@ from flask_cors import CORS
 import services
 import os
 import map_renderer
+import jwt
+from functools import wraps
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-# In production, you should restrict the origins to your frontend's domain
+
+# --- Authentication Configuration ---
+# In a real production environment, this secret key should be loaded from a secure,
+# non-version-controlled location (e.g., environment variables, a vault).
+app.config['SECRET_KEY'] = 'your-super-secret-and-complex-key-that-is-not-in-git'
+# ---
+
 CORS(app)
 
 # Ensure the directories for storing maps, configs, and final outputs exist
@@ -13,7 +22,62 @@ os.makedirs('static/maps', exist_ok=True)
 os.makedirs('static/configs', exist_ok=True)
 os.makedirs('static/final_maps', exist_ok=True)
 
+
+# --- Authentication Token Decorator ---
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            # Expected format: "Bearer <token>"
+            try:
+                auth_header = request.headers['Authorization']
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'message': 'Malformed Authorization header'}), 401
+
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+
+        try:
+            # Decode the token using the secret key
+            jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired!'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Token is invalid!'}), 401
+        
+        return f(*args, **kwargs)
+    return decorated
+
+
+# --- Public Authentication Endpoint ---
+@app.route('/login', methods=['POST'])
+def login():
+    """Authenticates a user and returns a JWT."""
+    auth = request.json
+    if not auth or not auth.get('username') or not auth.get('password'):
+        return jsonify({'message': 'Could not verify'}), 401, {'WWW-Authenticate': 'Basic realm="Login required!"'}
+
+    username = auth.get('username')
+    password = auth.get('password')
+
+    user = services.verify_user(username, password)
+
+    if user:
+        token = jwt.encode({
+            'user': username,
+            'exp': datetime.utcnow() + timedelta(hours=24) # Token expires in 24 hours
+        }, app.config['SECRET_KEY'], algorithm="HS256")
+
+        return jsonify({'token': token})
+
+    return jsonify({'message': 'Invalid credentials'}), 401
+
+
+# --- Protected API Endpoints ---
 @app.route('/get-device-info/<ip_address>', methods=['GET'])
+@token_required
 def get_device_info_endpoint(ip_address):
     """Retrieves device type, model, and hostname by IP address."""
     device_info = services.get_device_info(ip_address)
@@ -22,6 +86,7 @@ def get_device_info_endpoint(ip_address):
     return jsonify({"error": "Device not found"}), 404
 
 @app.route('/get-device-neighbors/<ip_address>', methods=['GET'])
+@token_required
 def get_device_neighbors_endpoint(ip_address):
     """Gets CDP neighbors of a device by IP address using SNMP."""
     neighbors = services.get_device_neighbors(ip_address)
@@ -30,12 +95,14 @@ def get_device_neighbors_endpoint(ip_address):
     return jsonify({"error": "Device not found or has no neighbors"}), 404
 
 @app.route('/get-all-cacti-installations', methods=['GET'])
+@token_required
 def get_all_cacti_installations_endpoint():
     """Retrieves all registered Cacti installations."""
     installations = services.get_all_cacti_installations()
     return jsonify(installations)
 
 @app.route('/upload-map', methods=['POST'])
+@token_required
 def upload_map_endpoint():
     """
     Uploads a weathermap image and config, then renders and saves a final
@@ -80,9 +147,8 @@ def upload_map_endpoint():
         print(f"Error during map upload and rendering process: {e}")
         return jsonify({"error": "An internal error occurred while processing the map"}), 500
 
-# This endpoint is kept for the frontend's initial device fetch logic,
-# which uses a POST request to start a new map.
 @app.route('/api/devices', methods=['POST'])
+@token_required
 def get_initial_device():
     """Endpoint to get the very first device to start the map."""
     data = request.get_json()

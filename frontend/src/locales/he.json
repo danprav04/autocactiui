@@ -8,7 +8,8 @@
     "errorSelectCacti": "אנא בחר התקנת Cacti תחילה.",
     "errorUpload": "העלאת המפה ל-Cacti נכשלה.",
     "errorFetchNeighbors": "לא ניתן היה לאחזר שכנים עבור כתובת {{ip}}.",
-    "errorAddNeighbor": "הוספת השכן {{ip}} נכשלה."
+    "errorAddNeighbor": "הוספת השכן {{ip}} נכשלה.",
+    "errorLogin": "ההתחברות נכשלה. אנא בדוק את שם המשתמש והסיסמה."
   },
   "sidebar": {
     "controls": "הגדרות",
@@ -39,7 +40,9 @@
     "newGroupName": "קבוצה חדשה",
     "opacity": "שקיפות",
     "clearMap": "נקה מפה",
-    "confirmReset": "האם אתה בטוח שברצונך לנקות את כל המפה? לא ניתן לבטל פעולה זו."
+    "confirmReset": "האם אתה בטוח שברצונך לנקות את כל המפה? לא ניתן לבטל פעולה זו.",
+    "session": "סשן",
+    "logout": "התנתק"
   },
   "startup": {
     "title": "יוצר מפות רשת אינטראקטיבי",
@@ -50,5 +53,12 @@
   },
   "themeToggle": {
     "title": "החלף ערכת נושא"
+  },
+  "login": {
+    "title": "ברוכים הבאים",
+    "subtitle": "אנא התחבר כדי להמשיך",
+    "username": "שם משתמש",
+    "password": "סיסמה",
+    "button": "התחבר"
   }
 }

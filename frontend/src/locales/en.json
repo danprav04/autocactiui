@@ -8,7 +8,8 @@
     "errorSelectCacti": "Please select a Cacti installation first.",
     "errorUpload": "Failed to upload map to Cacti.",
     "errorFetchNeighbors": "Could not fetch neighbors for IP {{ip}}.",
-    "errorAddNeighbor": "Failed to add neighbor {{ip}}."
+    "errorAddNeighbor": "Failed to add neighbor {{ip}}.",
+    "errorLogin": "Login failed. Please check your username and password."
   },
   "sidebar": {
     "controls": "Controls",
@@ -39,7 +40,9 @@
     "newGroupName": "New Group",
     "opacity": "Opacity",
     "clearMap": "Clear Map",
-    "confirmReset": "Are you sure you want to clear the entire map? This action cannot be undone."
+    "confirmReset": "Are you sure you want to clear the entire map? This action cannot be undone.",
+    "session": "Session",
+    "logout": "Logout"
   },
   "startup": {
     "title": "Interactive Network Map Creator",
@@ -50,5 +53,12 @@
   },
   "themeToggle": {
     "title": "Toggle Theme"
+  },
+  "login": {
+    "title": "Welcome",
+    "subtitle": "Please log in to continue",
+    "username": "Username",
+    "password": "Password",
+    "button": "Login"
   }
 }

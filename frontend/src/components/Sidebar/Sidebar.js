@@ -15,6 +15,7 @@ const Sidebar = ({
   onUploadMap,
   onAddGroup,
   onResetMap,
+  onLogout,
   availableIcons,
   mapName,
   setMapName,
@@ -88,9 +89,15 @@ const Sidebar = ({
               {t('sidebar.clearMap')}
             </button>
           </div>
-          <hr />
         </div>
       )}
+      
+      <h3>{t('sidebar.session')}</h3>
+      <div className="control-group">
+        <button onClick={onLogout} className="secondary">{t('sidebar.logout')}</button>
+      </div>
+
+      <hr />
 
       <div className="neighbors-section">
         {renderEditor()}

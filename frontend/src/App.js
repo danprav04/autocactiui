@@ -13,6 +13,7 @@ import Sidebar from './components/Sidebar/Sidebar';
 import CustomNode from './components/CustomNode';
 import GroupNode from './components/GroupNode';
 import StartupScreen from './components/Startup/StartupScreen';
+import LoginScreen from './components/Login/LoginScreen';
 import ThemeToggleButton from './components/common/ThemeToggleButton';
 import LanguageSwitcher from './components/common/LanguageSwitcher';
 
@@ -28,6 +29,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [mapName, setMapName] = useState('My-Network-Map');
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
   
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
@@ -35,7 +37,7 @@ function App() {
   // --- Custom Hooks for State and Logic Management ---
   const { theme, toggleTheme } = useThemeManager();
   useLocalizationManager();
-  const { cactiInstallations, selectedCactiId, setSelectedCactiId } = useCacti(setError);
+  const { cactiInstallations, selectedCactiId, setSelectedCactiId } = useCacti(setError, token);
   const {
     nodes, setNodes,
     edges, setEdges,
@@ -52,6 +54,28 @@ function App() {
     createNodeObject,
     resetMap,
   } = useMapInteraction(theme);
+
+  // --- Authentication Handlers ---
+  const handleLogin = async (username, password) => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const response = await api.login(username, password);
+      const newToken = response.data.token;
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+    } catch (err) {
+      setError(t('app.errorLogin'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    resetMap(); // Also clear the map on logout
+  };
 
   // --- Memos for Performance ---
   const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode }), []);
@@ -110,6 +134,10 @@ function App() {
       await handleAddNeighbor(neighbor, setIsLoading, setError);
   }, [handleAddNeighbor]);
 
+  if (!token) {
+    return <LoginScreen onLogin={handleLogin} error={error} isLoading={isLoading} />;
+  }
+
   return (
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
       <div className="app-container">
@@ -122,6 +150,7 @@ function App() {
           onUploadMap={handleUploadMap}
           onAddGroup={handleAddGroup}
           onResetMap={resetMap}
+          onLogout={handleLogout}
           availableIcons={availableIcons}
           mapName={mapName}
           setMapName={setMapName}

@@ -2,6 +2,24 @@ import os
 import uuid
 import re
 from PIL import Image
+from werkzeug.security import check_password_hash
+
+# --- Mock Authentication Data ---
+# In a real application, this would be replaced with a proper database
+# and secure password management. The password 'admin' is hashed.
+MOCK_USERS = {
+    "admin": {
+        "hash": "pbkdf2:sha256:600000$hUSaowPe1mJ14sCt$0392e20b3a323a6368d1502446a0c0a911765c92471f09c647b593685f6f7051"
+    }
+}
+
+def verify_user(username, password):
+    """Verifies user credentials against the mock database."""
+    user = MOCK_USERS.get(username)
+    if user:
+        return {"username": username}
+    return None
+# ---
 
 # Mock Database simulating your network devices and connections based on the new API spec
 MOCK_NETWORK = {

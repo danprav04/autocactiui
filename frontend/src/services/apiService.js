@@ -6,6 +6,30 @@ const apiClient = axios.create({
     baseURL: process.env.REACT_APP_API_URL
 });
 
+// Use an interceptor to automatically add the auth token to every request.
+apiClient.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+/**
+ * Authenticates a user against the backend.
+ * @param {string} username - The user's username.
+ * @param {string} password - The user's password.
+ * @returns {Promise<object>} A promise resolving to the authentication response, containing the token.
+ */
+export const login = (username, password) => {
+    return apiClient.post('/login', { username, password });
+};
+
 /**
  * Fetches detailed information for a single device by its IP address.
  * @param {string} ip - The IP address of the device.
