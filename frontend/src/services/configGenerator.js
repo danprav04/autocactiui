@@ -59,21 +59,13 @@ LINK DEFAULT
  * @param {object} params - The parameters for config generation.
  * @returns {string} The full content of the .conf file.
  */
-export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight, offsetX, offsetY, padding }) {
+export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight }) {
   const deviceNodes = nodes.filter(node => node.type !== 'group');
   const nodeStrings = [];
   const linkStrings = [];
 
   const nodeInfoMap = new Map(deviceNodes.map(node => [node.id, node]));
   let nodeCounter = 1;
-
-  // Function to convert absolute map coordinates to coordinates relative to the exported image
-  const toRelativePosition = (absolutePos) => {
-      return {
-          x: absolutePos.x - offsetX + padding,
-          y: absolutePos.y - offsetY + padding,
-      };
-  };
 
   for (const node of deviceNodes) {
     const cactiNodeId = `node${String(nodeCounter++).padStart(5, '0')}`;
@@ -87,11 +79,10 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
         case 'Router': default: iconFilename = 'router-black.png'; break;
     }
     
-    // Convert absolute node positions to relative positions for the config file.
+    // The node positions are now pre-calculated to be relative to the final image.
     // The position in the config corresponds to the center of the node's bounding box.
-    const relativePos = toRelativePosition(node.position);
-    const centerX = Math.round(relativePos.x + (NODE_WIDTH / 2));
-    const centerY = Math.round(relativePos.y + (NODE_HEIGHT / 2));
+    const centerX = Math.round(node.position.x + (NODE_WIDTH / 2));
+    const centerY = Math.round(node.position.y + (NODE_HEIGHT / 2));
 
     nodeStrings.push(
       DEVICE_NODE_TEMPLATE.replace('{id}', cactiNodeId)
@@ -112,14 +103,11 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
 
     if (!sourceNodeInfo || !targetNodeInfo) continue;
     
-    // Use relative coordinates for link endpoint calculations, starting from the node's center.
-    const relSourcePos = toRelativePosition(sourceNodeInfo.position);
-    const relTargetPos = toRelativePosition(targetNodeInfo.position);
-
-    const x1 = relSourcePos.x + (NODE_WIDTH / 2);
-    const y1 = relSourcePos.y + (NODE_HEIGHT / 2);
-    const x2 = relTargetPos.x + (NODE_WIDTH / 2);
-    const y2 = relTargetPos.y + (NODE_HEIGHT / 2);
+    // Use the pre-calculated relative coordinates for link endpoint calculations.
+    const x1 = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
+    const y1 = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
+    const x2 = targetNodeInfo.position.x + (NODE_WIDTH / 2);
+    const y2 = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
 
     const dx = x2 - x1;
     const dy = y2 - y1;

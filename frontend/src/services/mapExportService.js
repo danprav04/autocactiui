@@ -83,7 +83,6 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         throw new Error('Could not find map viewport for export.');
     }
 
-    // THE FIX: Get the calculated offsets (minX, minY) and padding from the bounds calculation.
     const { transform, width, height, minX, minY, padding } = calculateBoundsAndTransform(nodes);
     const originalTransform = viewport.style.transform;
     viewport.style.transform = transform; 
@@ -100,16 +99,22 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
             throw new Error('Failed to create image blob.');
         }
 
-        // THE FIX: Pass all necessary data to the config generator to create relative coordinates.
+        // Create a new set of nodes with their positions transformed into the coordinate
+        // system of the final PNG image. This simplifies the config generator.
+        const nodesForConfig = nodes.map(node => ({
+            ...node,
+            position: {
+                x: node.position.x - minX,
+                y: node.position.y - minY,
+            },
+        }));
+        
         const configContent = generateCactiConfig({
-            nodes, 
+            nodes: nodesForConfig, 
             edges, 
             mapName, 
             mapWidth: width, 
             mapHeight: height, 
-            offsetX: minX, 
-            offsetY: minY,
-            padding
         });
         
         const formData = new FormData();
