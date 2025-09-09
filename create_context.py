@@ -21,7 +21,8 @@ IGNORE_DIRS = [
     'build',
     'dist',
     'cacti_server',
-    '.venv' 
+    '.venv' ,
+    'static'
 ]
 
 # Patterns for specific files to ignore.

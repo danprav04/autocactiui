@@ -1,9 +1,6 @@
 // frontend/src/services/configGenerator.js
 import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
-// Template for a Weathermap NODE representing a device with an icon and label.
-const DEVICE_NODE_TEMPLATE = "NODE {id}\n\tLABEL {hostname}\n\tICON images/devices/{iconFilename}\n\tPOSITION {x} {y}";
-
 // Template for a Weathermap NODE used as an invisible anchor for a LINK.
 const DUMMY_NODE_TEMPLATE = "NODE {id}\n\tPOSITION {x} {y}";
 
@@ -67,68 +64,46 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
   const nodeInfoMap = new Map(deviceNodes.map(node => [node.id, node]));
   let nodeCounter = 1;
 
-  for (const node of deviceNodes) {
-    const cactiNodeId = `node${String(nodeCounter++).padStart(5, '0')}`;
-    
-    const iconType = node.data.iconType || 'Router';
-    let iconFilename;
-    switch (iconType) {
-        case 'Switch': iconFilename = 'switch-black.png'; break;
-        case 'Firewall': iconFilename = 'firewall.png'; break;
-        case 'Encryptor': iconFilename = 'encryptor.png'; break;
-        case 'Router': default: iconFilename = 'router-black.png'; break;
-    }
-    
-    // The node positions are now pre-calculated to be relative to the final image.
-    // The position in the config corresponds to the center of the node's bounding box.
-    const centerX = Math.round(node.position.x + (NODE_WIDTH / 2));
-    const centerY = Math.round(node.position.y + (NODE_HEIGHT / 2));
+  // An offset to ensure link endpoints land safely inside the node's visual boundary.
+  const LINK_ENDPOINT_OFFSET = 50; 
 
-    nodeStrings.push(
-      DEVICE_NODE_TEMPLATE.replace('{id}', cactiNodeId)
-        .replace('{hostname}', node.data.hostname)
-        .replace('{iconFilename}', iconFilename)
-        .replace('{x}', centerX)
-        .replace('{y}', centerY)
-    );
-  }
-
-  // The offset for link endpoints from the node's center. This is based on
-  // half the content width of the node (150px), not the total bounding box width.
-  const LINK_ENDPOINT_OFFSET = 75; 
-
+  // Iterate through the edges to create links and their required invisible nodes.
   for (const edge of edges) {
     const sourceNodeInfo = nodeInfoMap.get(edge.source);
     const targetNodeInfo = nodeInfoMap.get(edge.target);
 
     if (!sourceNodeInfo || !targetNodeInfo) continue;
     
-    // Use the pre-calculated relative coordinates for link endpoint calculations.
-    const x1 = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
-    const y1 = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
-    const x2 = targetNodeInfo.position.x + (NODE_WIDTH / 2);
-    const y2 = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
+    // The link's vector should be based on the geometric center of the node component.
+    const sourceCenterX = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
+    const sourceCenterY = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
+    const targetCenterX = targetNodeInfo.position.x + (NODE_WIDTH / 2);
+    const targetCenterY = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
 
-    const dx = x2 - x1;
-    const dy = y2 - y1;
+    const dx = targetCenterX - sourceCenterX;
+    const dy = targetCenterY - sourceCenterY;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance === 0) continue;
 
+    // Create a unit vector to find the point along the line for the offset.
     const ux = dx / distance;
     const uy = dy / distance;
 
-    const dummy1_x = Math.round(x1 + ux * LINK_ENDPOINT_OFFSET);
-    const dummy1_y = Math.round(y1 + uy * LINK_ENDPOINT_OFFSET);
-    const dummy2_x = Math.round(x2 - ux * LINK_ENDPOINT_OFFSET);
-    const dummy2_y = Math.round(y2 - uy * LINK_ENDPOINT_OFFSET);
+    // Calculate the absolute positions for the invisible dummy nodes.
+    const dummy1_x = Math.round(sourceCenterX + ux * LINK_ENDPOINT_OFFSET);
+    const dummy1_y = Math.round(sourceCenterY + uy * LINK_ENDPOINT_OFFSET);
+    const dummy2_x = Math.round(targetCenterX - ux * LINK_ENDPOINT_OFFSET);
+    const dummy2_y = Math.round(targetCenterY - uy * LINK_ENDPOINT_OFFSET);
 
     const dummy1_id = `node${String(nodeCounter++).padStart(5, '0')}`;
     const dummy2_id = `node${String(nodeCounter++).padStart(5, '0')}`;
 
+    // Add the invisible nodes required for the link to the node string list.
     nodeStrings.push(DUMMY_NODE_TEMPLATE.replace('{id}', dummy1_id).replace('{x}', dummy1_x).replace('{y}', dummy1_y));
     nodeStrings.push(DUMMY_NODE_TEMPLATE.replace('{id}', dummy2_id).replace('{x}', dummy2_x).replace('{y}', dummy2_y));
     
+    // Create the link definition that connects the two dummy nodes.
     const interfaceName = edge.data?.interface || 'unknown';
     const populatedLink = LINK_TEMPLATE
       .replace(/{id1}/g, dummy1_id)
@@ -140,6 +115,7 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
     linkStrings.push(populatedLink);
   }
   
+  // Assemble the final configuration string.
   let finalConfig = CONFIG_TEMPLATE;
   finalConfig = finalConfig.replace(/%name%/g, mapName);
   finalConfig = finalConfig.replace('%width%', mapWidth);

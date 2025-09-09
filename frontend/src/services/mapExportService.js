@@ -104,8 +104,8 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         const nodesForConfig = nodes.map(node => ({
             ...node,
             position: {
-                x: node.position.x - minX,
-                y: node.position.y - minY,
+                x: node.position.x - minX + padding,
+                y: node.position.y - minY + padding,
             },
         }));
         
@@ -151,7 +151,10 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
-        await exportAndUploadMap({ mapElement, nodes: originalNodes, edges: originalEdges, mapName, cactiId });
+        // FIX: Pass the visually prepared `exportNodes` and `exportEdges` to the export function.
+        // This ensures the data used for screenshotting and config generation is identical,
+        // resolving any coordinate mismatches.
+        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: exportEdges, mapName, cactiId });
     } finally {
         mapElement.classList.remove('exporting');
         if (wasDarkTheme) {
