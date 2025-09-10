@@ -34,9 +34,9 @@ export const NODE_WIDTH = 190;
 /**
  * The approximate height of a standard device node in pixels.
  * This must match the final rendered height from the browser for accurate map exports.
- * Updated based on visual measurement from screenshot evidence.
+ * FIX: Height is now an even number to ensure the geometric center is on a full pixel.
  */
-export const NODE_HEIGHT = 121;
+export const NODE_HEIGHT = 120;
 
 /**
  * The pixel distance within which snapping should occur.
