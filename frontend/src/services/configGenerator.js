@@ -74,15 +74,11 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
 
     if (!sourceNodeInfo || !targetNodeInfo) continue;
     
-    // With even-numbered dimensions for NODE_WIDTH and NODE_HEIGHT, the center point
-    // will be a clean integer, preventing floating-point inaccuracies.
-    const halfWidth = NODE_WIDTH / 2;
-    const halfHeight = NODE_HEIGHT / 2;
-
-    const sourceCenterX = sourceNodeInfo.position.x + halfWidth;
-    const sourceCenterY = sourceNodeInfo.position.y + halfHeight;
-    const targetCenterX = targetNodeInfo.position.x + halfWidth;
-    const targetCenterY = targetNodeInfo.position.y + halfHeight;
+    // The link's vector should be based on the geometric center of the node component.
+    const sourceCenterX = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
+    const sourceCenterY = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
+    const targetCenterX = targetNodeInfo.position.x + (NODE_WIDTH / 2);
+    const targetCenterY = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
 
     const dx = targetCenterX - sourceCenterX;
     const dy = targetCenterY - sourceCenterY;
@@ -94,18 +90,11 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
     const ux = dx / distance;
     const uy = dy / distance;
 
-    // EMPIRICAL CORRECTION FACTOR:
-    // A consistent 1-pixel downward offset was observed in the final rendered image. This is due
-    // to a systemic discrepancy between the browser's anti-aliased rendering (for the screenshot) and
-    // the backend's integer-based line drawing. Subtracting 1 from the final Y-coordinate shifts the
-    // rendered links UP by one pixel, compensating for the discrepancy and ensuring perfect alignment.
-    const Y_CORRECTION = -1;
-
     // Calculate the absolute positions for the invisible dummy nodes.
     const dummy1_x = Math.round(sourceCenterX + ux * LINK_ENDPOINT_OFFSET);
-    const dummy1_y = Math.round(sourceCenterY + uy * LINK_ENDPOINT_OFFSET) + Y_CORRECTION;
+    const dummy1_y = Math.round(sourceCenterY + uy * LINK_ENDPOINT_OFFSET);
     const dummy2_x = Math.round(targetCenterX - ux * LINK_ENDPOINT_OFFSET);
-    const dummy2_y = Math.round(targetCenterY - uy * LINK_ENDPOINT_OFFSET) + Y_CORRECTION;
+    const dummy2_y = Math.round(targetCenterY - uy * LINK_ENDPOINT_OFFSET);
 
     const dummy1_id = `node${String(nodeCounter++).padStart(5, '0')}`;
     const dummy2_id = `node${String(nodeCounter++).padStart(5, '0')}`;

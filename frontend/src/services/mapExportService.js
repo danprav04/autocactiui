@@ -5,10 +5,36 @@ import { uploadMap } from './apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
 /**
- * Calculates the exact bounding box of all nodes and the transform needed to position them for capture.
+ * Prepares nodes and edges for a clean export by applying specific styles.
+ * @param {Array} nodes - The original array of nodes.
+ * @param {Array} edges - The original array of edges.
+ * @returns {{exportNodes: Array, exportEdges: Array}} An object containing stylized nodes and edges.
+ */
+const prepareElementsForExport = (nodes, edges) => {
+    const exportNodes = nodes.map(node => ({
+        ...node,
+        selected: false,
+        data: {
+            ...node.data,
+            icon: node.type === 'custom' ? ICONS_BY_THEME[node.data.iconType].light : node.data.icon
+        }
+    }));
+    
+    const exportEdges = edges.map(edge => ({
+        ...edge,
+        animated: false,
+        type: 'straight',
+        style: { stroke: '#000000', strokeWidth: 2 }
+    }));
+
+    return { exportNodes, exportEdges };
+};
+
+/**
+ * Calculates the exact bounding box of all nodes and the transform to position content for capture.
  * Ensures the final output is at least Full HD (1920x1080).
  * @param {Array} nodes - The array of all nodes on the map.
- * @returns {{width: number, height: number, translateX: number, translateY: number}}
+ * @returns {{width: number, height: number, transform: string, minX: number, minY: number, padding: number}}
  */
 const calculateBoundsAndTransform = (nodes) => {
     const padding = 50;
@@ -16,7 +42,7 @@ const calculateBoundsAndTransform = (nodes) => {
     const MIN_HEIGHT = 1080;
 
     if (nodes.length === 0) {
-        return { width: MIN_WIDTH, height: MIN_HEIGHT, translateX: 0, translateY: 0 };
+        return { width: MIN_WIDTH, height: MIN_HEIGHT, transform: 'translate(0,0)', minX: 0, minY: 0, padding };
     }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -34,34 +60,40 @@ const calculateBoundsAndTransform = (nodes) => {
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
 
+    // Determine the final canvas size, ensuring it's at least HD resolution.
     const finalWidth = Math.max(contentWidth + padding * 2, MIN_WIDTH);
     const finalHeight = Math.max(contentHeight + padding * 2, MIN_HEIGHT);
 
+    // Calculate offsets to center the content within the (potentially larger) canvas.
     const offsetX = (finalWidth - contentWidth) / 2;
     const offsetY = (finalHeight - contentHeight) / 2;
+
+    const transform = `translate(${-minX + offsetX}px, ${-minY + offsetY}px)`;
 
     return {
         width: finalWidth,
         height: finalHeight,
-        translateX: -minX + offsetX,
-        translateY: -minY + offsetY,
+        transform: transform,
+        minX,
+        minY,
+        padding
     };
 };
 
 /**
  * Captures the map view, generates a config, and uploads both to Cacti.
- * @param {object} params - The export parameters, including nodes with final absolute positions.
+ * @param {object} params - The export parameters.
  * @returns {Promise<void>}
  */
-export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiId, width, height }) => {
+export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiId }) => {
     const viewport = mapElement.querySelector('.react-flow__viewport');
     if (!viewport) {
         throw new Error('Could not find map viewport for export.');
     }
 
-    // Since nodes are already in their final positions, ensure the viewport is not transformed.
+    const { transform, width, height, minX, minY } = calculateBoundsAndTransform(nodes);
     const originalTransform = viewport.style.transform;
-    viewport.style.transform = 'translate(0px, 0px)';
+    viewport.style.transform = transform; 
 
     try {
         const blob = await toBlob(viewport, {
@@ -74,28 +106,41 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         if (!blob) {
             throw new Error('Failed to create image blob.');
         }
+        
+        // Calculate the offsets needed to center the content in the final image.
+        const contentWidth = (nodes.reduce((max, n) => Math.max(max, n.position.x + (n.type === 'group' ? n.data.width : NODE_WIDTH)), 0) - minX);
+        const contentHeight = (nodes.reduce((max, n) => Math.max(max, n.position.y + (n.type === 'group' ? n.data.height : NODE_HEIGHT)), 0) - minY);
+        const offsetX = (width - contentWidth) / 2;
+        const offsetY = (height - contentHeight) / 2;
 
+
+        // Create a new set of nodes with their positions transformed into the coordinate
+        // system of the final PNG image, including the centering offset.
+        const nodesForConfig = nodes.map(node => ({
+            ...node,
+            position: {
+                x: node.position.x - minX + offsetX,
+                y: node.position.y - minY + offsetY,
+            },
+        }));
+        
         const configContent = generateCactiConfig({
-            nodes: nodes, 
+            nodes: nodesForConfig, 
             edges, 
             mapName, 
             mapWidth: width, 
             mapHeight: height, 
         });
-        console.log('[MapExport] Generated Cacti .conf content (for debugging):\n', configContent);
-
+        
         const formData = new FormData();
         formData.append('map_image', blob, `${mapName}.png`);
         formData.append('config_content', configContent);
         formData.append('map_name', mapName);
         formData.append('cacti_installation_id', cactiId);
 
-        console.log(`[MapExport] Uploading map '${mapName}' to Cacti installation ID ${cactiId}...`);
         await uploadMap(formData);
-        console.log('[MapExport] Upload successful.');
 
     } finally {
-        // Restore the original viewport transform after capture.
         viewport.style.transform = originalTransform;
     }
 };
@@ -110,68 +155,19 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     const originalEdges = [...edges];
     const wasDarkTheme = theme === 'dark';
 
-    // Step 1: Create a copy of the nodes with their base positions snapped to the nearest integer.
-    const snappedNodes = originalNodes.map(n => ({
-        ...n,
-        position: {
-            x: Math.round(n.position.x),
-            y: Math.round(n.position.y)
-        }
-    }));
-
-    // Step 2: Calculate the canvas size and translation needed based on the snapped node positions.
-    const bounds = calculateBoundsAndTransform(snappedNodes);
-    console.log('[MapExport] Debug Info:');
-    console.log(`  - Original First Node Position: { x: ${originalNodes[0]?.position.x}, y: ${originalNodes[0]?.position.y} }`);
-    console.log(`  - Snapped First Node Position: { x: ${snappedNodes[0]?.position.x}, y: ${snappedNodes[0]?.position.y} }`);
-    console.log(`  - Calculated Bounds & Transform:`, bounds);
-
-    // Step 3: Round the translation factors to integers. This is the critical fix.
-    // Using Math.round() ensures alignment with browser rendering engines which typically
-    // round to the nearest pixel when dealing with sub-pixel transforms.
-    const translateX = Math.round(bounds.translateX);
-    const translateY = Math.round(bounds.translateY);
-    console.log(`  - Rounded Translation: { translateX: ${translateX}, translateY: ${translateY} }`);
-
-    // Step 4: Create the final export nodes with pure-integer absolute positions.
-    const exportNodes = snappedNodes.map(node => ({
-        ...node,
-        selected: false,
-        data: {
-            ...node.data,
-            icon: node.type === 'custom' ? ICONS_BY_THEME[node.data.iconType].light : node.data.icon
-        },
-        position: {
-            x: node.position.x + translateX,
-            y: node.position.y + translateY
-        }
-    }));
-    console.log(`  - Final First Node Position for Export: { x: ${exportNodes[0]?.position.x}, y: ${exportNodes[0]?.position.y} }`);
-    
-    // Step 5: Update the component state to render the nodes for the screenshot.
+    const { exportNodes, exportEdges } = prepareElementsForExport(nodes, edges);
     setNodes(exportNodes);
-    setEdges([]);
+    setEdges(exportEdges);
     mapElement.classList.add('exporting');
     if (wasDarkTheme) {
         document.body.setAttribute('data-theme', 'light');
     }
 
-    // Step 6: Wait for the DOM to update.
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
-        // Step 7: Perform the export.
-        await exportAndUploadMap({
-            mapElement,
-            nodes: exportNodes,
-            edges: originalEdges,
-            mapName,
-            cactiId,
-            width: bounds.width,
-            height: bounds.height
-        });
+        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: exportEdges, mapName, cactiId });
     } finally {
-        // Step 8: Restore the original state of the map.
         mapElement.classList.remove('exporting');
         if (wasDarkTheme) {
             document.body.setAttribute('data-theme', 'dark');

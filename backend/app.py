@@ -6,14 +6,8 @@ import map_renderer
 import jwt
 from functools import wraps
 from datetime import datetime, timedelta
-import logging
 
 app = Flask(__name__)
-
-# --- Logging Configuration ---
-# Configure logging to provide detailed output for debugging the map creation process.
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # --- Authentication Configuration ---
 # In a real production environment, this secret key should be loaded from a secure,
@@ -126,18 +120,14 @@ def upload_map_endpoint():
         return jsonify({"error": "Missing required form data: cacti_installation_id, map_name, or config_content"}), 400
 
     try:
-        app.logger.info(f"Starting map upload for map_name: '{map_name}', Cacti ID: {cacti_id}")
-
         # Step 1: Save the uploaded background image and the modified .conf file
         saved_paths = services.save_uploaded_map(map_image, config_content, map_name)
         config_path = saved_paths['config_path']
-        app.logger.info(f"Saved map assets. Image: {saved_paths['image_path']}, Config: {config_path}")
         
         # Step 2: Define the output path for the final rendered map
         config_filename = os.path.basename(config_path)
         final_map_filename = config_filename.replace('.conf', '.png')
         final_map_path = os.path.join('static/final_maps', final_map_filename)
-        app.logger.info(f"Rendering final map to: {final_map_path}")
 
         # Step 3: Render the final map by drawing lines on the background and save it
         map_renderer.render_and_save_map(config_path, final_map_path)
@@ -145,7 +135,6 @@ def upload_map_endpoint():
         # Step 4: Generate a URL for the newly created final map
         # Use url_for for proper URL generation, pointing to the static file
         final_map_url = url_for('static', filename=f'final_maps/{final_map_filename}', _external=True)
-        app.logger.info(f"Successfully generated final map. URL: {final_map_url}")
 
         return jsonify({
             "success": True,
@@ -155,7 +144,7 @@ def upload_map_endpoint():
             "final_map_url": final_map_url
         })
     except Exception as e:
-        app.logger.error(f"Error during map upload and rendering process for '{map_name}'", exc_info=True)
+        print(f"Error during map upload and rendering process: {e}")
         return jsonify({"error": "An internal error occurred while processing the map"}), 500
 
 @app.route('/api/devices', methods=['POST'])

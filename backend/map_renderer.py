@@ -1,7 +1,6 @@
 import re
 import os
 from PIL import Image, ImageDraw
-import logging
 
 def parse_config(config_content):
     """
@@ -51,8 +50,7 @@ def parse_config(config_content):
                 'node1': nodes_match.group(1),
                 'node2': nodes_match.group(2)
             })
-    
-    logging.info(f"[MapRenderer] Parsed config: Found {len(data['nodes'])} node positions and {len(data['links'])} links.")
+
     return data
 
 def render_map_from_config(config_path):
@@ -63,7 +61,6 @@ def render_map_from_config(config_path):
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file not found at {config_path}")
 
-    logging.info(f"[MapRenderer] Rendering map from config: {config_path}")
     with open(config_path, 'r') as f:
         config_content = f.read()
 
@@ -74,7 +71,6 @@ def render_map_from_config(config_path):
 
     config_dir = os.path.dirname(config_path)
     background_image_path = os.path.normpath(os.path.join(config_dir, map_data['background']))
-    logging.info(f"[MapRenderer] Using background image: {background_image_path}")
     
     if not os.path.exists(background_image_path):
         raise FileNotFoundError(f"Background image not found at {background_image_path}")
@@ -84,7 +80,6 @@ def render_map_from_config(config_path):
 
     LINK_COLORS = ['#E6194B', '#3CB44B', '#4363D8', '#F58231', '#911EB4', '#46F0F0', '#FABEBE', '#008080', '#E6BEFF', '#AA6E28']
     color_index = 0
-    first_link_logged = False
 
     for link in map_data['links']:
         node1_id = link['node1']
@@ -94,11 +89,6 @@ def render_map_from_config(config_path):
             node1 = map_data['nodes'][node1_id]
             node2 = map_data['nodes'][node2_id]
             
-            # Log the coordinates for the first link to aid debugging.
-            if not first_link_logged:
-                logging.info(f"[MapRenderer] Drawing first link from {node1_id} at ({node1['x']}, {node1['y']}) to {node2_id} at ({node2['x']}, {node2['y']})")
-                first_link_logged = True
-
             current_color = LINK_COLORS[color_index % len(LINK_COLORS)]
             color_index += 1
             
@@ -120,4 +110,4 @@ def render_and_save_map(config_path, output_path):
     os.makedirs(output_dir, exist_ok=True)
 
     final_image.save(output_path, 'PNG')
-    logging.info(f"[MapRenderer] Final map image saved to {output_path}")
+    print(f"Final map image saved to {output_path}")
