@@ -287,7 +287,8 @@ export const useMapInteraction = (theme) => {
         color: '#cfe2ff',
         width: 400,
         height: 300,
-        opacity: 0.6
+        opacity: 0.6,
+        shape: 'rounded-rectangle'
       },
       zIndex: 0
     };

@@ -1,6 +1,26 @@
 // frontend/src/services/configGenerator.js
 import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
+/**
+ * A fixed horizontal offset (in pixels) to apply to all generated coordinates
+ * after scaling. A positive value shifts the entire map to the right on the final PNG.
+ */
+const CONFIG_X_OFFSET = -1;
+
+/**
+ * A fixed vertical offset (in pixels) to apply to all generated coordinates
+ * after scaling. A positive value shifts the entire map down on the final PNG.
+ */
+const CONFIG_Y_OFFSET = -1;
+
+/**
+ * A scaling factor to apply to all generated coordinates.
+ * 1 = no scaling, 2 = double size, 0.5 = half size.
+ * This is applied before the fixed offset.
+ */
+const CONFIG_SCALE_FACTOR = .8;
+
+
 // Template for a Weathermap NODE used as an invisible anchor for a LINK.
 const DUMMY_NODE_TEMPLATE = "NODE {id}\n\tPOSITION {x} {y}";
 
@@ -65,7 +85,7 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
   let nodeCounter = 1;
 
   // An offset to ensure link endpoints land safely inside the node's visual boundary.
-  const LINK_ENDPOINT_OFFSET = 50; 
+  const LINK_ENDPOINT_OFFSET = 70; 
 
   // Iterate through the edges to create links and their required invisible nodes.
   for (const edge of edges) {
@@ -91,10 +111,10 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
     const uy = dy / distance;
 
     // Calculate the absolute positions for the invisible dummy nodes.
-    const dummy1_x = Math.round(sourceCenterX + ux * LINK_ENDPOINT_OFFSET);
-    const dummy1_y = Math.round(sourceCenterY + uy * LINK_ENDPOINT_OFFSET);
-    const dummy2_x = Math.round(targetCenterX - ux * LINK_ENDPOINT_OFFSET);
-    const dummy2_y = Math.round(targetCenterY - uy * LINK_ENDPOINT_OFFSET);
+    const dummy1_x = Math.round((sourceCenterX + ux * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_X_OFFSET;
+    const dummy1_y = Math.round((sourceCenterY + uy * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_Y_OFFSET;
+    const dummy2_x = Math.round((targetCenterX - ux * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_X_OFFSET;
+    const dummy2_y = Math.round((targetCenterY - uy * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_Y_OFFSET;
 
     const dummy1_id = `node${String(nodeCounter++).padStart(5, '0')}`;
     const dummy2_id = `node${String(nodeCounter++).padStart(5, '0')}`;
