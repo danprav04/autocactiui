@@ -366,17 +366,20 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 .custom-node {
     background-color: var(--node-bg);
     border: 1px solid var(--node-border);
-    border-radius: 12px;
+    border-radius: 50%;
     padding: 15px;
-    width: 150px;
+    width: 140px;
+    height: 140px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 5px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
     box-shadow: 0 2px 5px var(--node-shadow);
+    box-sizing: border-box;
 }
 
 .custom-node.selected {

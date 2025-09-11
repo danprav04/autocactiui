@@ -5,20 +5,20 @@ import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
  * A fixed horizontal offset (in pixels) to apply to all generated coordinates
  * after scaling. A positive value shifts the entire map to the right on the final PNG.
  */
-const CONFIG_X_OFFSET = 72;
+const CONFIG_X_OFFSET = 56;
 
 /**
  * A fixed vertical offset (in pixels) to apply to all generated coordinates
  * after scaling. A positive value shifts the entire map down on the final PNG.
  */
-const CONFIG_Y_OFFSET = 48;
+const CONFIG_Y_OFFSET = 56;
 
 /**
  * A scaling factor to apply to all generated coordinates.
  * 1 = no scaling, 2 = double size, 0.5 = half size.
  * This is applied before the fixed offset.
  */
-const CONFIG_SCALE_FACTOR = .8005;
+const CONFIG_SCALE_FACTOR = .8;
 
 
 // Template for a Weathermap NODE used as an invisible anchor for a LINK.
@@ -85,7 +85,7 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
   let nodeCounter = 1;
 
   // An offset to ensure link endpoints land safely inside the node's visual boundary.
-  const LINK_ENDPOINT_OFFSET = 70; 
+  const LINK_ENDPOINT_OFFSET = 0; 
 
   // Iterate through the edges to create links and their required invisible nodes.
   for (const edge of edges) {
