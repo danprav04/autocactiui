@@ -85,7 +85,7 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
   let nodeCounter = 1;
 
   // An offset to ensure link endpoints land safely inside the node's visual boundary.
-  const LINK_ENDPOINT_OFFSET = 0; 
+  const LINK_ENDPOINT_OFFSET = 70; 
 
   // Iterate through the edges to create links and their required invisible nodes.
   for (const edge of edges) {
