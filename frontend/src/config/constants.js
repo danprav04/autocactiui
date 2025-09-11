@@ -29,14 +29,14 @@ export const INITIAL_ICON_NAME = 'Router';
  * This must match the final rendered width from the browser for accurate map exports.
  * Updated based on visual measurement from screenshot evidence.
  */
-export const NODE_WIDTH = 0;
+export const NODE_WIDTH = 140;
 
 /**
  * The approximate height of a standard device node in pixels.
  * This must match the final rendered height from the browser for accurate map exports.
  * Updated based on visual measurement from screenshot evidence.
  */
-export const NODE_HEIGHT = 0;
+export const NODE_HEIGHT = 140;
 
 /**
  * The pixel distance within which snapping should occur.

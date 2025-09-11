@@ -5,13 +5,13 @@ import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
  * A fixed horizontal offset (in pixels) to apply to all generated coordinates
  * after scaling. A positive value shifts the entire map to the right on the final PNG.
  */
-const CONFIG_X_OFFSET = 56;
+const CONFIG_X_OFFSET = -1;
 
 /**
  * A fixed vertical offset (in pixels) to apply to all generated coordinates
  * after scaling. A positive value shifts the entire map down on the final PNG.
  */
-const CONFIG_Y_OFFSET = 56;
+const CONFIG_Y_OFFSET = -1;
 
 /**
  * A scaling factor to apply to all generated coordinates.
