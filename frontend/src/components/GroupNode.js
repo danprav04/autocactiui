@@ -13,7 +13,7 @@ const ResizerIcon = () => (
 
 export default memo(({ id, data, selected }) => {
     const { onUpdateNodeData } = useContext(NodeContext);
-    const { label, color, width, height, opacity } = data;
+    const { label, color, width, height, opacity, shape } = data;
     const { zoom } = useViewport();
     
     const [isEditing, setIsEditing] = useState(false);
@@ -73,12 +73,25 @@ export default memo(({ id, data, selected }) => {
         document.addEventListener('mouseup', stopDrag, false);
     };
     
+    const getBorderRadius = () => {
+        switch(shape) {
+            case 'circle':
+                return '50%';
+            case 'rounded-rectangle':
+                return '8px';
+            case 'rectangle':
+            default:
+                return '0px';
+        }
+    }
+
     const nodeStyle = {
         backgroundColor: color,
         opacity: opacity,
         width: `${width}px`,
         height: `${height}px`,
         border: selected ? '2px solid var(--accent-primary)' : '1px dashed var(--node-border)',
+        borderRadius: getBorderRadius(),
     };
 
     return (

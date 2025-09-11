@@ -11,9 +11,17 @@ const GROUP_COLORS = [
     { name: 'Gray', value: '#e9ecef' }
 ];
 
+const GROUP_SHAPES = [
+    { name: 'sidebar.shapeRoundedRectangle', value: 'rounded-rectangle' },
+    { name: 'sidebar.shapeRectangle', value: 'rectangle' },
+    { name: 'sidebar.shapeCircle', value: 'circle' }
+];
+
+
 const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteNode }) => {
   const [groupLabel, setGroupLabel] = useState('');
   const [groupColor, setGroupColor] = useState(GROUP_COLORS[0].value);
+  const [groupShape, setGroupShape] = useState(GROUP_SHAPES[0].value);
   const [groupWidth, setGroupWidth] = useState(400);
   const [groupHeight, setGroupHeight] = useState(300);
   const [groupOpacity, setGroupOpacity] = useState(0.6);
@@ -24,6 +32,7 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteNode }) => {
       const { data } = selectedElement;
       setGroupLabel(data.label);
       setGroupColor(data.color);
+      setGroupShape(data.shape || GROUP_SHAPES[0].value);
       setGroupWidth(data.width);
       setGroupHeight(data.height);
       setGroupOpacity(data.opacity);
@@ -40,6 +49,7 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteNode }) => {
     if (
         groupLabel === selectedElement.data.label &&
         groupColor === selectedElement.data.color &&
+        groupShape === selectedElement.data.shape &&
         parsedWidth === selectedElement.data.width &&
         parsedHeight === selectedElement.data.height &&
         parsedOpacity === selectedElement.data.opacity
@@ -51,6 +61,7 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteNode }) => {
       onUpdateNodeData(selectedElement.id, {
         label: groupLabel,
         color: groupColor,
+        shape: groupShape,
         width: parsedWidth || 400,
         height: parsedHeight || 300,
         opacity: parsedOpacity
@@ -58,7 +69,7 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteNode }) => {
     }, 500);
 
     return () => clearTimeout(handler);
-  }, [groupLabel, groupColor, groupWidth, groupHeight, groupOpacity, selectedElement, onUpdateNodeData]);
+  }, [groupLabel, groupColor, groupShape, groupWidth, groupHeight, groupOpacity, selectedElement, onUpdateNodeData]);
 
   if (!selectedElement) return null;
 
@@ -73,6 +84,12 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteNode }) => {
         <label htmlFor="group-color-selector">{t('sidebar.groupColor')}</label>
         <select id="group-color-selector" className="icon-selector" value={groupColor} onChange={(e) => setGroupColor(e.target.value)}>
           {GROUP_COLORS.map(c => <option key={c.value} value={c.value}>{c.name}</option>)}
+        </select>
+      </div>
+       <div className="control-group">
+        <label htmlFor="group-shape-selector">{t('sidebar.groupShape')}</label>
+        <select id="group-shape-selector" className="icon-selector" value={groupShape} onChange={(e) => setGroupShape(e.target.value)}>
+          {GROUP_SHAPES.map(s => <option key={s.value} value={s.value}>{t(s.name)}</option>)}
         </select>
       </div>
       <div className="control-group">
