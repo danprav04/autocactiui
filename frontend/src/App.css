@@ -525,20 +525,3 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]::-moz-range-thumb:hover {
     transform: scale(1.1);
 }
-
-/* --- SNAP GUIDES --- */
-.snap-line-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none; /* Make sure SVG doesn't capture mouse events */
-    z-index: 9;
-}
-
-.snap-line-svg line {
-    stroke: var(--accent-primary);
-    stroke-width: 1px;
-    stroke-opacity: 0.8;
-}

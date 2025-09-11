@@ -5,38 +5,43 @@ import { useTranslation } from 'react-i18next';
 import * as api from '../services/apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT, SNAP_THRESHOLD } from '../config/constants';
 
+// Helper to get the initial state from localStorage, providing a fallback for safety.
+const getInitialState = () => {
+  try {
+    const savedNodes = localStorage.getItem('mapNodes');
+    const savedEdges = localStorage.getItem('mapEdges');
+    return {
+      nodes: savedNodes ? JSON.parse(savedNodes) : [],
+      edges: savedEdges ? JSON.parse(savedEdges) : [],
+    };
+  } catch (error) {
+    console.error("Failed to parse map state from localStorage", error);
+    return { nodes: [], edges: [] };
+  }
+};
+
+
 export const useMapInteraction = (theme) => {
-  const [nodes, setNodes] = useState(() => {
-    try {
-      const savedNodes = localStorage.getItem('mapNodes');
-      return savedNodes ? JSON.parse(savedNodes) : [];
-    } catch (error) {
-      console.error("Failed to parse nodes from localStorage", error);
-      return [];
-    }
-  });
-  const [edges, setEdges] = useState(() => {
-    try {
-      const savedEdges = localStorage.getItem('mapEdges');
-      return savedEdges ? JSON.parse(savedEdges) : [];
-    } catch (error) {
-      console.error("Failed to parse edges from localStorage", error);
-      return [];
-    }
-  });
+  const initialState = getInitialState();
+  const [nodes, setNodes] = useState(initialState.nodes);
+  const [edges, setEdges] = useState(initialState.edges);
+  
+  const [history, setHistory] = useState([initialState]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
   const [selectedElement, setSelectedElement] = useState(null);
   const [neighbors, setNeighbors] = useState([]);
   const [snapLines, setSnapLines] = useState([]);
   const { t } = useTranslation();
 
-  // Effect to save map state to localStorage whenever nodes or edges change
+  // Effect to save map state to localStorage whenever the current history state changes.
   useEffect(() => {
-    if (nodes.length > 0) {
-      localStorage.setItem('mapNodes', JSON.stringify(nodes));
-      localStorage.setItem('mapEdges', JSON.stringify(edges));
+    const currentState = history[historyIndex];
+    if (currentState && currentState.nodes.length > 0) {
+      localStorage.setItem('mapNodes', JSON.stringify(currentState.nodes));
+      localStorage.setItem('mapEdges', JSON.stringify(currentState.edges));
     }
-    // If nodes are cleared, the resetMap function will handle clearing localStorage
-  }, [nodes, edges]);
+  }, [history, historyIndex]);
 
   // Effect to update node icons automatically when the theme changes
   useEffect(() => {
@@ -51,6 +56,35 @@ export const useMapInteraction = (theme) => {
         })
     );
   }, [theme, setNodes]);
+  
+  const recordChange = useCallback((newNodes, newEdges) => {
+      const newHistory = history.slice(0, historyIndex + 1);
+      setHistory([...newHistory, { nodes: newNodes, edges: newEdges }]);
+      setHistoryIndex(newHistory.length);
+      setNodes(newNodes);
+      setEdges(newEdges);
+  }, [history, historyIndex]);
+  
+  const undo = useCallback(() => {
+      if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          const prevState = history[newIndex];
+          setNodes(prevState.nodes);
+          setEdges(prevState.edges);
+      }
+  }, [history, historyIndex]);
+  
+  const redo = useCallback(() => {
+      if (historyIndex < history.length - 1) {
+          const newIndex = historyIndex + 1;
+          setHistoryIndex(newIndex);
+          const nextState = history[newIndex];
+          setNodes(nextState.nodes);
+          setEdges(nextState.edges);
+      }
+  }, [history, historyIndex]);
+
 
   const createNodeObject = useCallback((device, position, explicitIconName) => {
     const discoveredType = device.type;
@@ -144,12 +178,21 @@ export const useMapInteraction = (theme) => {
 
         dragChange.position = newPos;
         setSnapLines(newSnapLines);
-    } else if (changes.some(c => c.type === 'position' && !c.dragging)) {
+    }
+    
+    const dragFinished = changes.some(c => c.type === 'position' && !c.dragging);
+    
+    // Only record a change in history if a drag has just finished.
+    if (dragFinished) {
+        recordChange(applyNodeChanges(changes, nodes), edges);
+    } else {
+        setNodes(nds => applyNodeChanges(changes, nds));
+    }
+    
+    if (changes.some(c => c.type === 'position' && !c.dragging)) {
         setSnapLines([]);
     }
-
-    setNodes(nds => applyNodeChanges(changes, nds));
-  }, [nodes]);
+  }, [nodes, edges, recordChange]);
 
   const handleFetchNeighbors = useCallback(async (ip, setLoading, setError) => {
     setLoading(true);
@@ -209,16 +252,12 @@ export const useMapInteraction = (theme) => {
       const secondaryEdges = neighborsOfNewNode.reduce((acc, newNeighbor) => {
           const existingNode = currentNodes.find(n => n.id === newNeighbor.ip);
           
-          // **THE FIX IS HERE**
-          // First, check if the neighbor node already exists on the map.
           if (existingNode) {
-              // Only if it exists, check if an edge already connects them.
               const edgeExists = currentEdges.some(e => 
                   (e.source === newNode.id && e.target === existingNode.id) || 
                   (e.source === existingNode.id && e.target === newNode.id)
               );
               
-              // If the node exists but an edge doesn't, create the new edge.
               if (!edgeExists) {
                   acc.push({ 
                       id: `e-${newNode.id}-${existingNode.id}`, 
@@ -232,9 +271,8 @@ export const useMapInteraction = (theme) => {
           }
           return acc;
       }, []);
-
-      setNodes(prev => [...prev, newNode]);
-      setEdges(prev => [...prev, primaryEdge, ...secondaryEdges]);
+      
+      recordChange([...nodes, newNode], [...edges, primaryEdge, ...secondaryEdges]);
       setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
     } catch(err) {
         setError(t('app.errorAddNeighbor', {ip: neighbor.ip}));
@@ -242,23 +280,26 @@ export const useMapInteraction = (theme) => {
     } finally {
         setLoading(false);
     }
-  }, [createNodeObject, selectedElement, nodes, edges, t]);
+  }, [createNodeObject, selectedElement, nodes, edges, t, recordChange]);
 
   const handleDeleteNode = useCallback(() => {
     if (!selectedElement) return;
     const { id, type } = selectedElement;
 
+    let newEdges = edges;
     if (type === 'custom') {
-        setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
+        newEdges = edges.filter(e => e.source !== id && e.target !== id);
     }
     
-    setNodes(nds => nds.filter(n => n.id !== id));
+    const newNodes = nodes.filter(n => n.id !== id);
+    
+    recordChange(newNodes, newEdges);
     setSelectedElement(null);
     setNeighbors([]);
-  }, [selectedElement]);
+  }, [selectedElement, nodes, edges, recordChange]);
 
   const handleUpdateNodeData = useCallback((nodeId, updatedData) => {
-    setNodes(nds => nds.map(n => {
+    const newNodes = nodes.map(n => {
       if (n.id === nodeId) {
         let finalData = { ...n.data, ...updatedData };
         if (n.type === 'custom') {
@@ -274,8 +315,9 @@ export const useMapInteraction = (theme) => {
         return updatedNode;
       }
       return n;
-    }));
-  }, [theme, selectedElement]);
+    });
+    recordChange(newNodes, edges);
+  }, [theme, selectedElement, nodes, edges, recordChange]);
 
   const handleAddGroup = useCallback(() => {
     const newGroup = {
@@ -292,14 +334,17 @@ export const useMapInteraction = (theme) => {
       },
       zIndex: 0
     };
-    setNodes(nds => [...nds, newGroup]);
-  }, [t]);
+    recordChange([...nodes, newGroup], edges);
+  }, [t, nodes, edges, recordChange]);
 
   const resetMap = () => {
-    setNodes([]);
-    setEdges([]);
+    const initialState = { nodes: [], edges: [] };
+    setNodes(initialState.nodes);
+    setEdges(initialState.edges);
     setSelectedElement(null);
     setNeighbors([]);
+    setHistory([initialState]);
+    setHistoryIndex(0);
     localStorage.removeItem('mapNodes');
     localStorage.removeItem('mapEdges');
   };
@@ -309,7 +354,6 @@ export const useMapInteraction = (theme) => {
     edges, setEdges,
     selectedElement,
     neighbors,
-    snapLines,
     onNodesChange,
     onNodeClick,
     onPaneClick,
@@ -319,5 +363,7 @@ export const useMapInteraction = (theme) => {
     handleAddGroup,
     createNodeObject,
     resetMap,
+    undo,
+    redo,
   };
 };

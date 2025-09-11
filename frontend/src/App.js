@@ -1,5 +1,5 @@
 // frontend/src/App.js
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { ReactFlowProvider } from 'react-flow-renderer';
 import { useTranslation } from 'react-i18next';
 
@@ -43,7 +43,6 @@ function App() {
     edges, setEdges,
     selectedElement,
     neighbors,
-    snapLines,
     onNodesChange,
     onNodeClick,
     onPaneClick,
@@ -53,7 +52,31 @@ function App() {
     handleAddGroup,
     createNodeObject,
     resetMap,
+    undo,
+    redo,
   } = useMapInteraction(theme);
+
+  // --- Keyboard Shortcuts for Undo/Redo ---
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.ctrlKey) {
+        if (event.key === 'z') {
+          event.preventDefault();
+          undo();
+        } else if (event.key === 'y') {
+          event.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [undo, redo]);
+
 
   // --- Authentication Handlers ---
   const handleLogin = async (username, password) => {
@@ -183,7 +206,6 @@ function App() {
                 onPaneClick={onPaneClick}
                 nodeTypes={nodeTypes} 
                 theme={theme}
-                snapLines={snapLines}
               />
             </ReactFlowProvider>
           )}
