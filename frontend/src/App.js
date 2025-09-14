@@ -65,7 +65,7 @@ function App() {
     bringToFront,
     sendToBack,
     selectAllByType,
-  } = useMapInteraction(theme, reactFlowInstance);
+  } = useMapInteraction(theme);
 
   // --- Keyboard Shortcuts for Undo/Redo ---
   useEffect(() => {

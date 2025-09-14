@@ -4,256 +4,138 @@ import { applyNodeChanges } from 'react-flow-renderer';
 import { useTranslation } from 'react-i18next';
 import * as api from '../services/apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
+import { useHistoryState } from './useHistoryState';
+import { useNodeManagement } from './useNodeManagement';
+import { useTooling } from './useTooling';
 
-const getInitialState = () => {
-  try {
-    const savedNodes = localStorage.getItem('mapNodes');
-    const savedEdges = localStorage.getItem('mapEdges');
-    return {
-      nodes: savedNodes ? JSON.parse(savedNodes) : [],
-      edges: savedEdges ? JSON.parse(savedEdges) : [],
-    };
-  } catch (error) {
-    console.error("Failed to parse map state from localStorage", error);
-    return { nodes: [], edges: [] };
-  }
-};
-
-export const useMapInteraction = (theme, reactFlowInstanceRef) => {
-  const initialState = getInitialState();
-  const [nodes, setNodes] = useState(initialState.nodes);
-  const [edges, setEdges] = useState(initialState.edges);
-  
-  const [history, setHistory] = useState([initialState]);
-  const [historyIndex, setHistoryIndex] = useState(0);
+export const useMapInteraction = (theme) => {
+  const { state, setState, undo, redo, resetState } = useHistoryState();
+  // Defensive fallback to prevent crash if state is ever undefined during a rapid re-render
+  const { nodes, edges } = state || { nodes: [], edges: [] };
 
   const [selectedElements, setSelectedElements] = useState([]);
   const [neighbors, setNeighbors] = useState([]);
   const { t } = useTranslation();
 
+  const {
+    createNodeObject,
+    handleDeleteElements,
+    handleUpdateNodeData,
+    handleAddGroup,
+    handleAddTextNode,
+  } = useNodeManagement(theme, setState);
+
+  const {
+    alignElements,
+    distributeElements,
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
+    selectAllByType,
+  } = useTooling(selectedElements, setState);
+
+  // Update icons when theme changes
   useEffect(() => {
-    const currentState = history[historyIndex];
-    if (currentState) {
-      localStorage.setItem('mapNodes', JSON.stringify(currentState.nodes));
-      localStorage.setItem('mapEdges', JSON.stringify(currentState.edges));
-    }
-  }, [history, historyIndex]);
-
-  useEffect(() => {
-    setNodes(nds =>
-        nds.map(node => {
-            if (node.type !== 'custom') return node;
-            const iconType = node.data.iconType;
-            if (iconType && ICONS_BY_THEME[iconType]) {
-                return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
-            }
-            return node;
-        })
-    );
-  }, [theme, setNodes]);
-  
-  const recordChange = useCallback((newNodes, newEdges) => {
-      const newHistory = history.slice(0, historyIndex + 1);
-      setHistory([...newHistory, { nodes: newNodes, edges: newEdges }]);
-      setHistoryIndex(newHistory.length);
-      setNodes(newNodes);
-      setEdges(newEdges);
-  }, [history, historyIndex]);
-  
-  const undo = useCallback(() => {
-      if (historyIndex > 0) {
-          const newIndex = historyIndex - 1;
-          setHistoryIndex(newIndex);
-          const prevState = history[newIndex];
-          setNodes(prevState.nodes);
-          setEdges(prevState.edges);
-      }
-  }, [history, historyIndex]);
-  
-  const redo = useCallback(() => {
-      if (historyIndex < history.length - 1) {
-          const newIndex = historyIndex + 1;
-          setHistoryIndex(newIndex);
-          const nextState = history[newIndex];
-          setNodes(nextState.nodes);
-          setEdges(nextState.edges);
-      }
-  }, [history, historyIndex]);
-
-
-  const createNodeObject = useCallback((device, position, explicitIconName) => {
-    const discoveredType = device.type;
-    let finalIconName = explicitIconName;
-
-    if (!finalIconName) {
-      finalIconName = ICONS_BY_THEME[discoveredType] ? discoveredType : 'Unknown';
-    }
-    
-    return {
-      id: device.ip,
-      type: 'custom',
-      position: position || { x: (Math.random() * 400) + 100, y: (Math.random() * 400) + 50 },
-      data: { 
-        hostname: device.hostname, 
-        ip: device.ip,
-        iconType: finalIconName,
-        icon: ICONS_BY_THEME[finalIconName][theme]
-      },
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-      zIndex: 10
-    };
-  }, [theme]);
-
-  const onNodesChange = useCallback((changes) => {
-    const positionChange = changes.find((change) => change.type === 'position' && change.position);
-
-    if (positionChange) {
-        const isDragEnd = !positionChange.dragging;
-        const newNodes = nodes.map((node) => {
-            if (node.id === positionChange.id) {
-                const absolutePosition = positionChange.position;
-                let newParent = null;
-                const nodeWidth = node.width || NODE_WIDTH;
-                const nodeHeight = node.height || NODE_HEIGHT;
-
-                // On drag end, we check for a new parent. During drag, we assume the parent is the same.
-                if (isDragEnd) {
-                    const groupNodes = nodes.filter((g) => g.type === 'group' && g.id !== node.id);
-                    for (const group of groupNodes) {
-                        const nodeCenter = { x: absolutePosition.x + nodeWidth / 2, y: absolutePosition.y + nodeHeight / 2 };
-                        if (
-                            nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
-                            nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height
-                        ) {
-                            newParent = group;
-                            break;
-                        }
-                    }
-                } else {
-                    // During drag, keep the original parent
-                    newParent = nodes.find(n => n.id === node.parentNode);
-                }
-
-                if (newParent) {
-                    return {
-                        ...node,
-                        position: {
-                            x: absolutePosition.x - newParent.position.x,
-                            y: absolutePosition.y - newParent.position.y,
-                        },
-                        parentNode: newParent.id,
-                        extent: 'parent',
-                    };
-                }
-
-                // No parent, so remove parenting info and use absolute position
-                const { parentNode, extent, ...rest } = node;
-                return {
-                    ...rest,
-                    position: absolutePosition,
-                };
-            }
-            return node;
-        });
-
-        if (isDragEnd) {
-            recordChange(newNodes, edges);
-        } else {
-            setNodes(newNodes);
+    setState(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(node => {
+        if (node.type !== 'custom') return node;
+        const iconType = node.data.iconType;
+        if (iconType && ICONS_BY_THEME[iconType]) {
+          return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
         }
-    } else {
-        // For other changes (selection, removal, dimensions), use the helper
-        const updatedNodes = applyNodeChanges(changes, nodes);
-        setNodes(updatedNodes);
-
-        const isHistoryChange = changes.some(c =>
-            c.type === 'remove' ||
-            c.type === 'dimensions' ||
-            c.type === 'select'
-        );
-
-        if (isHistoryChange) {
-            recordChange(updatedNodes, edges);
-        }
-    }
-  }, [nodes, edges, recordChange, setNodes]);
-
+        return node;
+      })
+    }), true); // Overwrite state, no history change for theme
+  }, [theme, setState]);
+  
   const updateSelection = useCallback((newSelectedNodes) => {
     setSelectedElements(newSelectedNodes);
     const selectedIds = new Set(newSelectedNodes.map(n => n.id));
-    // This state update does not need to be in history; onNodesChange handles that.
-    setNodes(nds => nds.map(n => ({ ...n, selected: selectedIds.has(n.id) })));
-  }, [setNodes]);
+    setState(prev => ({
+        ...prev,
+        nodes: prev.nodes.map(n => ({ ...n, selected: selectedIds.has(n.id) }))
+    }), true);
+  }, [setState]);
+
+  const onNodesChange = useCallback((changes) => {
+    const positionChange = changes.find((change) => change.type === 'position' && change.position);
+    
+    if (positionChange) {
+        const isDragEnd = !positionChange.dragging;
+        setState(prev => {
+            const newNodes = prev.nodes.map((node) => {
+                if (node.id === positionChange.id) {
+                    const absolutePosition = positionChange.position;
+                    let newParent = null;
+                    if (isDragEnd) {
+                        for (const group of prev.nodes.filter(g => g.type === 'group' && g.id !== node.id)) {
+                            const nodeCenter = { x: absolutePosition.x + (node.width||NODE_WIDTH)/2, y: absolutePosition.y + (node.height||NODE_HEIGHT)/2 };
+                            if (nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
+                                nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height) {
+                                newParent = group;
+                                break;
+                            }
+                        }
+                    } else {
+                        newParent = prev.nodes.find(n => n.id === node.parentNode);
+                    }
+                    if (newParent) {
+                        return { ...node, position: { x: absolutePosition.x - newParent.position.x, y: absolutePosition.y - newParent.position.y }, parentNode: newParent.id, extent: 'parent' };
+                    }
+                    const { parentNode, extent, ...rest } = node;
+                    return { ...rest, position: absolutePosition };
+                }
+                return node;
+            });
+            return { ...prev, nodes: newNodes };
+        }, !isDragEnd);
+    } else {
+        setState(prev => ({ ...prev, nodes: applyNodeChanges(changes, prev.nodes) }));
+    }
+  }, [setState]);
 
   const handleFetchNeighbors = useCallback(async (ip, setLoading, setError) => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const response = await api.getDeviceNeighbors(ip);
-      const allNeighbors = response.data.neighbors;
+      setState(prev => {
+          if (!prev) return; // Defensive check
+          const allNeighbors = response.data.neighbors;
+          const nodeIdsOnMap = new Set(prev.nodes.map(n => n.id));
+          setNeighbors(allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip)));
 
-      // Partition neighbors into those already on the map and those that are new
-      const nodeIdsOnMap = new Set(nodes.map(n => n.id));
-      const newNeighborsForSidebar = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
-      const existingNeighborsOnMap = allNeighbors.filter(n => nodeIdsOnMap.has(n.ip));
-
-      setNeighbors(newNeighborsForSidebar);
-
-      // Create edges for neighbors that are already on the map but not connected
-      const currentEdgeIds = new Set(edges.map(e => e.id));
-      const edgesToCreate = [];
-
-      existingNeighborsOnMap.forEach(neighbor => {
-        const edgeId1 = `e-${ip}-${neighbor.ip}`;
-        const edgeId2 = `e-${neighbor.ip}-${ip}`;
-
-        if (!currentEdgeIds.has(edgeId1) && !currentEdgeIds.has(edgeId2)) {
-          edgesToCreate.push({
-            id: edgeId1,
-            source: ip,
-            target: neighbor.ip,
-            animated: true,
-            style: { stroke: '#6c757d' },
-            data: { interface: neighbor.interface },
-          });
-        }
+          const currentEdgeIds = new Set(prev.edges.map(e => e.id));
+          const edgesToCreate = allNeighbors
+            .filter(n => nodeIdsOnMap.has(n.ip))
+            .filter(n => !currentEdgeIds.has(`e-${ip}-${n.ip}`) && !currentEdgeIds.has(`e-${n.ip}-${ip}`))
+            .map(n => ({ id: `e-${ip}-${n.ip}`, source: ip, target: n.ip, animated: true, style: { stroke: '#6c757d' }, data: { interface: n.interface } }));
+          
+          return edgesToCreate.length > 0 ? { ...prev, edges: [...prev.edges, ...edgesToCreate] } : prev;
       });
-      
-      if (edgesToCreate.length > 0) {
-        // Important: we are only changing edges, so we pass the current `nodes` array.
-        recordChange(nodes, [...edges, ...edgesToCreate]);
-      }
-
     } catch (err) {
       setError(t('app.errorFetchNeighbors', { ip }));
       setNeighbors([]);
     } finally {
       setLoading(false);
     }
-  }, [nodes, edges, t, recordChange]);
+  }, [setState, t]);
 
   const onNodeClick = useCallback((event, node, setLoading, setError, isMultiSelect) => {
     let newSelectedNodes;
     if (isMultiSelect) {
-        const alreadySelected = selectedElements.some(el => el.id === node.id);
-        if (alreadySelected) {
-            newSelectedNodes = selectedElements.filter(el => el.id !== node.id);
-        } else {
-            newSelectedNodes = [...selectedElements, node];
-        }
+        newSelectedNodes = selectedElements.some(el => el.id === node.id)
+            ? selectedElements.filter(el => el.id !== node.id)
+            : [...selectedElements, node];
     } else {
         if (selectedElements.length === 1 && selectedElements[0].id === node.id) {
-            if(neighbors.length === 0 && node.type === 'custom') {
-                 handleFetchNeighbors(node.id, setLoading, setError);
-            }
+            if (neighbors.length === 0 && node.type === 'custom') handleFetchNeighbors(node.id, setLoading, setError);
             return;
         }
         newSelectedNodes = [node];
     }
-
     updateSelection(newSelectedNodes);
-
     if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
         handleFetchNeighbors(newSelectedNodes[0].id, setLoading, setError);
     } else {
@@ -261,278 +143,59 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
     }
   }, [selectedElements, updateSelection, handleFetchNeighbors, neighbors.length]);
 
-  const onPaneClick = useCallback(() => {
-    updateSelection([]);
-    setNeighbors([]);
-  }, [updateSelection]);
-  
-  const onSelectionChange = useCallback(({ nodes: selectedNodesFromRF }) => {
-      updateSelection(selectedNodesFromRF);
-  }, [updateSelection]);
+  const onPaneClick = useCallback(() => { updateSelection([]); setNeighbors([]); }, [updateSelection]);
+  const onSelectionChange = useCallback(({ nodes }) => updateSelection(nodes), [updateSelection]);
 
   const handleAddNeighbor = useCallback(async (neighbor, setLoading, setError) => {
-    const singleSelected = selectedElements.length === 1 ? selectedElements[0] : null;
-    if (!singleSelected || singleSelected.type !== 'custom' || nodes.some(n => n.id === neighbor.ip)) return;
+    const sourceNode = selectedElements.length === 1 ? selectedElements[0] : null;
+    if (!sourceNode || sourceNode.type !== 'custom' || (nodes && nodes.some(n => n.id === neighbor.ip))) return;
     
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const deviceResponse = await api.getDeviceInfo(neighbor.ip);
       if (!deviceResponse.data || deviceResponse.data.error) throw new Error(`No info for ${neighbor.ip}`);
       
-      const newPosition = { x: singleSelected.position.x + (Math.random() * 250 - 125), y: singleSelected.position.y + 150 };
-      const newNode = createNodeObject(deviceResponse.data, newPosition);
-
-      const primaryEdge = {
-          id: `e-${singleSelected.id}-${newNode.id}`,
-          source: singleSelected.id,
-          target: newNode.id,
-          animated: true,
-          style: { stroke: '#6c757d' },
-          data: { interface: neighbor.interface }
-      };
-
-      const nextNodes = [...nodes, newNode];
-      const nextEdges = [...edges, primaryEdge];
-      const newInterconnects = [];
-
-      try {
-        const newDeviceNeighborsResponse = await api.getDeviceNeighbors(newNode.id);
-        const newDeviceNeighbors = newDeviceNeighborsResponse.data.neighbors;
-
-        const allNodeIdsOnMap = new Set(nextNodes.map(n => n.id));
-        const allEdgeIdsOnMap = new Set(nextEdges.map(e => e.id));
-        
-        newDeviceNeighbors.forEach(potentialConnection => {
-          if (allNodeIdsOnMap.has(potentialConnection.ip)) {
-            const edgeId1 = `e-${newNode.id}-${potentialConnection.ip}`;
-            const edgeId2 = `e-${potentialConnection.ip}-${newNode.id}`;
-            if (!allEdgeIdsOnMap.has(edgeId1) && !allEdgeIdsOnMap.has(edgeId2)) {
-              newInterconnects.push({
-                id: edgeId1,
-                source: newNode.id,
-                target: potentialConnection.ip,
-                animated: true,
-                style: { stroke: '#6c757d' },
-                data: { interface: potentialConnection.interface },
-              });
-            }
-          }
-        });
-      } catch (e) {
-        console.error(`Could not pre-fetch neighbors for ${newNode.id}:`, e);
-      }
+      const newNode = createNodeObject(deviceResponse.data, { x: sourceNode.position.x + 200, y: sourceNode.position.y });
+      const newEdge = { id: `e-${sourceNode.id}-${newNode.id}`, source: sourceNode.id, target: newNode.id, animated: true, style: { stroke: '#6c757d' }, data: { interface: neighbor.interface } };
       
-      recordChange(nextNodes, [...nextEdges, ...newInterconnects]);
+      const newDeviceNeighbors = (await api.getDeviceNeighbors(newNode.id)).data.neighbors;
+      
+      setState(prev => {
+          if (!prev) return; // Defensive check
+          const nextNodes = [...prev.nodes, newNode];
+          const nextEdges = [...prev.edges, newEdge];
+          const nodeIds = new Set(nextNodes.map(n => n.id));
+          const edgeIds = new Set(nextEdges.map(e => e.id));
+          
+          const interconnects = newDeviceNeighbors
+              .filter(n => nodeIds.has(n.ip))
+              .filter(n => !edgeIds.has(`e-${newNode.id}-${n.ip}`) && !edgeIds.has(`e-${n.ip}-${newNode.id}`))
+              .map(n => ({ id: `e-${newNode.id}-${n.ip}`, source: newNode.id, target: n.ip, animated: true, style: { stroke: '#6c757d' }, data: { interface: n.interface } }));
+
+          return { nodes: nextNodes, edges: [...nextEdges, ...interconnects] };
+      });
       setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
-    } catch(err) {
-        setError(t('app.errorAddNeighbor', {ip: neighbor.ip}));
+    } catch (err) {
+      setError(t('app.errorAddNeighbor', {ip: neighbor.ip}));
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-  }, [createNodeObject, selectedElements, nodes, edges, t, recordChange]);
+  }, [selectedElements, nodes, createNodeObject, setState, t]);
 
-  const handleDeleteElements = useCallback(() => {
-    if (selectedElements.length === 0) return;
-    const selectedIds = new Set(selectedElements.map(el => el.id));
-
-    const newNodes = nodes.filter(n => !selectedIds.has(n.id));
-    const newEdges = edges.filter(e => !selectedIds.has(e.source) && !selectedIds.has(e.target));
-    
-    recordChange(newNodes, newEdges);
-    updateSelection([]);
-    setNeighbors([]);
-  }, [selectedElements, nodes, edges, recordChange, updateSelection]);
-
-  const handleUpdateNodeData = useCallback((nodeId, updatedData, addToHistory = true) => {
-    const newNodes = nodes.map(n => {
-      if (n.id === nodeId) {
-        let finalData = { ...n.data, ...updatedData };
-        if (n.type === 'custom') {
-            const newIconType = updatedData.iconType || n.data.iconType;
-            finalData.icon = ICONS_BY_THEME[newIconType][theme];
-        }
-        return { ...n, data: finalData };
-      }
-      return n;
-    });
-
-    if (addToHistory) {
-      recordChange(newNodes, edges);
-    } else {
-      setNodes(newNodes);
-    }
-  }, [theme, nodes, edges, recordChange]);
-
-  const handleAddGroup = useCallback(() => {
-    const newGroup = {
-      id: `group_${Date.now()}`,
-      type: 'group',
-      position: { x: 200, y: 200 },
-      data: {
-        label: t('sidebar.newGroupName'),
-        color: '#cfe2ff', width: 400, height: 300, opacity: 0.6,
-        shape: 'rounded-rectangle',
-        borderColor: '#8a8d91', borderStyle: 'dashed', borderWidth: 1,
-      },
-      zIndex: 0
-    };
-    recordChange([...nodes, newGroup], edges);
-  }, [t, nodes, edges, recordChange]);
-  
-  const handleAddTextNode = useCallback(() => {
-      const newNode = {
-          id: `text_${Date.now()}`,
-          type: 'text',
-          position: {x: 300, y: 100},
-          data: {
-              text: 'New Text',
-              fontSize: 16,
-              color: theme === 'dark' ? '#e4e6eb' : '#212529'
-          },
-          zIndex: 10
-      };
-      recordChange([...nodes, newNode], edges);
-  }, [nodes, edges, recordChange, theme]);
-  
-  const alignElements = useCallback((direction) => {
-      if (selectedElements.length < 2) return;
-      
-      const updatedNodes = [...nodes];
-      const selectedIds = selectedElements.map(el => el.id);
-
-      let anchor;
-      switch (direction) {
-          case 'left':
-              anchor = Math.min(...selectedElements.map(el => el.position.x));
-              break;
-          case 'right':
-              anchor = Math.max(...selectedElements.map(el => el.position.x + (el.width || NODE_WIDTH)));
-              break;
-          case 'top':
-              anchor = Math.min(...selectedElements.map(el => el.position.y));
-              break;
-          case 'bottom':
-              anchor = Math.max(...selectedElements.map(el => el.position.y + (el.height || NODE_HEIGHT)));
-              break;
-          case 'h-center':
-              anchor = selectedElements.reduce((sum, el) => sum + el.position.x + (el.width || NODE_WIDTH) / 2, 0) / selectedElements.length;
-              break;
-          case 'v-center':
-              anchor = selectedElements.reduce((sum, el) => sum + el.position.y + (el.height || NODE_HEIGHT) / 2, 0) / selectedElements.length;
-              break;
-          default: return;
-      }
-
-      const newNodes = updatedNodes.map(node => {
-          if (!selectedIds.includes(node.id)) return node;
-          const newPos = { ...node.position };
-          const width = node.width || NODE_WIDTH;
-          const height = node.height || NODE_HEIGHT;
-          
-          if (direction === 'left') newPos.x = anchor;
-          if (direction === 'right') newPos.x = anchor - width;
-          if (direction === 'top') newPos.y = anchor;
-          if (direction === 'bottom') newPos.y = anchor - height;
-          if (direction === 'h-center') newPos.x = anchor - width / 2;
-          if (direction === 'v-center') newPos.y = anchor - height / 2;
-          
-          return { ...node, position: newPos };
-      });
-      recordChange(newNodes, edges);
-  }, [selectedElements, nodes, edges, recordChange]);
-
-  const distributeElements = useCallback((direction) => {
-      if (selectedElements.length < 3) return;
-
-      const sorted = [...selectedElements].sort((a, b) => 
-          direction === 'horizontal' ? a.position.x - b.position.x : a.position.y - b.position.y
-      );
-
-      const first = sorted[0];
-      const last = sorted[sorted.length - 1];
-      
-      let totalSpace, totalSize, startPos, endPos;
-      if (direction === 'horizontal') {
-          startPos = first.position.x;
-          endPos = last.position.x;
-          totalSpace = endPos - startPos;
-          totalSize = sorted.reduce((sum, el) => sum + (el.width || NODE_WIDTH), 0);
-      } else {
-          startPos = first.position.y;
-          endPos = last.position.y;
-          totalSpace = endPos - startPos;
-          totalSize = sorted.reduce((sum, el) => sum + (el.height || NODE_HEIGHT), 0);
-      }
-
-      const spacing = (totalSpace - totalSize) / (sorted.length - 1);
-      let currentPos = startPos + (sorted[0].width || NODE_WIDTH) + spacing;
-      
-      const newNodes = nodes.map(node => {
-          const sortedIndex = sorted.findIndex(s => s.id === node.id);
-          if (sortedIndex === -1 || sortedIndex === 0 || sortedIndex === sorted.length -1) return node;
-
-          const el = sorted[sortedIndex];
-          const newPos = { ...el.position };
-
-          if (direction === 'horizontal') {
-              newPos.x = currentPos;
-              currentPos += (el.width || NODE_WIDTH) + spacing;
-          } else {
-              newPos.y = currentPos;
-              currentPos += (el.height || NODE_HEIGHT) + spacing;
-          }
-          return { ...node, position: newPos };
-      });
-      recordChange(newNodes, edges);
-  }, [selectedElements, nodes, edges, recordChange]);
-
-  const changeZIndex = useCallback((direction) => {
-      if (selectedElements.length === 0) return;
-      
-      const zIndexes = nodes.map(n => n.zIndex || 0);
-      const minZ = Math.min(...zIndexes);
-      const maxZ = Math.max(...zIndexes);
-      const selectedIds = new Set(selectedElements.map(el => el.id));
-
-      const newNodes = nodes.map(node => {
-          if (!selectedIds.has(node.id)) return node;
-          
-          const currentZ = node.zIndex || 0;
-          let newZ = currentZ;
-          
-          switch(direction) {
-              case 'front': newZ = maxZ + 1; break;
-              case 'back': newZ = minZ - 1; break;
-              case 'forward': newZ = currentZ + 1; break;
-              case 'backward': newZ = currentZ - 1; break;
-              default: break;
-          }
-          return { ...node, zIndex: newZ };
-      });
-      recordChange(newNodes, edges);
-  }, [selectedElements, nodes, edges, recordChange]);
-
-  const selectAllByType = useCallback((iconType) => {
-    const selected = nodes.filter(n => n.data.iconType === iconType);
-    updateSelection(selected);
-  }, [nodes, updateSelection]);
-
-  const resetMap = () => {
-    const initialState = { nodes: [], edges: [] };
-    setNodes(initialState.nodes);
-    setEdges(initialState.edges);
+  const resetMap = useCallback(() => {
+    resetState();
     setSelectedElements([]);
     setNeighbors([]);
-    setHistory([initialState]);
-    setHistoryIndex(0);
-    localStorage.removeItem('mapNodes');
-    localStorage.removeItem('mapEdges');
-  };
+  }, [resetState]);
+  
+  // Expose a function that needs `updateSelection`
+  const selectAllByTypeHandler = useCallback((iconType) => {
+    selectAllByType(iconType, updateSelection);
+  }, [selectAllByType, updateSelection]);
 
   return {
-    nodes, setNodes,
-    edges, setEdges,
+    nodes, setNodes: (newNodes) => setState(prev => ({...prev, nodes: typeof newNodes === 'function' ? newNodes(prev.nodes) : newNodes}), true),
+    edges, setEdges: (newEdges) => setState(prev => ({...prev, edges: typeof newEdges === 'function' ? newEdges(prev.edges) : newEdges}), true),
     selectedElements,
     neighbors,
     onNodesChange,
@@ -540,7 +203,7 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
     onPaneClick,
     onSelectionChange,
     handleAddNeighbor,
-    handleDeleteElements,
+    handleDeleteElements: () => handleDeleteElements(selectedElements),
     handleUpdateNodeData,
     handleAddGroup,
     handleAddTextNode,
@@ -550,10 +213,10 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
     redo,
     alignElements,
     distributeElements,
-    bringForward: () => changeZIndex('forward'),
-    sendBackward: () => changeZIndex('backward'),
-    bringToFront: () => changeZIndex('front'),
-    sendToBack: () => changeZIndex('back'),
-    selectAllByType,
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
+    selectAllByType: selectAllByTypeHandler,
   };
 };
