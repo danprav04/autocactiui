@@ -191,14 +191,47 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
     setError('');
     try {
       const response = await api.getDeviceNeighbors(ip);
-      setNeighbors(response.data.neighbors.filter(n => !nodes.some(node => node.id === n.ip)));
+      const allNeighbors = response.data.neighbors;
+
+      // Partition neighbors into those already on the map and those that are new
+      const nodeIdsOnMap = new Set(nodes.map(n => n.id));
+      const newNeighborsForSidebar = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
+      const existingNeighborsOnMap = allNeighbors.filter(n => nodeIdsOnMap.has(n.ip));
+
+      setNeighbors(newNeighborsForSidebar);
+
+      // Create edges for neighbors that are already on the map but not connected
+      const currentEdgeIds = new Set(edges.map(e => e.id));
+      const edgesToCreate = [];
+
+      existingNeighborsOnMap.forEach(neighbor => {
+        const edgeId1 = `e-${ip}-${neighbor.ip}`;
+        const edgeId2 = `e-${neighbor.ip}-${ip}`;
+
+        if (!currentEdgeIds.has(edgeId1) && !currentEdgeIds.has(edgeId2)) {
+          edgesToCreate.push({
+            id: edgeId1,
+            source: ip,
+            target: neighbor.ip,
+            animated: true,
+            style: { stroke: '#6c757d' },
+            data: { interface: neighbor.interface },
+          });
+        }
+      });
+      
+      if (edgesToCreate.length > 0) {
+        // Important: we are only changing edges, so we pass the current `nodes` array.
+        recordChange(nodes, [...edges, ...edgesToCreate]);
+      }
+
     } catch (err) {
       setError(t('app.errorFetchNeighbors', { ip }));
       setNeighbors([]);
     } finally {
       setLoading(false);
     }
-  }, [nodes, t]);
+  }, [nodes, edges, t, recordChange]);
 
   const onNodeClick = useCallback((event, node, setLoading, setError, isMultiSelect) => {
     let newSelectedNodes;
@@ -258,8 +291,39 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
           style: { stroke: '#6c757d' },
           data: { interface: neighbor.interface }
       };
+
+      const nextNodes = [...nodes, newNode];
+      const nextEdges = [...edges, primaryEdge];
+      const newInterconnects = [];
+
+      try {
+        const newDeviceNeighborsResponse = await api.getDeviceNeighbors(newNode.id);
+        const newDeviceNeighbors = newDeviceNeighborsResponse.data.neighbors;
+
+        const allNodeIdsOnMap = new Set(nextNodes.map(n => n.id));
+        const allEdgeIdsOnMap = new Set(nextEdges.map(e => e.id));
+        
+        newDeviceNeighbors.forEach(potentialConnection => {
+          if (allNodeIdsOnMap.has(potentialConnection.ip)) {
+            const edgeId1 = `e-${newNode.id}-${potentialConnection.ip}`;
+            const edgeId2 = `e-${potentialConnection.ip}-${newNode.id}`;
+            if (!allEdgeIdsOnMap.has(edgeId1) && !allEdgeIdsOnMap.has(edgeId2)) {
+              newInterconnects.push({
+                id: edgeId1,
+                source: newNode.id,
+                target: potentialConnection.ip,
+                animated: true,
+                style: { stroke: '#6c757d' },
+                data: { interface: potentialConnection.interface },
+              });
+            }
+          }
+        });
+      } catch (e) {
+        console.error(`Could not pre-fetch neighbors for ${newNode.id}:`, e);
+      }
       
-      recordChange([...nodes, newNode], [...edges, primaryEdge]);
+      recordChange(nextNodes, [...nextEdges, ...newInterconnects]);
       setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
     } catch(err) {
         setError(t('app.errorAddNeighbor', {ip: neighbor.ip}));
