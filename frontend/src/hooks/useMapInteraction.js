@@ -256,7 +256,7 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
     setNeighbors([]);
   }, [selectedElements, nodes, edges, recordChange, updateSelection]);
 
-  const handleUpdateNodeData = useCallback((nodeId, updatedData) => {
+  const handleUpdateNodeData = useCallback((nodeId, updatedData, addToHistory = true) => {
     const newNodes = nodes.map(n => {
       if (n.id === nodeId) {
         let finalData = { ...n.data, ...updatedData };
@@ -268,7 +268,12 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
       }
       return n;
     });
-    recordChange(newNodes, edges);
+
+    if (addToHistory) {
+      recordChange(newNodes, edges);
+    } else {
+      setNodes(newNodes);
+    }
   }, [theme, nodes, edges, recordChange]);
 
   const handleAddGroup = useCallback(() => {

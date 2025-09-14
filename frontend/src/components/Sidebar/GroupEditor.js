@@ -26,6 +26,8 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteElements }) =>
   const [groupData, setGroupData] = useState({});
   const { t } = useTranslation();
 
+  // This effect now correctly syncs the local state when the selected element's data changes
+  // from an external source, like resizing the node on the map canvas.
   useEffect(() => {
     if (selectedElement) {
       setGroupData({
@@ -40,10 +42,29 @@ const GroupEditor = ({ selectedElement, onUpdateNodeData, onDeleteElements }) =>
         borderWidth: selectedElement.data.borderWidth || 1,
       });
     }
-  }, [selectedElement?.id]); // Changed dependency to prevent self-revert
+  }, [selectedElement]); // Dependency changed to the whole object.
   
+  // This effect pushes changes from the editor back to the global state.
   useEffect(() => {
     if (!selectedElement || !Object.keys(groupData).length) return;
+
+    // A deep-enough comparison to prevent updating global state
+    // if the props already match the local state. This breaks update loops
+    // and prevents overwriting external changes with stale local state.
+    const hasChanged =
+      selectedElement.data.label !== groupData.label ||
+      selectedElement.data.color !== groupData.color ||
+      (selectedElement.data.shape || GROUP_SHAPES[0].value) !== groupData.shape ||
+      parseInt(selectedElement.data.width, 10) !== parseInt(groupData.width, 10) ||
+      parseInt(selectedElement.data.height, 10) !== parseInt(groupData.height, 10) ||
+      parseFloat(selectedElement.data.opacity) !== parseFloat(groupData.opacity) ||
+      (selectedElement.data.borderColor || '#8a8d91') !== groupData.borderColor ||
+      (selectedElement.data.borderStyle || 'dashed') !== groupData.borderStyle ||
+      (selectedElement.data.borderWidth || 1) !== parseInt(groupData.borderWidth, 10);
+
+    if (!hasChanged) {
+        return;
+    }
 
     const handler = setTimeout(() => {
       onUpdateNodeData(selectedElement.id, {

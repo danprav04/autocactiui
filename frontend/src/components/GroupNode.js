@@ -19,6 +19,7 @@ export default memo(({ id, data, selected }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [labelText, setLabelText] = useState(label);
     const nodeRef = useRef(null);
+    const lastDimensions = useRef(null);
 
     // Update local label state if the parent data changes
     useEffect(() => {
@@ -56,27 +57,37 @@ export default memo(({ id, data, selected }) => {
         const startY = e.clientY;
         const startWidth = width;
         const startHeight = height;
-        const aspectRatio = startWidth / startHeight;
+        
+        lastDimensions.current = { width: startWidth, height: startHeight };
 
         const doDrag = (dragEvent) => {
             let newWidth = startWidth + (dragEvent.clientX - startX) / zoom;
             let newHeight = startHeight + (dragEvent.clientY - startY) / zoom;
 
             if (dragEvent.altKey) {
-                // Proportional scaling
-                if (newWidth / newHeight > aspectRatio) {
-                    newHeight = newWidth / aspectRatio;
-                } else {
-                    newWidth = newHeight * aspectRatio;
-                }
+                // Force a 1:1 aspect ratio (square/circle) by using the larger dimension for both.
+                const side = Math.max(newWidth, newHeight);
+                newWidth = side;
+                newHeight = side;
             }
+            
+            const finalDimensions = {
+                width: Math.max(newWidth, 100),
+                height: Math.max(newHeight, 80)
+            };
 
-            onUpdateNodeData(id, { width: Math.max(newWidth, 100), height: Math.max(newHeight, 80) });
+            lastDimensions.current = finalDimensions;
+            // Perform a "live" update that doesn't save to the undo/redo history
+            onUpdateNodeData(id, finalDimensions, false);
         };
 
         const stopDrag = () => {
             document.removeEventListener('mousemove', doDrag, false);
             document.removeEventListener('mouseup', stopDrag, false);
+            // On mouse up, perform a final update that IS saved to history
+            if(lastDimensions.current) {
+                onUpdateNodeData(id, lastDimensions.current, true);
+            }
         };
 
         document.addEventListener('mousemove', doDrag, false);
