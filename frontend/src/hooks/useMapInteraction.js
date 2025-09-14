@@ -106,59 +106,83 @@ export const useMapInteraction = (theme, reactFlowInstanceRef) => {
   }, [theme]);
 
   const onNodesChange = useCallback((changes) => {
-    const updatedNodes = applyNodeChanges(changes, nodes);
-    
-    const dragEndChange = changes.find(change => change.type === 'position' && !change.dragging);
-    if (dragEndChange) {
-        const movedNode = updatedNodes.find(n => n.id === dragEndChange.id);
-        if (movedNode) {
-            const groupNodes = updatedNodes.filter(n => n.type === 'group' && n.id !== movedNode.id);
-            let parentGroup = null;
+    const positionChange = changes.find((change) => change.type === 'position' && change.position);
 
-            for (const group of groupNodes) {
-                const nodeCenter = { x: movedNode.position.x + movedNode.width / 2, y: movedNode.position.y + movedNode.height / 2 };
-                if (
-                    nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
-                    nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height
-                ) {
-                    parentGroup = group;
-                    break;
+    if (positionChange) {
+        const isDragEnd = !positionChange.dragging;
+        const newNodes = nodes.map((node) => {
+            if (node.id === positionChange.id) {
+                const absolutePosition = positionChange.position;
+                let newParent = null;
+                const nodeWidth = node.width || NODE_WIDTH;
+                const nodeHeight = node.height || NODE_HEIGHT;
+
+                // On drag end, we check for a new parent. During drag, we assume the parent is the same.
+                if (isDragEnd) {
+                    const groupNodes = nodes.filter((g) => g.type === 'group' && g.id !== node.id);
+                    for (const group of groupNodes) {
+                        const nodeCenter = { x: absolutePosition.x + nodeWidth / 2, y: absolutePosition.y + nodeHeight / 2 };
+                        if (
+                            nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
+                            nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height
+                        ) {
+                            newParent = group;
+                            break;
+                        }
+                    }
+                } else {
+                    // During drag, keep the original parent
+                    newParent = nodes.find(n => n.id === node.parentNode);
                 }
-            }
 
-            if (parentGroup) {
-                movedNode.parentNode = parentGroup.id;
-                movedNode.extent = 'parent';
-                movedNode.position = {
-                    x: movedNode.position.x - parentGroup.position.x,
-                    y: movedNode.position.y - parentGroup.position.y,
+                if (newParent) {
+                    return {
+                        ...node,
+                        position: {
+                            x: absolutePosition.x - newParent.position.x,
+                            y: absolutePosition.y - newParent.position.y,
+                        },
+                        parentNode: newParent.id,
+                        extent: 'parent',
+                    };
+                }
+
+                // No parent, so remove parenting info and use absolute position
+                const { parentNode, extent, ...rest } = node;
+                return {
+                    ...rest,
+                    position: absolutePosition,
                 };
-            } else {
-                if (movedNode.parentNode) {
-                   const oldParent = nodes.find(n => n.id === movedNode.parentNode);
-                   if (oldParent) {
-                       movedNode.position = {
-                           x: movedNode.position.x + oldParent.position.x,
-                           y: movedNode.position.y + oldParent.position.y,
-                       };
-                   }
-                }
-                delete movedNode.parentNode;
-                delete movedNode.extent;
             }
+            return node;
+        });
+
+        if (isDragEnd) {
+            recordChange(newNodes, edges);
+        } else {
+            setNodes(newNodes);
+        }
+    } else {
+        // For other changes (selection, removal, dimensions), use the helper
+        const updatedNodes = applyNodeChanges(changes, nodes);
+        setNodes(updatedNodes);
+
+        const isHistoryChange = changes.some(c =>
+            c.type === 'remove' ||
+            c.type === 'dimensions' ||
+            c.type === 'select'
+        );
+
+        if (isHistoryChange) {
+            recordChange(updatedNodes, edges);
         }
     }
-    
-    if (changes.some(c => c.type === 'position' && !c.dragging)) {
-        recordChange(updatedNodes, edges);
-    } else {
-        setNodes(updatedNodes);
-    }
-  }, [nodes, edges, recordChange]);
+  }, [nodes, edges, recordChange, setNodes]);
 
   const updateSelection = useCallback((newSelectedNodes) => {
     setSelectedElements(newSelectedNodes);
     const selectedIds = new Set(newSelectedNodes.map(n => n.id));
+    // This state update does not need to be in history; onNodesChange handles that.
     setNodes(nds => nds.map(n => ({ ...n, selected: selectedIds.has(n.id) })));
   }, [setNodes]);
 
