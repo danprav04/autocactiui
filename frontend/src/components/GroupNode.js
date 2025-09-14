@@ -73,17 +73,24 @@ export default memo(({ id, data, selected }) => {
         document.addEventListener('mouseup', stopDrag, false);
     };
     
-    const getBorderRadius = () => {
+    const getShapeStyle = () => {
         switch(shape) {
             case 'circle':
-                return '50%';
+                return { borderRadius: '50%' };
             case 'rounded-rectangle':
-                return '8px';
+                return { borderRadius: '8px' };
+            case 'triangle':
+                return { 
+                    clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                    borderRadius: '0px' 
+                };
             case 'rectangle':
             default:
-                return '0px';
+                return { borderRadius: '0px' };
         }
     }
+
+    const isTriangle = shape === 'triangle';
 
     const nodeStyle = {
         backgroundColor: color,
@@ -91,27 +98,36 @@ export default memo(({ id, data, selected }) => {
         width: `${width}px`,
         height: `${height}px`,
         border: selected ? '2px solid var(--accent-primary)' : '1px dashed var(--node-border)',
-        borderRadius: getBorderRadius(),
+        ...getShapeStyle(),
+        // Center the label horizontally for the triangle shape
+        justifyContent: isTriangle ? 'center' : 'flex-start',
     };
+
+    // Add padding to the top for the triangle shape to push the label down
+    const labelContainerStyle = isTriangle ? {
+        paddingTop: `${height * 0.1}px`
+    } : {};
 
     return (
         <div ref={nodeRef} className="group-node" style={nodeStyle}>
-            {isEditing ? (
-                <input
-                    type="text"
-                    value={labelText}
-                    onChange={handleLabelChange}
-                    onBlur={handleLabelUpdate}
-                    onKeyDown={handleInputKeyDown}
-                    className="group-label-input nodrag" // Add nodrag here as well
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()} // Prevent deselection
-                />
-            ) : (
-                <div className="group-label" onDoubleClick={handleLabelDoubleClick}>
-                    {label}
-                </div>
-            )}
+            <div style={labelContainerStyle}>
+                {isEditing ? (
+                    <input
+                        type="text"
+                        value={labelText}
+                        onChange={handleLabelChange}
+                        onBlur={handleLabelUpdate}
+                        onKeyDown={handleInputKeyDown}
+                        className="group-label-input nodrag" // Add nodrag here as well
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()} // Prevent deselection
+                    />
+                ) : (
+                    <div className="group-label" onDoubleClick={handleLabelDoubleClick}>
+                        {label}
+                    </div>
+                )}
+            </div>
             <div 
                 // The 'nodrag' class is crucial to prevent the node from moving
                 // when the user intends to resize.

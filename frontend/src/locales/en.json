@@ -36,6 +36,7 @@
     "shapeRectangle": "Rectangle",
     "shapeRoundedRectangle": "Rounded Rectangle",
     "shapeCircle": "Circle",
+    "shapeTriangle": "Triangle",
     "width": "Width (px)",
     "height": "Height (px)",
     "deleteGroup": "Delete Group",

@@ -14,7 +14,8 @@ const GROUP_COLORS = [
 const GROUP_SHAPES = [
     { name: 'sidebar.shapeRoundedRectangle', value: 'rounded-rectangle' },
     { name: 'sidebar.shapeRectangle', value: 'rectangle' },
-    { name: 'sidebar.shapeCircle', value: 'circle' }
+    { name: 'sidebar.shapeCircle', value: 'circle' },
+    { name: 'sidebar.shapeTriangle', value: 'triangle' }
 ];
 
 
