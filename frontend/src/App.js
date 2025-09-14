@@ -12,6 +12,7 @@ import Map from './components/Map';
 import Sidebar from './components/Sidebar/Sidebar';
 import CustomNode from './components/CustomNode';
 import GroupNode from './components/GroupNode';
+import TextNode from './components/TextNode';
 import StartupScreen from './components/Startup/StartupScreen';
 import LoginScreen from './components/Login/LoginScreen';
 import ThemeToggleButton from './components/common/ThemeToggleButton';
@@ -33,6 +34,7 @@ function App() {
   
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
+  const reactFlowInstance = useRef(null);
 
   // --- Custom Hooks for State and Logic Management ---
   const { theme, toggleTheme } = useThemeManager();
@@ -41,31 +43,43 @@ function App() {
   const {
     nodes, setNodes,
     edges, setEdges,
-    selectedElement,
+    selectedElements,
     neighbors,
     onNodesChange,
     onNodeClick,
     onPaneClick,
+    onSelectionChange,
     handleAddNeighbor,
-    handleDeleteNode,
+    handleDeleteElements,
     handleUpdateNodeData,
     handleAddGroup,
+    handleAddTextNode,
     createNodeObject,
     resetMap,
     undo,
     redo,
-  } = useMapInteraction(theme);
+    alignElements,
+    distributeElements,
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
+    selectAllByType,
+  } = useMapInteraction(theme, reactFlowInstance);
 
   // --- Keyboard Shortcuts for Undo/Redo ---
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.ctrlKey) {
+      if (event.ctrlKey || event.metaKey) {
         if (event.key === 'z') {
           event.preventDefault();
           undo();
         } else if (event.key === 'y') {
           event.preventDefault();
           redo();
+        } else if (event.key === 'a') {
+          event.preventDefault();
+          onSelectionChange({nodes: nodes.map(n => ({...n, selected: true})), edges: []});
         }
       }
     };
@@ -75,7 +89,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [undo, redo]);
+  }, [undo, redo, nodes, onSelectionChange]);
 
 
   // --- Authentication Handlers ---
@@ -101,7 +115,7 @@ function App() {
   };
 
   // --- Memos for Performance ---
-  const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode }), []);
+  const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode, text: TextNode }), []);
   const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
   
   const handleStart = async (ip, initialIconName) => {
@@ -116,7 +130,7 @@ function App() {
       setNodes([newNode]);
       setEdges([]);
       // Simulate click to select the first node and fetch its neighbors
-      onNodeClick(null, newNode, setIsLoading, setError);
+      onNodeClick(null, newNode, setIsLoading, setError, false);
     } catch (err) {
       setError(t('app.errorInitialDevice'));
       resetMap();
@@ -150,7 +164,8 @@ function App() {
   };
 
   const onNodeClickHandler = useCallback((event, node) => {
-      onNodeClick(event, node, setIsLoading, setError);
+      const isMultiSelect = event.ctrlKey || event.metaKey;
+      onNodeClick(event, node, setIsLoading, setError, isMultiSelect);
   }, [onNodeClick]);
 
   const onAddNeighborHandler = useCallback(async (neighbor) => {
@@ -165,13 +180,14 @@ function App() {
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
       <div className="app-container">
         <Sidebar 
-          selectedElement={selectedElement}
+          selectedElements={selectedElements}
           neighbors={neighbors}
           onAddNeighbor={onAddNeighborHandler}
-          onDeleteNode={handleDeleteNode}
+          onDeleteElements={handleDeleteElements}
           onUpdateNodeData={handleUpdateNodeData}
           onUploadMap={handleUploadMap}
           onAddGroup={handleAddGroup}
+          onAddTextNode={handleAddTextNode}
           onResetMap={resetMap}
           onLogout={handleLogout}
           availableIcons={availableIcons}
@@ -182,6 +198,13 @@ function App() {
           cactiInstallations={cactiInstallations}
           selectedCactiId={selectedCactiId}
           setSelectedCactiId={setSelectedCactiId}
+          alignElements={alignElements}
+          distributeElements={distributeElements}
+          bringForward={bringForward}
+          sendBackward={sendBackward}
+          bringToFront={bringToFront}
+          sendToBack={sendToBack}
+          selectAllByType={selectAllByType}
         />
         <div className="main-content" ref={reactFlowWrapper}>
           <div className="top-controls">
@@ -204,8 +227,10 @@ function App() {
                 onNodeClick={onNodeClickHandler} 
                 onNodesChange={onNodesChange}
                 onPaneClick={onPaneClick}
+                onSelectionChange={onSelectionChange}
                 nodeTypes={nodeTypes} 
                 theme={theme}
+                setReactFlowInstance={(instance) => (reactFlowInstance.current = instance)}
               />
             </ReactFlowProvider>
           )}

@@ -13,7 +13,7 @@ const ResizerIcon = () => (
 
 export default memo(({ id, data, selected }) => {
     const { onUpdateNodeData } = useContext(NodeContext);
-    const { label, color, width, height, opacity, shape } = data;
+    const { label, color, width, height, opacity, shape, borderColor, borderStyle, borderWidth } = data;
     const { zoom } = useViewport();
     
     const [isEditing, setIsEditing] = useState(false);
@@ -49,18 +49,28 @@ export default memo(({ id, data, selected }) => {
     };
 
     const onResizeStart = (e) => {
-        // No need for stopPropagation as the 'nodrag' class handles it.
         e.preventDefault();
+        e.stopPropagation();
 
         const startX = e.clientX;
         const startY = e.clientY;
         const startWidth = width;
         const startHeight = height;
+        const aspectRatio = startWidth / startHeight;
 
-        const doDrag = (e) => {
-            const newWidth = startWidth + (e.clientX - startX) / zoom;
-            const newHeight = startHeight + (e.clientY - startY) / zoom;
-            // Update node data with new dimensions, enforcing a minimum size
+        const doDrag = (dragEvent) => {
+            let newWidth = startWidth + (dragEvent.clientX - startX) / zoom;
+            let newHeight = startHeight + (dragEvent.clientY - startY) / zoom;
+
+            if (dragEvent.altKey) {
+                // Proportional scaling
+                if (newWidth / newHeight > aspectRatio) {
+                    newHeight = newWidth / aspectRatio;
+                } else {
+                    newWidth = newHeight * aspectRatio;
+                }
+            }
+
             onUpdateNodeData(id, { width: Math.max(newWidth, 100), height: Math.max(newHeight, 80) });
         };
 
@@ -77,16 +87,14 @@ export default memo(({ id, data, selected }) => {
         switch(shape) {
             case 'circle':
                 return { borderRadius: '50%' };
-            case 'rounded-rectangle':
-                return { borderRadius: '8px' };
             case 'triangle':
                 return { 
                     clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
                     borderRadius: '0px' 
                 };
-            case 'rectangle':
+            case 'rounded-rectangle':
             default:
-                return { borderRadius: '0px' };
+                return { borderRadius: '8px' };
         }
     }
 
@@ -97,13 +105,11 @@ export default memo(({ id, data, selected }) => {
         opacity: opacity,
         width: `${width}px`,
         height: `${height}px`,
-        border: selected ? '2px solid var(--accent-primary)' : '1px dashed var(--node-border)',
+        border: `${borderWidth}px ${borderStyle} ${selected ? 'var(--accent-primary)' : borderColor}`,
         ...getShapeStyle(),
-        // Center the label horizontally for the triangle shape
         justifyContent: isTriangle ? 'center' : 'flex-start',
     };
 
-    // Add padding to the top for the triangle shape to push the label down
     const labelContainerStyle = isTriangle ? {
         paddingTop: `${height * 0.1}px`
     } : {};
@@ -118,9 +124,9 @@ export default memo(({ id, data, selected }) => {
                         onChange={handleLabelChange}
                         onBlur={handleLabelUpdate}
                         onKeyDown={handleInputKeyDown}
-                        className="group-label-input nodrag" // Add nodrag here as well
+                        className="group-label-input nodrag"
                         autoFocus
-                        onClick={(e) => e.stopPropagation()} // Prevent deselection
+                        onClick={(e) => e.stopPropagation()}
                     />
                 ) : (
                     <div className="group-label" onDoubleClick={handleLabelDoubleClick}>
@@ -129,8 +135,6 @@ export default memo(({ id, data, selected }) => {
                 )}
             </div>
             <div 
-                // The 'nodrag' class is crucial to prevent the node from moving
-                // when the user intends to resize.
                 className="group-resizer nodrag" 
                 onMouseDown={onResizeStart}
             >

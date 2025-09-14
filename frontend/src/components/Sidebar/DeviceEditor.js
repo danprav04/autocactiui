@@ -6,7 +6,7 @@ import NeighborsList from './NeighborsList';
 const DeviceEditor = ({
   selectedElement,
   onUpdateNodeData,
-  onDeleteNode,
+  onDeleteElements,
   availableIcons,
   neighbors,
   onAddNeighbor,
@@ -21,11 +21,12 @@ const DeviceEditor = ({
       const currentType = selectedElement.data.iconType;
       setEditableType(availableIcons.includes(currentType) ? currentType : availableIcons[0]);
     }
-  }, [selectedElement, availableIcons]);
+  }, [selectedElement?.id, availableIcons]); // Changed dependency to prevent self-revert
 
   useEffect(() => {
     if (!selectedElement) return;
 
+    // Do not trigger update if the values are the same as the prop
     if (editableHostname === selectedElement.data.hostname && editableType === selectedElement.data.iconType) {
       return;
     }
@@ -74,7 +75,7 @@ const DeviceEditor = ({
         </select>
       </div>
       <div className="control-group">
-        <button onClick={onDeleteNode} className="danger">
+        <button onClick={onDeleteElements} className="danger">
           {t('sidebar.deleteDevice')}
         </button>
       </div>

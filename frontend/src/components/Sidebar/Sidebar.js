@@ -4,16 +4,19 @@ import { useTranslation } from 'react-i18next';
 import MapExportControls from './MapExportControls';
 import DeviceEditor from './DeviceEditor';
 import GroupEditor from './GroupEditor';
+import TextEditor from './TextEditor';
+import MultiSelectToolbar from './MultiSelectToolbar';
 import SidebarPlaceholder from './SidebarPlaceholder';
 
 const Sidebar = ({
-  selectedElement,
+  selectedElements,
   neighbors,
   onAddNeighbor,
-  onDeleteNode,
+  onDeleteElements,
   onUpdateNodeData,
   onUploadMap,
   onAddGroup,
+  onAddTextNode,
   onResetMap,
   onLogout,
   availableIcons,
@@ -23,7 +26,14 @@ const Sidebar = ({
   isUploading,
   cactiInstallations,
   selectedCactiId,
-  setSelectedCactiId
+  setSelectedCactiId,
+  alignElements,
+  distributeElements,
+  bringForward,
+  sendBackward,
+  bringToFront,
+  sendToBack,
+  selectAllByType,
 }) => {
   const { t } = useTranslation();
 
@@ -34,17 +44,33 @@ const Sidebar = ({
   };
 
   const renderEditor = () => {
-    if (!selectedElement) {
+    if (selectedElements.length === 0) {
       return <SidebarPlaceholder isMapStarted={isMapStarted} />;
     }
+
+    if (selectedElements.length > 1) {
+        return (
+            <MultiSelectToolbar
+                selectedElements={selectedElements}
+                alignElements={alignElements}
+                distributeElements={distributeElements}
+                bringForward={bringForward}
+                sendBackward={sendBackward}
+                bringToFront={bringToFront}
+                sendToBack={sendToBack}
+                onDeleteElements={onDeleteElements}
+            />
+        );
+    }
     
+    const selectedElement = selectedElements[0];
     switch (selectedElement.type) {
       case 'custom':
         return (
           <DeviceEditor
             selectedElement={selectedElement}
             onUpdateNodeData={onUpdateNodeData}
-            onDeleteNode={onDeleteNode}
+            onDeleteElements={onDeleteElements}
             availableIcons={availableIcons}
             neighbors={neighbors}
             onAddNeighbor={onAddNeighbor}
@@ -55,7 +81,15 @@ const Sidebar = ({
           <GroupEditor
             selectedElement={selectedElement}
             onUpdateNodeData={onUpdateNodeData}
-            onDeleteNode={onDeleteNode}
+            onDeleteElements={onDeleteElements}
+          />
+        );
+      case 'text':
+        return (
+          <TextEditor
+            selectedElement={selectedElement}
+            onUpdateNodeData={onUpdateNodeData}
+            onDeleteElements={onDeleteElements}
           />
         );
       default:
@@ -81,10 +115,31 @@ const Sidebar = ({
       {isMapStarted && (
         <div>
           <h3>{t('sidebar.mapTools')}</h3>
-          <div className="control-group">
-            <button onClick={onAddGroup} className="secondary">{t('sidebar.addGroup')}</button>
+           <div className="control-group">
+              <label>{t('sidebar.addElements')}</label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={onAddGroup} className="secondary">{t('sidebar.addGroup')}</button>
+                <button onClick={onAddTextNode} className="secondary">{t('sidebar.addText')}</button>
+              </div>
           </div>
+           <div className="control-group">
+              <label htmlFor="type-selector-all">{t('sidebar.quickSelect')}</label>
+              <select
+                id="type-selector-all"
+                className="icon-selector"
+                onChange={(e) => selectAllByType(e.target.value)}
+                value=""
+              >
+                <option value="" disabled>{t('sidebar.selectByType')}</option>
+                {availableIcons.map((iconName) => (
+                  <option key={iconName} value={iconName}>
+                    {iconName}
+                  </option>
+                ))}
+              </select>
+           </div>
           <div className="control-group">
+            <label>{t('sidebar.mapActions')}</label>
             <button onClick={handleResetClick} className="danger" disabled={!isMapStarted}>
               {t('sidebar.clearMap')}
             </button>

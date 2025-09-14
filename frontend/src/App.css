@@ -196,7 +196,7 @@ hr {
   color: var(--text-secondary);
 }
 
-input[type="text"], input[type="number"], .icon-selector, select {
+input[type="text"], input[type="number"], input[type="color"], .icon-selector, select {
   width: 100%;
   padding: 10px;
   border-radius: 6px;
@@ -206,8 +206,13 @@ input[type="text"], input[type="number"], .icon-selector, select {
   font-size: 14px;
   box-sizing: border-box;
 }
+input[type="color"] {
+  padding: 5px;
+  height: 40px;
+}
 
-input[type="text"]:focus, input[type="number"]:focus, .icon-selector:focus, select:focus {
+
+input[type="text"]:focus, input[type="number"]:focus, input[type="color"]:focus, .icon-selector:focus, select:focus {
     border-color: var(--accent-primary);
     outline: none;
 }
@@ -242,6 +247,43 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
     color: var(--text-secondary);
     margin-top: 0;
 }
+
+/* --- MULTI-SELECT TOOLBAR --- */
+.multi-select-toolbar .button-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.multi-select-toolbar .button-grid.distribute {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.multi-select-toolbar button {
+  padding: 8px;
+  font-size: 12px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.multi-select-toolbar button svg {
+  width: 16px;
+  height: 16px;
+}
+.multi-select-toolbar h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  margin-top: 16px;
+  text-transform: uppercase;
+}
+.multi-select-toolbar .full-width-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
 
 /* --- NEIGHBORS LIST --- */
 .neighbors-section { flex-grow: 1; }
@@ -324,6 +366,7 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
   height: 100%;
   background-color: var(--map-bg);
   direction: ltr; /* Ensures the map canvas and its controls remain LTR regardless of page direction */
+  position: relative;
 }
 .react-flow__attribution { display: none; }
 .react-flow__minimap {
@@ -345,6 +388,14 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
     fill: var(--text-secondary);
 }
 .exporting .react-flow__handle { display: none; }
+
+.marquee-selection {
+  position: absolute;
+  background-color: rgba(0, 123, 255, 0.2);
+  border: 1px solid var(--accent-primary);
+  z-index: 1000;
+  pointer-events: none; /* Important */
+}
 
 
 /* --- NOTIFICATIONS --- */
@@ -424,7 +475,6 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 }
 
 .group-node {
-  border-radius: 8px;
   padding: 15px;
   box-sizing: border-box;
   text-align: left;
@@ -485,6 +535,40 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
 .group-resizer:hover svg {
     opacity: 1;
 }
+
+
+/* --- TEXT NODE --- */
+.text-node {
+    padding: 10px;
+    background-color: transparent;
+    border: 1px dashed transparent;
+    border-radius: 4px;
+    font-size: 16px;
+    text-align: center;
+    min-width: 50px;
+    min-height: 20px;
+}
+.text-node.selected {
+    border-color: var(--node-selected-border);
+    box-shadow: 0 0 0 1px var(--node-selected-border);
+}
+
+.text-node-input {
+    padding: 8px;
+    border: none;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.text-node-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
 
 /* --- SIDEBAR STYLES --- */
 input[type="range"] {

@@ -3,9 +3,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { applyNodeChanges } from 'react-flow-renderer';
 import { useTranslation } from 'react-i18next';
 import * as api from '../services/apiService';
-import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT, SNAP_THRESHOLD } from '../config/constants';
+import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
-// Helper to get the initial state from localStorage, providing a fallback for safety.
 const getInitialState = () => {
   try {
     const savedNodes = localStorage.getItem('mapNodes');
@@ -20,8 +19,7 @@ const getInitialState = () => {
   }
 };
 
-
-export const useMapInteraction = (theme) => {
+export const useMapInteraction = (theme, reactFlowInstanceRef) => {
   const initialState = getInitialState();
   const [nodes, setNodes] = useState(initialState.nodes);
   const [edges, setEdges] = useState(initialState.edges);
@@ -29,21 +27,18 @@ export const useMapInteraction = (theme) => {
   const [history, setHistory] = useState([initialState]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  const [selectedElement, setSelectedElement] = useState(null);
+  const [selectedElements, setSelectedElements] = useState([]);
   const [neighbors, setNeighbors] = useState([]);
-  const [snapLines, setSnapLines] = useState([]);
   const { t } = useTranslation();
 
-  // Effect to save map state to localStorage whenever the current history state changes.
   useEffect(() => {
     const currentState = history[historyIndex];
-    if (currentState && currentState.nodes.length > 0) {
+    if (currentState) {
       localStorage.setItem('mapNodes', JSON.stringify(currentState.nodes));
       localStorage.setItem('mapEdges', JSON.stringify(currentState.edges));
     }
   }, [history, historyIndex]);
 
-  // Effect to update node icons automatically when the theme changes
   useEffect(() => {
     setNodes(nds =>
         nds.map(node => {
@@ -104,95 +99,68 @@ export const useMapInteraction = (theme) => {
         iconType: finalIconName,
         icon: ICONS_BY_THEME[finalIconName][theme]
       },
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
       zIndex: 10
     };
   }, [theme]);
 
   const onNodesChange = useCallback((changes) => {
-    const dragChange = changes.find(c => c.type === 'position' && c.dragging);
+    const updatedNodes = applyNodeChanges(changes, nodes);
+    
+    const dragEndChange = changes.find(change => change.type === 'position' && !change.dragging);
+    if (dragEndChange) {
+        const movedNode = updatedNodes.find(n => n.id === dragEndChange.id);
+        if (movedNode) {
+            const groupNodes = updatedNodes.filter(n => n.type === 'group' && n.id !== movedNode.id);
+            let parentGroup = null;
 
-    if (dragChange) {
-        const draggedNode = nodes.find(n => n.id === dragChange.id);
-
-        if (!dragChange.position || !draggedNode || draggedNode.type !== 'custom') {
-            setSnapLines([]);
-            setNodes(nds => applyNodeChanges(changes, nds));
-            return;
-        }
-        
-        const newPos = { ...dragChange.position };
-        let bestSnapX = { dist: Infinity };
-        let bestSnapY = { dist: Infinity };
-
-        for (const otherNode of nodes) {
-            if (otherNode.id === draggedNode.id) continue;
-
-            const otherNodeWidth = otherNode.type === 'group' ? otherNode.data.width : NODE_WIDTH;
-            const otherNodeHeight = otherNode.type === 'group' ? otherNode.data.height : NODE_HEIGHT;
-
-            const otherPointsX = [ otherNode.position.x, otherNode.position.x + otherNodeWidth / 2, otherNode.position.x + otherNodeWidth ];
-            const otherPointsY = [ otherNode.position.y, otherNode.position.y + otherNodeHeight / 2, otherNode.position.y + otherNodeHeight ];
-
-            if (otherNode.type === 'group') {
-                otherPointsX.push(otherNode.position.x + otherNodeWidth / 3);
-                otherPointsX.push(otherNode.position.x + (otherNodeWidth * 2) / 3);
-                otherPointsY.push(otherNode.position.y + otherNodeHeight / 3);
-                otherPointsY.push(otherNode.position.y + (otherNodeHeight * 2) / 3);
-            }
-
-            const draggedPointsX = [newPos.x, newPos.x + NODE_WIDTH / 2, newPos.x + NODE_WIDTH];
-            const draggedPointsY = [newPos.y, newPos.y + NODE_HEIGHT / 2, newPos.y + NODE_HEIGHT];
-
-            for (let i = 0; i < draggedPointsX.length; i++) {
-                for (const p of otherPointsX) {
-                    const dist = Math.abs(draggedPointsX[i] - p);
-                    if (dist < SNAP_THRESHOLD && dist < bestSnapX.dist) {
-                        bestSnapX = { dist, pos: p, align: i }; // 0=left, 1=center, 2=right
-                    }
+            for (const group of groupNodes) {
+                const nodeCenter = { x: movedNode.position.x + movedNode.width / 2, y: movedNode.position.y + movedNode.height / 2 };
+                if (
+                    nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
+                    nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height
+                ) {
+                    parentGroup = group;
+                    break;
                 }
             }
-            
-            for (let i = 0; i < draggedPointsY.length; i++) {
-                for (const p of otherPointsY) {
-                    const dist = Math.abs(draggedPointsY[i] - p);
-                    if (dist < SNAP_THRESHOLD && dist < bestSnapY.dist) {
-                        bestSnapY = { dist, pos: p, align: i }; // 0=top, 1=center, 2=bottom
-                    }
+
+            if (parentGroup) {
+                movedNode.parentNode = parentGroup.id;
+                movedNode.extent = 'parent';
+                movedNode.position = {
+                    x: movedNode.position.x - parentGroup.position.x,
+                    y: movedNode.position.y - parentGroup.position.y,
+                };
+            } else {
+                if (movedNode.parentNode) {
+                   const oldParent = nodes.find(n => n.id === movedNode.parentNode);
+                   if (oldParent) {
+                       movedNode.position = {
+                           x: movedNode.position.x + oldParent.position.x,
+                           y: movedNode.position.y + oldParent.position.y,
+                       };
+                   }
                 }
+                delete movedNode.parentNode;
+                delete movedNode.extent;
             }
         }
-        
-        const newSnapLines = [];
-        if (bestSnapX.pos !== undefined) {
-            if (bestSnapX.align === 0) newPos.x = bestSnapX.pos;
-            if (bestSnapX.align === 1) newPos.x = bestSnapX.pos - NODE_WIDTH / 2;
-            if (bestSnapX.align === 2) newPos.x = bestSnapX.pos - NODE_WIDTH;
-            newSnapLines.push({ type: 'vertical', x: bestSnapX.pos });
-        }
-        if (bestSnapY.pos !== undefined) {
-            if (bestSnapY.align === 0) newPos.y = bestSnapY.pos;
-            if (bestSnapY.align === 1) newPos.y = bestSnapY.pos - NODE_HEIGHT / 2;
-            if (bestSnapY.align === 2) newPos.y = bestSnapY.pos - NODE_HEIGHT;
-            newSnapLines.push({ type: 'horizontal', y: bestSnapY.pos });
-        }
-
-        dragChange.position = newPos;
-        setSnapLines(newSnapLines);
-    }
-    
-    const dragFinished = changes.some(c => c.type === 'position' && !c.dragging);
-    
-    // Only record a change in history if a drag has just finished.
-    if (dragFinished) {
-        recordChange(applyNodeChanges(changes, nodes), edges);
-    } else {
-        setNodes(nds => applyNodeChanges(changes, nds));
     }
     
     if (changes.some(c => c.type === 'position' && !c.dragging)) {
-        setSnapLines([]);
+        recordChange(updatedNodes, edges);
+    } else {
+        setNodes(updatedNodes);
     }
   }, [nodes, edges, recordChange]);
+
+  const updateSelection = useCallback((newSelectedNodes) => {
+    setSelectedElements(newSelectedNodes);
+    const selectedIds = new Set(newSelectedNodes.map(n => n.id));
+    setNodes(nds => nds.map(n => ({ ...n, selected: selectedIds.has(n.id) })));
+  }, [setNodes]);
 
   const handleFetchNeighbors = useCallback(async (ip, setLoading, setError) => {
     setLoading(true);
@@ -208,24 +176,46 @@ export const useMapInteraction = (theme) => {
     }
   }, [nodes, t]);
 
-  const onNodeClick = useCallback((event, node, setLoading, setError) => {
-    setNodes(nds => nds.map(n => ({ ...n, selected: n.id === node.id })));
-    setSelectedElement(node);
-    if (node.type === 'custom') {
-        handleFetchNeighbors(node.id, setLoading, setError);
+  const onNodeClick = useCallback((event, node, setLoading, setError, isMultiSelect) => {
+    let newSelectedNodes;
+    if (isMultiSelect) {
+        const alreadySelected = selectedElements.some(el => el.id === node.id);
+        if (alreadySelected) {
+            newSelectedNodes = selectedElements.filter(el => el.id !== node.id);
+        } else {
+            newSelectedNodes = [...selectedElements, node];
+        }
+    } else {
+        if (selectedElements.length === 1 && selectedElements[0].id === node.id) {
+            if(neighbors.length === 0 && node.type === 'custom') {
+                 handleFetchNeighbors(node.id, setLoading, setError);
+            }
+            return;
+        }
+        newSelectedNodes = [node];
+    }
+
+    updateSelection(newSelectedNodes);
+
+    if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
+        handleFetchNeighbors(newSelectedNodes[0].id, setLoading, setError);
     } else {
         setNeighbors([]);
     }
-  }, [handleFetchNeighbors]);
+  }, [selectedElements, updateSelection, handleFetchNeighbors, neighbors.length]);
 
   const onPaneClick = useCallback(() => {
-    setNodes(nds => nds.map(n => ({...n, selected: false})));
-    setSelectedElement(null);
+    updateSelection([]);
     setNeighbors([]);
-  }, []);
+  }, [updateSelection]);
+  
+  const onSelectionChange = useCallback(({ nodes: selectedNodesFromRF }) => {
+      updateSelection(selectedNodesFromRF);
+  }, [updateSelection]);
 
   const handleAddNeighbor = useCallback(async (neighbor, setLoading, setError) => {
-    if (!selectedElement || selectedElement.type !== 'custom' || nodes.some(n => n.id === neighbor.ip)) return;
+    const singleSelected = selectedElements.length === 1 ? selectedElements[0] : null;
+    if (!singleSelected || singleSelected.type !== 'custom' || nodes.some(n => n.id === neighbor.ip)) return;
     
     setLoading(true);
     setError('');
@@ -233,70 +223,38 @@ export const useMapInteraction = (theme) => {
       const deviceResponse = await api.getDeviceInfo(neighbor.ip);
       if (!deviceResponse.data || deviceResponse.data.error) throw new Error(`No info for ${neighbor.ip}`);
       
-      const newPosition = { x: selectedElement.position.x + (Math.random() * 250 - 125), y: selectedElement.position.y + 150 };
+      const newPosition = { x: singleSelected.position.x + (Math.random() * 250 - 125), y: singleSelected.position.y + 150 };
       const newNode = createNodeObject(deviceResponse.data, newPosition);
 
       const primaryEdge = {
-          id: `e-${selectedElement.id}-${newNode.id}`,
-          source: selectedElement.id,
+          id: `e-${singleSelected.id}-${newNode.id}`,
+          source: singleSelected.id,
           target: newNode.id,
           animated: true,
           style: { stroke: '#6c757d' },
           data: { interface: neighbor.interface }
       };
       
-      const neighborsOfNewNode = (await api.getDeviceNeighbors(newNode.id)).data.neighbors || [];
-      const currentNodes = [...nodes, newNode];
-      const currentEdges = [...edges, primaryEdge]; 
-
-      const secondaryEdges = neighborsOfNewNode.reduce((acc, newNeighbor) => {
-          const existingNode = currentNodes.find(n => n.id === newNeighbor.ip);
-          
-          if (existingNode) {
-              const edgeExists = currentEdges.some(e => 
-                  (e.source === newNode.id && e.target === existingNode.id) || 
-                  (e.source === existingNode.id && e.target === newNode.id)
-              );
-              
-              if (!edgeExists) {
-                  acc.push({ 
-                      id: `e-${newNode.id}-${existingNode.id}`, 
-                      source: newNode.id, 
-                      target: existingNode.id, 
-                      animated: true, 
-                      style: { stroke: '#6c757d' },
-                      data: { interface: newNeighbor.interface }
-                  });
-              }
-          }
-          return acc;
-      }, []);
-      
-      recordChange([...nodes, newNode], [...edges, primaryEdge, ...secondaryEdges]);
+      recordChange([...nodes, newNode], [...edges, primaryEdge]);
       setNeighbors(prev => prev.filter(n => n.ip !== neighbor.ip));
     } catch(err) {
         setError(t('app.errorAddNeighbor', {ip: neighbor.ip}));
-        console.error(err);
     } finally {
         setLoading(false);
     }
-  }, [createNodeObject, selectedElement, nodes, edges, t, recordChange]);
+  }, [createNodeObject, selectedElements, nodes, edges, t, recordChange]);
 
-  const handleDeleteNode = useCallback(() => {
-    if (!selectedElement) return;
-    const { id, type } = selectedElement;
+  const handleDeleteElements = useCallback(() => {
+    if (selectedElements.length === 0) return;
+    const selectedIds = new Set(selectedElements.map(el => el.id));
 
-    let newEdges = edges;
-    if (type === 'custom') {
-        newEdges = edges.filter(e => e.source !== id && e.target !== id);
-    }
-    
-    const newNodes = nodes.filter(n => n.id !== id);
+    const newNodes = nodes.filter(n => !selectedIds.has(n.id));
+    const newEdges = edges.filter(e => !selectedIds.has(e.source) && !selectedIds.has(e.target));
     
     recordChange(newNodes, newEdges);
-    setSelectedElement(null);
+    updateSelection([]);
     setNeighbors([]);
-  }, [selectedElement, nodes, edges, recordChange]);
+  }, [selectedElements, nodes, edges, recordChange, updateSelection]);
 
   const handleUpdateNodeData = useCallback((nodeId, updatedData) => {
     const newNodes = nodes.map(n => {
@@ -306,18 +264,12 @@ export const useMapInteraction = (theme) => {
             const newIconType = updatedData.iconType || n.data.iconType;
             finalData.icon = ICONS_BY_THEME[newIconType][theme];
         }
-        
-        const updatedNode = { ...n, data: finalData };
-        
-        if (selectedElement && selectedElement.id === nodeId) {
-          setSelectedElement(updatedNode);
-        }
-        return updatedNode;
+        return { ...n, data: finalData };
       }
       return n;
     });
     recordChange(newNodes, edges);
-  }, [theme, selectedElement, nodes, edges, recordChange]);
+  }, [theme, nodes, edges, recordChange]);
 
   const handleAddGroup = useCallback(() => {
     const newGroup = {
@@ -326,22 +278,158 @@ export const useMapInteraction = (theme) => {
       position: { x: 200, y: 200 },
       data: {
         label: t('sidebar.newGroupName'),
-        color: '#cfe2ff',
-        width: 400,
-        height: 300,
-        opacity: 0.6,
-        shape: 'rounded-rectangle'
+        color: '#cfe2ff', width: 400, height: 300, opacity: 0.6,
+        shape: 'rounded-rectangle',
+        borderColor: '#8a8d91', borderStyle: 'dashed', borderWidth: 1,
       },
       zIndex: 0
     };
     recordChange([...nodes, newGroup], edges);
   }, [t, nodes, edges, recordChange]);
+  
+  const handleAddTextNode = useCallback(() => {
+      const newNode = {
+          id: `text_${Date.now()}`,
+          type: 'text',
+          position: {x: 300, y: 100},
+          data: {
+              text: 'New Text',
+              fontSize: 16,
+              color: theme === 'dark' ? '#e4e6eb' : '#212529'
+          },
+          zIndex: 10
+      };
+      recordChange([...nodes, newNode], edges);
+  }, [nodes, edges, recordChange, theme]);
+  
+  const alignElements = useCallback((direction) => {
+      if (selectedElements.length < 2) return;
+      
+      const updatedNodes = [...nodes];
+      const selectedIds = selectedElements.map(el => el.id);
+
+      let anchor;
+      switch (direction) {
+          case 'left':
+              anchor = Math.min(...selectedElements.map(el => el.position.x));
+              break;
+          case 'right':
+              anchor = Math.max(...selectedElements.map(el => el.position.x + (el.width || NODE_WIDTH)));
+              break;
+          case 'top':
+              anchor = Math.min(...selectedElements.map(el => el.position.y));
+              break;
+          case 'bottom':
+              anchor = Math.max(...selectedElements.map(el => el.position.y + (el.height || NODE_HEIGHT)));
+              break;
+          case 'h-center':
+              anchor = selectedElements.reduce((sum, el) => sum + el.position.x + (el.width || NODE_WIDTH) / 2, 0) / selectedElements.length;
+              break;
+          case 'v-center':
+              anchor = selectedElements.reduce((sum, el) => sum + el.position.y + (el.height || NODE_HEIGHT) / 2, 0) / selectedElements.length;
+              break;
+          default: return;
+      }
+
+      const newNodes = updatedNodes.map(node => {
+          if (!selectedIds.includes(node.id)) return node;
+          const newPos = { ...node.position };
+          const width = node.width || NODE_WIDTH;
+          const height = node.height || NODE_HEIGHT;
+          
+          if (direction === 'left') newPos.x = anchor;
+          if (direction === 'right') newPos.x = anchor - width;
+          if (direction === 'top') newPos.y = anchor;
+          if (direction === 'bottom') newPos.y = anchor - height;
+          if (direction === 'h-center') newPos.x = anchor - width / 2;
+          if (direction === 'v-center') newPos.y = anchor - height / 2;
+          
+          return { ...node, position: newPos };
+      });
+      recordChange(newNodes, edges);
+  }, [selectedElements, nodes, edges, recordChange]);
+
+  const distributeElements = useCallback((direction) => {
+      if (selectedElements.length < 3) return;
+
+      const sorted = [...selectedElements].sort((a, b) => 
+          direction === 'horizontal' ? a.position.x - b.position.x : a.position.y - b.position.y
+      );
+
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      
+      let totalSpace, totalSize, startPos, endPos;
+      if (direction === 'horizontal') {
+          startPos = first.position.x;
+          endPos = last.position.x;
+          totalSpace = endPos - startPos;
+          totalSize = sorted.reduce((sum, el) => sum + (el.width || NODE_WIDTH), 0);
+      } else {
+          startPos = first.position.y;
+          endPos = last.position.y;
+          totalSpace = endPos - startPos;
+          totalSize = sorted.reduce((sum, el) => sum + (el.height || NODE_HEIGHT), 0);
+      }
+
+      const spacing = (totalSpace - totalSize) / (sorted.length - 1);
+      let currentPos = startPos + (sorted[0].width || NODE_WIDTH) + spacing;
+      
+      const newNodes = nodes.map(node => {
+          const sortedIndex = sorted.findIndex(s => s.id === node.id);
+          if (sortedIndex === -1 || sortedIndex === 0 || sortedIndex === sorted.length -1) return node;
+
+          const el = sorted[sortedIndex];
+          const newPos = { ...el.position };
+
+          if (direction === 'horizontal') {
+              newPos.x = currentPos;
+              currentPos += (el.width || NODE_WIDTH) + spacing;
+          } else {
+              newPos.y = currentPos;
+              currentPos += (el.height || NODE_HEIGHT) + spacing;
+          }
+          return { ...node, position: newPos };
+      });
+      recordChange(newNodes, edges);
+  }, [selectedElements, nodes, edges, recordChange]);
+
+  const changeZIndex = useCallback((direction) => {
+      if (selectedElements.length === 0) return;
+      
+      const zIndexes = nodes.map(n => n.zIndex || 0);
+      const minZ = Math.min(...zIndexes);
+      const maxZ = Math.max(...zIndexes);
+      const selectedIds = new Set(selectedElements.map(el => el.id));
+
+      const newNodes = nodes.map(node => {
+          if (!selectedIds.has(node.id)) return node;
+          
+          const currentZ = node.zIndex || 0;
+          let newZ = currentZ;
+          
+          switch(direction) {
+              case 'front': newZ = maxZ + 1; break;
+              case 'back': newZ = minZ - 1; break;
+              case 'forward': newZ = currentZ + 1; break;
+              case 'backward': newZ = currentZ - 1; break;
+              default: break;
+          }
+          return { ...node, zIndex: newZ };
+      });
+      recordChange(newNodes, edges);
+  }, [selectedElements, nodes, edges, recordChange]);
+
+  const selectAllByType = useCallback((iconType) => {
+    const selected = nodes.filter(n => n.data.iconType === iconType);
+    updateSelection(selected);
+  }, [nodes, updateSelection]);
 
   const resetMap = () => {
     const initialState = { nodes: [], edges: [] };
     setNodes(initialState.nodes);
     setEdges(initialState.edges);
-    setSelectedElement(null);
+    setSelectedElements([]);
     setNeighbors([]);
     setHistory([initialState]);
     setHistoryIndex(0);
@@ -352,18 +440,27 @@ export const useMapInteraction = (theme) => {
   return {
     nodes, setNodes,
     edges, setEdges,
-    selectedElement,
+    selectedElements,
     neighbors,
     onNodesChange,
     onNodeClick,
     onPaneClick,
+    onSelectionChange,
     handleAddNeighbor,
-    handleDeleteNode,
+    handleDeleteElements,
     handleUpdateNodeData,
     handleAddGroup,
+    handleAddTextNode,
     createNodeObject,
     resetMap,
     undo,
     redo,
+    alignElements,
+    distributeElements,
+    bringForward: () => changeZIndex('forward'),
+    sendBackward: () => changeZIndex('backward'),
+    bringToFront: () => changeZIndex('front'),
+    sendToBack: () => changeZIndex('back'),
+    selectAllByType,
   };
 };
