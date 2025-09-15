@@ -11,14 +11,28 @@ import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
  * @returns {{exportNodes: Array, exportEdges: Array}} An object containing stylized nodes and edges.
  */
 const prepareElementsForExport = (nodes, edges) => {
-    const exportNodes = nodes.map(node => ({
-        ...node,
-        selected: false,
-        data: {
-            ...node.data,
-            icon: node.type === 'custom' ? ICONS_BY_THEME[node.data.iconType].light : node.data.icon
+    const exportNodes = nodes.map(node => {
+        const exportNode = {
+            ...node,
+            selected: false,
+            className: 'export-node', // Add a universal class for export styling
+        };
+
+        // Force light-theme visuals for consistent exports
+        if (node.type === 'custom') {
+            exportNode.data = {
+                ...node.data,
+                icon: ICONS_BY_THEME[node.data.iconType].light,
+            };
+        } else if (node.type === 'text') {
+            exportNode.data = {
+                ...node.data,
+                color: '#212529', // Force dark text for light background
+            };
         }
-    }));
+
+        return exportNode;
+    });
     
     const exportEdges = edges.map(edge => ({
         ...edge,

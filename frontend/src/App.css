@@ -523,3 +523,24 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"]::-moz-range-thumb:hover {
     transform: scale(1.1);
 }
+
+/* --- EXPORT OVERRIDE STYLES --- */
+/* Force a consistent light theme for map exports to ensure readability on a white background */
+
+/* Custom device nodes */
+.react-flow__node.export-node .custom-node {
+    background-color: #ffffff !important; /* Match light theme's --node-bg */
+    border-color: #ced4da !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important; /* Add the light theme's shadow */
+}
+
+.react-flow__node.export-node .custom-node .node-label strong,
+.react-flow__node.export-node .custom-node .node-label small {
+    color: #212529 !important; /* Force dark text */
+}
+
+/* Group node labels */
+.react-flow__node.export-node .group-label {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    color: #212529 !important;
+}
