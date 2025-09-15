@@ -239,40 +239,67 @@ export const useMapInteraction = (theme) => {
   }, [baseHandleDeleteElements, selectedElements]);
 
   const onNodesChange = useCallback((changes) => {
-    const positionChange = changes.find((change) => change.type === 'position' && change.position);
-    
-    if (positionChange) {
-        const isDragEnd = !positionChange.dragging;
-        setState(prev => {
-            const newNodes = prev.nodes.map((node) => {
-                if (node.id === positionChange.id) {
-                    const absolutePosition = positionChange.position;
-                    let newParent = null;
-                    if (isDragEnd) {
-                        for (const group of prev.nodes.filter(g => g.type === 'group' && g.id !== node.id)) {
-                            const nodeCenter = { x: absolutePosition.x + (node.width||NODE_WIDTH)/2, y: absolutePosition.y + (node.height||NODE_HEIGHT)/2 };
-                            if (nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
-                                nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height) {
-                                newParent = group;
-                                break;
-                            }
-                        }
-                    } else {
-                        newParent = prev.nodes.find(n => n.id === node.parentNode);
-                    }
-                    if (newParent) {
-                        return { ...node, position: { x: absolutePosition.x - newParent.position.x, y: absolutePosition.y - newParent.position.y }, parentNode: newParent.id, extent: 'parent' };
-                    }
-                    const { parentNode, extent, ...rest } = node;
-                    return { ...rest, position: absolutePosition };
+    const isDragEnd = changes.some(change => change.type === 'position' && change.dragging === false);
+
+    setState(prev => {
+        // First, apply all incoming changes. This will move groups and children together.
+        const nodesAfterMove = applyNodeChanges(changes, prev.nodes);
+
+        // If a drag just ended, we might need to update parenting.
+        if (isDragEnd) {
+            const draggedNodeIds = new Set(changes.filter(c => c.type === 'position').map(c => c.id));
+            const groups = nodesAfterMove.filter(n => n.type === 'group');
+
+            const finalNodes = nodesAfterMove.map(node => {
+                // Only process nodes that were part of the drag operation and are not groups themselves.
+                if (!draggedNodeIds.has(node.id) || node.type === 'group') {
+                    return node;
                 }
-                return node;
+
+                let newParent = null;
+                for (const group of groups) {
+                    const nodeCenter = { 
+                        x: node.position.x + (node.width || NODE_WIDTH) / 2, 
+                        y: node.position.y + (node.height || NODE_HEIGHT) / 2 
+                    };
+
+                    if (
+                        nodeCenter.x > group.position.x &&
+                        nodeCenter.x < group.position.x + group.data.width &&
+                        nodeCenter.y > group.position.y &&
+                        nodeCenter.y < group.position.y + group.data.height
+                    ) {
+                        newParent = group;
+                        break;
+                    }
+                }
+
+                if (newParent) {
+                    // Node is inside a group. Update position to be relative.
+                    return {
+                        ...node,
+                        position: {
+                            x: node.position.x - newParent.position.x,
+                            y: node.position.y - newParent.position.y,
+                        },
+                        parentNode: newParent.id,
+                        extent: 'parent',
+                    };
+                } else {
+                    // Node is not inside any group. If it had a parent, it needs to be removed.
+                    // The position is already absolute from applyNodeChanges, so we just unset parentNode.
+                    const { parentNode, extent, ...rest } = node;
+                    return rest;
+                }
             });
-            return { ...prev, nodes: newNodes };
-        }, !isDragEnd);
-    } else {
-        setState(prev => ({ ...prev, nodes: applyNodeChanges(changes, prev.nodes) }));
-    }
+
+            return { ...prev, nodes: finalNodes };
+        }
+        
+        // If it's not the end of a drag, just return the nodes after moving.
+        return { ...prev, nodes: nodesAfterMove };
+
+    }, !isDragEnd); // This correctly controls history creation.
   }, [setState]);
 
   const resetMap = useCallback(() => {
