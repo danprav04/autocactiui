@@ -110,29 +110,28 @@ export const useTooling = (selectedElements, setState) => {
     if (selectedElements.length === 0) return;
 
     setState(prev => {
+        // Ensure all nodes have a zIndex, default to 1.
+        const allNodes = prev.nodes.map(n => ({ ...n, zIndex: n.zIndex ?? 1 }));
         const selectedIds = new Set(selectedElements.map(el => el.id));
-        let allNodes = prev.nodes.map(n => ({ ...n, zIndex: n.zIndex || 0 }));
 
         if (direction === 'front' || direction === 'back') {
-            const zIndexes = allNodes.map(n => n.zIndex);
-            const minZ = Math.min(...zIndexes);
-            const maxZ = Math.max(...zIndexes);
+            const selected = allNodes.filter(n => selectedIds.has(n.id));
+            const unselected = allNodes.filter(n => !selectedIds.has(n.id)).sort((a, b) => a.zIndex - b.zIndex);
             
-            allNodes = allNodes.map(node => {
-                if (selectedIds.has(node.id)) {
-                    return { ...node, zIndex: direction === 'front' ? maxZ + 1 : minZ - 1 };
-                }
-                return node;
-            });
-        } else {
-            // Sort nodes by zIndex to establish a clear visual stack
-            allNodes.sort((a, b) => a.zIndex - b.zIndex);
+            const reordered = direction === 'front' ? [...unselected, ...selected] : [...selected, ...unselected];
+
+            // Re-assign sequential z-index starting from 1
+            const finalNodes = reordered.map((node, index) => ({ ...node, zIndex: index + 1 }));
+            return { ...prev, nodes: finalNodes };
+
+        } else { // 'forward' or 'backward'
+            const sortedNodes = allNodes.sort((a, b) => a.zIndex - b.zIndex);
 
             if (direction === 'forward') {
                 // Iterate backwards to prevent a single node from moving multiple steps
-                for (let i = allNodes.length - 2; i >= 0; i--) {
-                    const currentNode = allNodes[i];
-                    const nextNode = allNodes[i + 1];
+                for (let i = sortedNodes.length - 2; i >= 0; i--) {
+                    const currentNode = sortedNodes[i];
+                    const nextNode = sortedNodes[i + 1];
                     if (selectedIds.has(currentNode.id) && !selectedIds.has(nextNode.id)) {
                         // Swap zIndex
                         [currentNode.zIndex, nextNode.zIndex] = [nextNode.zIndex, currentNode.zIndex];
@@ -140,18 +139,17 @@ export const useTooling = (selectedElements, setState) => {
                 }
             } else if (direction === 'backward') {
                 // Iterate forwards to handle multiple selections moving down together
-                for (let i = 1; i < allNodes.length; i++) {
-                    const currentNode = allNodes[i];
-                    const prevNode = allNodes[i - 1];
+                for (let i = 1; i < sortedNodes.length; i++) {
+                    const currentNode = sortedNodes[i];
+                    const prevNode = sortedNodes[i - 1];
                     if (selectedIds.has(currentNode.id) && !selectedIds.has(prevNode.id)) {
                         // Swap zIndex
                         [currentNode.zIndex, prevNode.zIndex] = [prevNode.zIndex, currentNode.zIndex];
                     }
                 }
             }
+            return { ...prev, nodes: sortedNodes };
         }
-        
-        return { ...prev, nodes: allNodes };
     });
   }, [selectedElements, setState]);
   

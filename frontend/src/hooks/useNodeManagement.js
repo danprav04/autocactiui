@@ -89,7 +89,7 @@ export const useNodeManagement = (theme, setState) => {
         shape: 'rounded-rectangle',
         borderColor: '#8a8d91', borderStyle: 'dashed', borderWidth: 1,
       },
-      zIndex: 0
+      zIndex: 1
     };
     setState(prev => ({ ...prev, nodes: [...prev.nodes, newGroup] }));
   }, [t, setState]);
