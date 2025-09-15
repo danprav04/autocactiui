@@ -39,7 +39,7 @@
 }
 
 .context-menu-item.danger {
-    color: var(--accent-danger);
+    color: var(white);
 }
 .context-menu-item.danger:hover {
     background-color: var(--accent-danger);
