@@ -2,6 +2,19 @@
 import { useCallback } from 'react';
 import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
+/**
+ * Determines the rendering layer of a node.
+ * Groups are in the 'group' layer, while devices and text are in the 'device' layer.
+ * @param {object} node - The React Flow node.
+ * @returns {'group' | 'device'} The layer name.
+ */
+const getNodeLayer = (node) => {
+    if (node.type === 'group') {
+        return 'group';
+    }
+    return 'device';
+};
+
 export const useTooling = (selectedElements, setState) => {
 
   const alignElements = useCallback((direction) => {
@@ -110,19 +123,28 @@ export const useTooling = (selectedElements, setState) => {
     if (selectedElements.length === 0) return;
 
     setState(prev => {
-        // Ensure all nodes have a zIndex, default to 1.
         const allNodes = prev.nodes.map(n => ({ ...n, zIndex: n.zIndex ?? 1 }));
         const selectedIds = new Set(selectedElements.map(el => el.id));
 
         if (direction === 'front' || direction === 'back') {
-            const selected = allNodes.filter(n => selectedIds.has(n.id));
-            const unselected = allNodes.filter(n => !selectedIds.has(n.id)).sort((a, b) => a.zIndex - b.zIndex);
-            
-            const reordered = direction === 'front' ? [...unselected, ...selected] : [...selected, ...unselected];
+            const groupNodes = allNodes.filter(n => getNodeLayer(n) === 'group').sort((a, b) => a.zIndex - b.zIndex);
+            const deviceNodes = allNodes.filter(n => getNodeLayer(n) === 'device').sort((a, b) => a.zIndex - b.zIndex);
 
-            // Re-assign sequential z-index starting from 1
-            const finalNodes = reordered.map((node, index) => ({ ...node, zIndex: index + 1 }));
-            return { ...prev, nodes: finalNodes };
+            const selectedGroups = groupNodes.filter(n => selectedIds.has(n.id));
+            const unselectedGroups = groupNodes.filter(n => !selectedIds.has(n.id));
+            const selectedDevices = deviceNodes.filter(n => selectedIds.has(n.id));
+            const unselectedDevices = deviceNodes.filter(n => !selectedIds.has(n.id));
+            
+            const finalGroups = direction === 'front' ? [...unselectedGroups, ...selectedGroups] : [...selectedGroups, ...unselectedGroups];
+            const finalDevices = direction === 'front' ? [...unselectedDevices, ...selectedDevices] : [...selectedDevices, ...unselectedDevices];
+
+            const finalNodeOrder = [...finalGroups, ...finalDevices];
+            
+            // Re-assign sequential z-index to the entire ordered stack.
+            // This guarantees groups are always below devices.
+            const nodesWithNewZIndex = finalNodeOrder.map((node, index) => ({ ...node, zIndex: index + 1 }));
+            
+            return { ...prev, nodes: nodesWithNewZIndex };
 
         } else { // 'forward' or 'backward'
             const sortedNodes = allNodes.sort((a, b) => a.zIndex - b.zIndex);
@@ -132,8 +154,8 @@ export const useTooling = (selectedElements, setState) => {
                 for (let i = sortedNodes.length - 2; i >= 0; i--) {
                     const currentNode = sortedNodes[i];
                     const nextNode = sortedNodes[i + 1];
-                    if (selectedIds.has(currentNode.id) && !selectedIds.has(nextNode.id)) {
-                        // Swap zIndex
+                    // Swap only if the next node is not selected AND they are in the same layer
+                    if (selectedIds.has(currentNode.id) && !selectedIds.has(nextNode.id) && getNodeLayer(currentNode) === getNodeLayer(nextNode)) {
                         [currentNode.zIndex, nextNode.zIndex] = [nextNode.zIndex, currentNode.zIndex];
                     }
                 }
@@ -142,8 +164,8 @@ export const useTooling = (selectedElements, setState) => {
                 for (let i = 1; i < sortedNodes.length; i++) {
                     const currentNode = sortedNodes[i];
                     const prevNode = sortedNodes[i - 1];
-                    if (selectedIds.has(currentNode.id) && !selectedIds.has(prevNode.id)) {
-                        // Swap zIndex
+                    // Swap only if the previous node is not selected AND they are in the same layer
+                    if (selectedIds.has(currentNode.id) && !selectedIds.has(prevNode.id) && getNodeLayer(currentNode) === getNodeLayer(prevNode)) {
                         [currentNode.zIndex, prevNode.zIndex] = [prevNode.zIndex, currentNode.zIndex];
                     }
                 }
