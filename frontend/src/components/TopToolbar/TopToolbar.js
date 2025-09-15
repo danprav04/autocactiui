@@ -9,10 +9,11 @@ const AlignRightIcon = () => <svg viewBox="0 0 24 24"><path d="M7 21v-4h2v4H7zm4
 const AlignTopIcon = () => <svg viewBox="0 0 24 24" transform="rotate(90 12 12)"><path d="M15 21v-4h2v4h-2zm-4 0v-8h2v8h-2zm-4 0v-6h2v6H7zM3 3v16h2V3H3z"/></svg>;
 const AlignVCenterIcon = () => <svg viewBox="0 0 24 24" transform="rotate(90 12 12)"><path d="M11 2v4h2V2h-2zm-4 6v10h2V8H7zm8 0v10h2V8h-2zM3 2v4h2V2H3zm16 0v4h2V2h-2z"/></svg>;
 const AlignBottomIcon = () => <svg viewBox="0 0 24 24" transform="rotate(90 12 12)"><path d="M7 21v-4h2v4H7zm4 0v-8h2v8h-2zm4 0v-6h2v6h-2zM19 3v16h2V3h-2z"/></svg>;
+const DistributeHIcon = () => <svg viewBox="0 0 24 24"><path d="M3 17v2h18v-2H3zm3.5-7L3 6.5l3.5-3.5v2.5h11V3L21 6.5 17.5 10v-2.5H6.5V10z"/></svg>;
+const DistributeVIcon = () => <svg viewBox="0 0 24 24"><path d="M17 3v18h2V3h-2zM3 3v2h10V3H3zm3.5 10.5L3 17l3.5 3.5v-2.5h5V21l3.5-3.5-3.5-3.5v2.5h-5V13.5z"/></svg>;
 
 
 // --- SUB-COMPONENTS ---
-
 const useDebouncedUpdater = (selectedElement, onUpdateNodeData) => {
     const [localData, setLocalData] = useState(selectedElement.data);
     
@@ -37,6 +38,10 @@ const useDebouncedUpdater = (selectedElement, onUpdateNodeData) => {
     return [localData, handleChange];
 };
 
+const ToolbarPlaceholder = () => {
+    const { t } = useTranslation();
+    return <div className='toolbar-placeholder toolbar-info-text'>{t('sidebar.placeholderClickNode')}</div>;
+}
 
 const DeviceProperties = ({ node, onUpdateNodeData, availableIcons }) => {
     const { t } = useTranslation();
@@ -121,24 +126,30 @@ const MultiSelectTools = ({ count, alignElements, distributeElements }) => {
     const { t } = useTranslation();
     return (
         <>
-            <span className='toolbar-info-text'>{t('sidebar.multiSelectTitle')} ({count})</span>
+            <div className="toolbar-group">
+                <span className='toolbar-info-text'>{t('sidebar.multiSelectTitle')} ({count})</span>
+            </div>
             <div className="toolbar-separator" />
             <div className="toolbar-group">
                 <label>{t('sidebar.align')}</label>
-                <button onClick={() => alignElements('left')} title={t('sidebar.alignLeft')}><AlignLeftIcon /></button>
-                <button onClick={() => alignElements('h-center')} title={t('sidebar.alignHCenter')}><AlignHCenterIcon /></button>
-                <button onClick={() => alignElements('right')} title={t('sidebar.alignRight')}><AlignRightIcon /></button>
-                <button onClick={() => alignElements('top')} title={t('sidebar.alignTop')}><AlignTopIcon /></button>
-                <button onClick={() => alignElements('v-center')} title={t('sidebar.alignVCenter')}><AlignVCenterIcon /></button>
-                <button onClick={() => alignElements('bottom')} title={t('sidebar.alignBottom')}><AlignBottomIcon /></button>
+                <div className="toolbar-button-group">
+                    <button onClick={() => alignElements('left')} title={t('sidebar.alignLeft')}><AlignLeftIcon /></button>
+                    <button onClick={() => alignElements('h-center')} title={t('sidebar.alignHCenter')}><AlignHCenterIcon /></button>
+                    <button onClick={() => alignElements('right')} title={t('sidebar.alignRight')}><AlignRightIcon /></button>
+                    <button onClick={() => alignElements('top')} title={t('sidebar.alignTop')}><AlignTopIcon /></button>
+                    <button onClick={() => alignElements('v-center')} title={t('sidebar.alignVCenter')}><AlignVCenterIcon /></button>
+                    <button onClick={() => alignElements('bottom')} title={t('sidebar.alignBottom')}><AlignBottomIcon /></button>
+                </div>
             </div>
             {count > 2 && (
                 <>
                     <div className="toolbar-separator" />
                     <div className="toolbar-group">
                         <label>{t('sidebar.distribute')}</label>
-                        <button onClick={() => distributeElements('horizontal')} title={t('sidebar.distributeH')}>H</button>
-                        <button onClick={() => distributeElements('vertical')} title={t('sidebar.distributeV')}>V</button>
+                        <div className="toolbar-button-group">
+                            <button onClick={() => distributeElements('horizontal')} title={t('sidebar.distributeH')}><DistributeHIcon/></button>
+                            <button onClick={() => distributeElements('vertical')} title={t('sidebar.distributeV')}><DistributeVIcon/></button>
+                        </div>
                     </div>
                 </>
             )}
@@ -147,11 +158,12 @@ const MultiSelectTools = ({ count, alignElements, distributeElements }) => {
 };
 
 // --- MAIN COMPONENT ---
-
 const TopToolbar = ({ selectedElements, onUpdateNodeData, alignElements, distributeElements, availableIcons }) => {
-    if (selectedElements.length === 0) return null;
-
     const renderContent = () => {
+        if (selectedElements.length === 0) {
+            return <ToolbarPlaceholder />;
+        }
+        
         if (selectedElements.length > 1) {
             return (
                 <MultiSelectTools
@@ -171,7 +183,7 @@ const TopToolbar = ({ selectedElements, onUpdateNodeData, alignElements, distrib
             case 'text':
                 return <TextProperties node={selected} onUpdateNodeData={onUpdateNodeData} />;
             default:
-                return null;
+                return <ToolbarPlaceholder />;
         }
     };
 

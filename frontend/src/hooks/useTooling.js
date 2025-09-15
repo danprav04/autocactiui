@@ -107,30 +107,52 @@ export const useTooling = (selectedElements, setState) => {
   }, [selectedElements, setState]);
 
   const changeZIndex = useCallback((direction) => {
-      if (selectedElements.length === 0) return;
-      
-      const selectedIds = new Set(selectedElements.map(el => el.id));
-      setState(prev => {
-        const zIndexes = prev.nodes.map(n => n.zIndex || 0);
-        const minZ = Math.min(...zIndexes);
-        const maxZ = Math.max(...zIndexes);
-        
-        const newNodes = prev.nodes.map(node => {
-            if (!selectedIds.has(node.id)) return node;
-            const currentZ = node.zIndex || 0;
-            let newZ = currentZ;
+    if (selectedElements.length === 0) return;
+
+    setState(prev => {
+        const selectedIds = new Set(selectedElements.map(el => el.id));
+        let allNodes = prev.nodes.map(n => ({ ...n, zIndex: n.zIndex || 0 }));
+
+        if (direction === 'front' || direction === 'back') {
+            const zIndexes = allNodes.map(n => n.zIndex);
+            const minZ = Math.min(...zIndexes);
+            const maxZ = Math.max(...zIndexes);
             
-            switch(direction) {
-                case 'front': newZ = maxZ + 1; break;
-                case 'back': newZ = minZ - 1; break;
-                case 'forward': newZ = currentZ + 1; break;
-                case 'backward': newZ = currentZ - 1; break;
-                default: break;
+            allNodes = allNodes.map(node => {
+                if (selectedIds.has(node.id)) {
+                    return { ...node, zIndex: direction === 'front' ? maxZ + 1 : minZ - 1 };
+                }
+                return node;
+            });
+        } else {
+            // Sort nodes by zIndex to establish a clear visual stack
+            allNodes.sort((a, b) => a.zIndex - b.zIndex);
+
+            if (direction === 'forward') {
+                // Iterate backwards to prevent a single node from moving multiple steps
+                for (let i = allNodes.length - 2; i >= 0; i--) {
+                    const currentNode = allNodes[i];
+                    const nextNode = allNodes[i + 1];
+                    if (selectedIds.has(currentNode.id) && !selectedIds.has(nextNode.id)) {
+                        // Swap zIndex
+                        [currentNode.zIndex, nextNode.zIndex] = [nextNode.zIndex, currentNode.zIndex];
+                    }
+                }
+            } else if (direction === 'backward') {
+                // Iterate forwards to handle multiple selections moving down together
+                for (let i = 1; i < allNodes.length; i++) {
+                    const currentNode = allNodes[i];
+                    const prevNode = allNodes[i - 1];
+                    if (selectedIds.has(currentNode.id) && !selectedIds.has(prevNode.id)) {
+                        // Swap zIndex
+                        [currentNode.zIndex, prevNode.zIndex] = [prevNode.zIndex, currentNode.zIndex];
+                    }
+                }
             }
-            return { ...node, zIndex: newZ };
-        });
-        return { ...prev, nodes: newNodes };
-      });
+        }
+        
+        return { ...prev, nodes: allNodes };
+    });
   }, [selectedElements, setState]);
   
   const selectAllByType = useCallback((iconType, updateSelection) => {
