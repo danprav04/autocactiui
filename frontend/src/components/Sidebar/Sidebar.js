@@ -2,13 +2,10 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import MapExportControls from './MapExportControls';
-import NeighborsList from './NeighborsList';
 import SidebarPlaceholder from './SidebarPlaceholder';
 
 const Sidebar = ({
   selectedElements,
-  neighbors,
-  onAddNeighbor,
   onUploadMap,
   onAddGroup,
   onAddTextNode,
@@ -33,14 +30,6 @@ const Sidebar = ({
   };
 
   const renderContextualContent = () => {
-    if (selectedElements.length === 1 && selectedElements[0].type === 'custom') {
-      return (
-        <>
-          <h3>{t('sidebar.availableNeighbors')}</h3>
-          <NeighborsList neighbors={neighbors} onAddNeighbor={onAddNeighbor} />
-        </>
-      );
-    }
     return <SidebarPlaceholder isMapStarted={isMapStarted} />;
   };
 

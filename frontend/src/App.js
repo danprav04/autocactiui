@@ -49,12 +49,10 @@ function App() {
     nodes, setNodes,
     edges, setEdges,
     selectedElements,
-    neighbors,
     onNodesChange,
     onNodeClick,
     onPaneClick,
     onSelectionChange,
-    handleAddNeighbor,
     handleDeleteElements,
     handleUpdateNodeData,
     handleAddGroup,
@@ -135,7 +133,7 @@ function App() {
       setNodes([newNode]);
       setEdges([]);
       // Simulate click to select the first node and fetch its neighbors
-      onNodeClick(null, newNode, setIsLoading, setError, false);
+      onNodeClick(null, newNode, setIsLoading, setError);
     } catch (err) {
       setError(t('app.errorInitialDevice'));
       resetMap();
@@ -170,8 +168,7 @@ function App() {
 
   const onNodeClickHandler = useCallback((event, node) => {
       setContextMenu(null); // Close context menu on any node click
-      const isMultiSelect = event.ctrlKey || event.metaKey;
-      onNodeClick(event, node, setIsLoading, setError, isMultiSelect);
+      onNodeClick(event, node, setIsLoading, setError);
   }, [onNodeClick]);
 
   const onPaneClickHandler = useCallback(() => {
@@ -184,10 +181,6 @@ function App() {
     setContextMenu({ node, top: event.clientY, left: event.clientX });
   }, []);
 
-  const onAddNeighborHandler = useCallback(async (neighbor) => {
-      await handleAddNeighbor(neighbor, setIsLoading, setError);
-  }, [handleAddNeighbor]);
-
   if (!token) {
     return <LoginScreen onLogin={handleLogin} error={error} isLoading={isLoading} />;
   }
@@ -197,8 +190,6 @@ function App() {
       <div className="app-container">
         <Sidebar 
           selectedElements={selectedElements}
-          neighbors={neighbors}
-          onAddNeighbor={onAddNeighborHandler}
           onUploadMap={handleUploadMap}
           onAddGroup={handleAddGroup}
           onAddTextNode={handleAddTextNode}
