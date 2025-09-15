@@ -176,8 +176,10 @@ function App() {
 
   const handleNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
+    // Trigger selection logic before opening the menu
+    onNodeClick(event, node, setIsLoading, setError, true);
     setContextMenu({ node, top: event.clientY, left: event.clientX });
-  }, []);
+  }, [onNodeClick]);
 
   if (!token) {
     return <LoginScreen onLogin={handleLogin} error={error} isLoading={isLoading} />;

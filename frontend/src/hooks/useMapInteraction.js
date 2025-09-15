@@ -177,23 +177,31 @@ export const useMapInteraction = (theme) => {
     }
   }, [setState, createNodeObject, handleFetchNeighbors, clearPreviewElements, t]);
 
-  const onNodeClick = useCallback((event, node, setLoading, setError) => {
+  const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
     // If a preview node is clicked, confirm it and stop further processing.
     if (node.data.isPreview) {
         confirmPreviewNode(node, setLoading, setError);
         return;
     }
     
-    // Logic for regular node clicks
+    const isNodeAlreadySelected = selectedElements.some(el => el.id === node.id);
+
+    // If it's a context menu click on an already selected node, do nothing to the selection.
+    if (isContextMenu && isNodeAlreadySelected) {
+        return;
+    }
+
     const isMultiSelect = event && (event.ctrlKey || event.metaKey);
     let newSelectedNodes;
 
     if (isMultiSelect) {
-        newSelectedNodes = selectedElements.some(el => el.id === node.id)
+        newSelectedNodes = isNodeAlreadySelected
             ? selectedElements.filter(el => el.id !== node.id)
             : [...selectedElements, node];
     } else {
-        // Always treat a single click as a fresh selection to allow re-fetching neighbors.
+        // This case now handles:
+        // - Plain left-click (always re-selects)
+        // - Context menu on a new node (selects it)
         newSelectedNodes = [node];
     }
 
