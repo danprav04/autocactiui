@@ -3,6 +3,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import MapExportControls from './MapExportControls';
 import SidebarPlaceholder from './SidebarPlaceholder';
+import MultiSelectToolbar from './MultiSelectToolbar';
 
 const Sidebar = ({
   selectedElements,
@@ -20,6 +21,13 @@ const Sidebar = ({
   selectedCactiId,
   setSelectedCactiId,
   selectAllByType,
+  onDeleteElements,
+  alignElements,
+  distributeElements,
+  bringForward,
+  sendBackward,
+  bringToFront,
+  sendToBack,
 }) => {
   const { t } = useTranslation();
 
@@ -30,6 +38,52 @@ const Sidebar = ({
   };
 
   const renderContextualContent = () => {
+    const selectionCount = selectedElements.length;
+
+    if (selectionCount > 1) {
+      return (
+        <MultiSelectToolbar
+          selectedElements={selectedElements}
+          alignElements={alignElements}
+          distributeElements={distributeElements}
+          bringForward={bringForward}
+          sendBackward={sendBackward}
+          bringToFront={bringToFront}
+          sendToBack={sendToBack}
+          onDeleteElements={onDeleteElements}
+        />
+      );
+    }
+    
+    if (selectionCount === 1) {
+      const selected = selectedElements[0];
+      if (selected.type === 'custom') {
+        return (
+          <>
+            <div className="selected-device-label">{selected.data.hostname}</div>
+            <div className="control-group">
+                <button onClick={onDeleteElements} className="danger">
+                  {t('sidebar.deleteDevice')}
+                </button>
+            </div>
+          </>
+        );
+      } else { // For Group or Text nodes
+        return (
+          <>
+            <div className="selected-device-label">
+              {selected.type === 'group' ? selected.data.label : t('sidebar.editText')}
+            </div>
+            <div className="control-group">
+                <button onClick={onDeleteElements} className="danger">
+                    {t('sidebar.deleteSelected')}
+                </button>
+            </div>
+          </>
+        );
+      }
+    }
+
     return <SidebarPlaceholder isMapStarted={isMapStarted} />;
   };
 

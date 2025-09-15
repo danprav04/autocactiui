@@ -204,6 +204,13 @@ function App() {
           selectedCactiId={selectedCactiId}
           setSelectedCactiId={setSelectedCactiId}
           selectAllByType={selectAllByType}
+          onDeleteElements={handleDeleteElements}
+          alignElements={alignElements}
+          distributeElements={distributeElements}
+          bringForward={bringForward}
+          sendBackward={sendBackward}
+          bringToFront={bringToFront}
+          sendToBack={sendToBack}
         />
         <div className="main-content" ref={reactFlowWrapper}>
           <TopToolbar

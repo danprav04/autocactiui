@@ -14,6 +14,7 @@ export const useMapInteraction = (theme) => {
   const { nodes, edges } = state || { nodes: [], edges: [] };
 
   const [selectedElements, setSelectedElements] = useState([]);
+  const [currentNeighbors, setCurrentNeighbors] = useState([]);
   const { t } = useTranslation();
 
   const {
@@ -65,6 +66,7 @@ export const useMapInteraction = (theme) => {
 
   const handleFetchNeighbors = useCallback(async (sourceNode, setLoading, setError) => {
     setLoading(true); setError('');
+    setCurrentNeighbors([]);
     try {
       const response = await api.getDeviceNeighbors(sourceNode.id);
       const allNeighbors = response.data.neighbors;
@@ -77,6 +79,8 @@ export const useMapInteraction = (theme) => {
         
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
         const neighborsToAdd = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
+
+        setCurrentNeighbors(neighborsToAdd);
 
         // Auto-draw edges to existing nodes, regardless of whether there are new neighbors
         const currentEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
@@ -130,6 +134,7 @@ export const useMapInteraction = (theme) => {
 
   const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
     setLoading(true); setError('');
+    setCurrentNeighbors([]);
     try {
         const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
         if (deviceResponse.data.error) throw new Error(`No info for ${nodeToConfirm.id}`);
@@ -177,6 +182,13 @@ export const useMapInteraction = (theme) => {
     }
   }, [setState, createNodeObject, handleFetchNeighbors, clearPreviewElements, t]);
 
+  const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
+      const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
+      if (nodeToConfirm) {
+          confirmPreviewNode(nodeToConfirm, setLoading, setError);
+      }
+  }, [nodes, confirmPreviewNode]);
+
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
     // If a preview node is clicked, confirm it and stop further processing.
     if (node.data.isPreview) {
@@ -217,11 +229,14 @@ export const useMapInteraction = (theme) => {
     // If a single device is now selected, fetch its neighbors to show as previews.
     if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
         handleFetchNeighbors(newSelectedNodes[0], setLoading, setError);
+    } else {
+        setCurrentNeighbors([]);
     }
   }, [selectedElements, setState, clearPreviewElements, handleFetchNeighbors, confirmPreviewNode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedElements([]);
+    setCurrentNeighbors([]);
     clearPreviewElements();
     setState(prev => ({
         ...prev,
@@ -229,9 +244,14 @@ export const useMapInteraction = (theme) => {
     }), true);
   }, [setState, clearPreviewElements]);
 
-  const onSelectionChange = useCallback(({ nodes }) => {
-      setSelectedElements(nodes);
-  }, []);
+  const onSelectionChange = useCallback(({ nodes: selectedNodes }) => {
+      setSelectedElements(selectedNodes);
+      // Clear preview elements if the selection is not a single device node.
+      if (selectedNodes.length !== 1 || (selectedNodes.length === 1 && selectedNodes[0].type !== 'custom')) {
+          clearPreviewElements();
+          setCurrentNeighbors([]);
+      }
+  }, [clearPreviewElements]);
   
   const handleDeleteElements = useCallback(() => {
     baseHandleDeleteElements(selectedElements);
@@ -343,6 +363,7 @@ export const useMapInteraction = (theme) => {
   const resetMap = useCallback(() => {
     resetState();
     setSelectedElements([]);
+    setCurrentNeighbors([]);
   }, [resetState]);
   
   // Expose a function that needs `updateSelection`
@@ -373,5 +394,7 @@ export const useMapInteraction = (theme) => {
     bringToFront,
     sendToBack,
     selectAllByType: selectAllByTypeHandler,
+    currentNeighbors,
+    confirmNeighbor,
   };
 };
