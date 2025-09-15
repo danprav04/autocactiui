@@ -123,3 +123,55 @@
     width: 100%;
     text-align: center;
 }
+
+.toolbar-spacer {
+    flex-grow: 1;
+}
+
+/* Styles for language and theme buttons moved from App.css */
+.toolbar-group .language-switcher button {
+    padding: 6px 10px;
+    font-size: 13px;
+    margin-bottom: 0;
+    width: auto;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.toolbar-group .language-switcher button:disabled {
+  background-color: var(--accent-primary);
+  color: var(--text-on-accent);
+  border-color: var(--accent-primary);
+  opacity: 1;
+  cursor: default;
+}
+
+.toolbar-group .theme-toggle-button {
+    width: 34px;
+    height: 34px;
+    padding: 6px;
+    margin: 0;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toolbar-group .theme-toggle-button:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+}
+
+.toolbar-group .theme-toggle-button svg {
+    width: 18px;
+    height: 18px;
+    color: var(--text-primary);
+}

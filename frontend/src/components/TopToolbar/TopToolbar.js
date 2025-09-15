@@ -1,6 +1,8 @@
 // frontend/src/components/TopToolbar/TopToolbar.js
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import ThemeToggleButton from '../common/ThemeToggleButton';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 
 // --- ICONS ---
 const AlignLeftIcon = () => <svg viewBox="0 0 24 24"><path d="M15 21v-4h2v4h-2zm-4 0v-8h2v8h-2zm-4 0v-6h2v6H7zM3 3v16h2V3H3z"/></svg>;
@@ -67,6 +69,12 @@ const DeviceProperties = ({ node, onUpdateNodeData, availableIcons }) => {
     );
 };
 
+const GROUP_SHAPES = [
+    { name: 'sidebar.shapeRoundedRectangle', value: 'rounded-rectangle' },
+    { name: 'sidebar.shapeCircle', value: 'circle' },
+    { name: 'sidebar.shapeTriangle', value: 'triangle' }
+];
+
 const GroupProperties = ({ node, onUpdateNodeData }) => {
     const { t } = useTranslation();
     const [localData, handleChange] = useDebouncedUpdater(node, onUpdateNodeData);
@@ -78,6 +86,12 @@ const GroupProperties = ({ node, onUpdateNodeData }) => {
                 <input id="label" type="text" value={localData.label || ''} onChange={handleChange} style={{width: '150px'}} />
             </div>
             <div className="toolbar-separator" />
+             <div className="toolbar-group">
+                <label htmlFor="shape">{t('sidebar.groupShape')}</label>
+                <select id="shape" value={localData.shape || GROUP_SHAPES[0].value} onChange={handleChange}>
+                    {GROUP_SHAPES.map(s => <option key={s.value} value={s.value}>{t(s.name)}</option>)}
+                </select>
+            </div>
             <div className="toolbar-group">
                 <label htmlFor="color">{t('sidebar.groupColor')}</label>
                 <input id="color" type="color" value={localData.color} onChange={handleChange} />
@@ -158,7 +172,7 @@ const MultiSelectTools = ({ count, alignElements, distributeElements }) => {
 };
 
 // --- MAIN COMPONENT ---
-const TopToolbar = ({ selectedElements, onUpdateNodeData, alignElements, distributeElements, availableIcons }) => {
+const TopToolbar = ({ selectedElements, onUpdateNodeData, alignElements, distributeElements, availableIcons, theme, toggleTheme }) => {
     const renderContent = () => {
         if (selectedElements.length === 0) {
             return <ToolbarPlaceholder />;
@@ -190,6 +204,11 @@ const TopToolbar = ({ selectedElements, onUpdateNodeData, alignElements, distrib
     return (
         <div className="top-toolbar">
             {renderContent()}
+            <div className="toolbar-spacer" />
+            <div className="toolbar-group">
+                <LanguageSwitcher />
+                <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+            </div>
         </div>
     );
 };

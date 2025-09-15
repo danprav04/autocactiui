@@ -15,8 +15,6 @@ import GroupNode from './components/GroupNode';
 import TextNode from './components/TextNode';
 import StartupScreen from './components/Startup/StartupScreen';
 import LoginScreen from './components/Login/LoginScreen';
-import ThemeToggleButton from './components/common/ThemeToggleButton';
-import LanguageSwitcher from './components/common/LanguageSwitcher';
 import TopToolbar from './components/TopToolbar/TopToolbar';
 import ContextMenu from './components/ContextMenu/ContextMenu';
 
@@ -212,11 +210,9 @@ function App() {
             alignElements={alignElements}
             distributeElements={distributeElements}
             availableIcons={availableIcons}
+            theme={theme}
+            toggleTheme={toggleTheme}
           />
-          <div className="top-right-controls">
-            <LanguageSwitcher />
-            <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
-          </div>
           <div className='map-container'>
             {nodes.length === 0 ? (
               <div className="startup-wrapper">
