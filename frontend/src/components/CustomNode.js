@@ -25,7 +25,7 @@ export default memo(({ data, selected }) => {
       <Handle type="target" position={Position.Top} style={handleStyle} />
       <Handle type="source" position={Position.Bottom} style={handleStyle} />
       
-      <img src={data.icon} className="node-icon" alt={`${data.hostname} icon`} />
+      {!data.isPreview && <img src={data.icon} className="node-icon" alt={`${data.hostname} icon`} />}
       
       <div className="node-label">
         <strong>{data.hostname}</strong>
