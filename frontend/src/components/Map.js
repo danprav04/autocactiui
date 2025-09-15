@@ -20,7 +20,7 @@ const MarqueeSelection = ({ startPos, endPos }) => {
     return <div className="marquee-selection" style={style} />;
 };
 
-const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance }) => {
+const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu }) => {
   
   const [marqueeStart, setMarqueeStart] = useState(null);
   const [marqueeEnd, setMarqueeEnd] = useState(null);
@@ -97,6 +97,8 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
               });
               onSelectionChange({ nodes: selectedNodes, edges: [] });
           }
+      } else if (event.button === 0) { // Handle simple clicks that didn't start a marquee
+        onPaneClick(event);
       }
       setMarqueeStart(null);
       setMarqueeEnd(null);
@@ -115,6 +117,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         edges={edges}
         onNodeClick={onNodeClick}
         onNodesChange={onNodesChange}
+        onNodeContextMenu={onNodeContextMenu}
         // Use custom pane interaction handlers instead of onPaneClick
         onPaneClick={undefined} 
         onSelectionChange={onSelectionChange}

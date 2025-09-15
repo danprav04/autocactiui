@@ -5,20 +5,20 @@ import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
  * A fixed horizontal offset (in pixels) to apply to all generated coordinates
  * after scaling. A positive value shifts the entire map to the right on the final PNG.
  */
-const CONFIG_X_OFFSET = -1;
+const CONFIG_X_OFFSET = 0;
 
 /**
  * A fixed vertical offset (in pixels) to apply to all generated coordinates
  * after scaling. A positive value shifts the entire map down on the final PNG.
  */
-const CONFIG_Y_OFFSET = -1;
+const CONFIG_Y_OFFSET = 0;
 
 /**
  * A scaling factor to apply to all generated coordinates.
  * 1 = no scaling, 2 = double size, 0.5 = half size.
  * This is applied before the fixed offset.
  */
-const CONFIG_SCALE_FACTOR = .8;
+const CONFIG_SCALE_FACTOR = 1;
 
 
 // Template for a Weathermap NODE used as an invisible anchor for a LINK.

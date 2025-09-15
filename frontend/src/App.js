@@ -15,13 +15,15 @@ import GroupNode from './components/GroupNode';
 import TextNode from './components/TextNode';
 import StartupScreen from './components/Startup/StartupScreen';
 import LoginScreen from './components/Login/LoginScreen';
-import ThemeToggleButton from './components/common/ThemeToggleButton';
-import LanguageSwitcher from './components/common/LanguageSwitcher';
+import TopToolbar from './components/TopToolbar/TopToolbar';
+import ContextMenu from './components/ContextMenu/ContextMenu';
 
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
 import { ICONS_BY_THEME } from './config/constants';
 import './App.css';
+import './components/TopToolbar/TopToolbar.css';
+import './components/ContextMenu/ContextMenu.css';
 
 export const NodeContext = React.createContext(null);
 
@@ -31,6 +33,7 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [mapName, setMapName] = useState('My-Network-Map');
   const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [contextMenu, setContextMenu] = useState(null);
   
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
@@ -44,12 +47,10 @@ function App() {
     nodes, setNodes,
     edges, setEdges,
     selectedElements,
-    neighbors,
     onNodesChange,
     onNodeClick,
     onPaneClick,
     onSelectionChange,
-    handleAddNeighbor,
     handleDeleteElements,
     handleUpdateNodeData,
     handleAddGroup,
@@ -130,7 +131,7 @@ function App() {
       setNodes([newNode]);
       setEdges([]);
       // Simulate click to select the first node and fetch its neighbors
-      onNodeClick(null, newNode, setIsLoading, setError, false);
+      onNodeClick(null, newNode, setIsLoading, setError);
     } catch (err) {
       setError(t('app.errorInitialDevice'));
       resetMap();
@@ -164,13 +165,21 @@ function App() {
   };
 
   const onNodeClickHandler = useCallback((event, node) => {
-      const isMultiSelect = event.ctrlKey || event.metaKey;
-      onNodeClick(event, node, setIsLoading, setError, isMultiSelect);
+      setContextMenu(null); // Close context menu on any node click
+      onNodeClick(event, node, setIsLoading, setError);
   }, [onNodeClick]);
 
-  const onAddNeighborHandler = useCallback(async (neighbor) => {
-      await handleAddNeighbor(neighbor, setIsLoading, setError);
-  }, [handleAddNeighbor]);
+  const onPaneClickHandler = useCallback(() => {
+    onPaneClick();
+    setContextMenu(null);
+  }, [onPaneClick]);
+
+  const handleNodeContextMenu = useCallback((event, node) => {
+    event.preventDefault();
+    // Trigger selection logic before opening the menu
+    onNodeClick(event, node, setIsLoading, setError, true);
+    setContextMenu({ node, top: event.clientY, left: event.clientX });
+  }, [onNodeClick]);
 
   if (!token) {
     return <LoginScreen onLogin={handleLogin} error={error} isLoading={isLoading} />;
@@ -181,10 +190,6 @@ function App() {
       <div className="app-container">
         <Sidebar 
           selectedElements={selectedElements}
-          neighbors={neighbors}
-          onAddNeighbor={onAddNeighborHandler}
-          onDeleteElements={handleDeleteElements}
-          onUpdateNodeData={handleUpdateNodeData}
           onUploadMap={handleUploadMap}
           onAddGroup={handleAddGroup}
           onAddTextNode={handleAddTextNode}
@@ -198,44 +203,59 @@ function App() {
           cactiInstallations={cactiInstallations}
           selectedCactiId={selectedCactiId}
           setSelectedCactiId={setSelectedCactiId}
-          alignElements={alignElements}
-          distributeElements={distributeElements}
-          bringForward={bringForward}
-          sendBackward={sendBackward}
-          bringToFront={bringToFront}
-          sendToBack={sendToBack}
           selectAllByType={selectAllByType}
         />
         <div className="main-content" ref={reactFlowWrapper}>
-          <div className="top-controls">
-            <LanguageSwitcher />
-            <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+          <TopToolbar
+            selectedElements={selectedElements}
+            onUpdateNodeData={handleUpdateNodeData}
+            alignElements={alignElements}
+            distributeElements={distributeElements}
+            availableIcons={availableIcons}
+            theme={theme}
+            toggleTheme={toggleTheme}
+          />
+          <div className='map-container'>
+            {nodes.length === 0 ? (
+              <div className="startup-wrapper">
+                <StartupScreen 
+                  onStart={handleStart} 
+                  isLoading={isLoading}
+                  availableIcons={availableIcons}
+                />
+              </div>
+            ) : (
+              <ReactFlowProvider>
+                <Map 
+                  nodes={nodes} 
+                  edges={edges} 
+                  onNodeClick={onNodeClickHandler} 
+                  onNodesChange={onNodesChange}
+                  onPaneClick={onPaneClickHandler}
+                  onSelectionChange={onSelectionChange}
+                  onNodeContextMenu={handleNodeContextMenu}
+                  nodeTypes={nodeTypes} 
+                  theme={theme}
+                  setReactFlowInstance={(instance) => (reactFlowInstance.current = instance)}
+                />
+              </ReactFlowProvider>
+            )}
+            {contextMenu && (
+              <ContextMenu
+                node={contextMenu.node}
+                top={contextMenu.top}
+                left={contextMenu.left}
+                onClose={() => setContextMenu(null)}
+                onDeleteElements={handleDeleteElements}
+                bringToFront={bringToFront}
+                sendToBack={sendToBack}
+                bringForward={bringForward}
+                sendBackward={sendBackward}
+              />
+            )}
+            {error && <p className="error-message">{error}</p>}
+            {isLoading && !isUploading && <p className="loading-message">{t('app.loading')}</p>}
           </div>
-          {nodes.length === 0 ? (
-            <div className="startup-wrapper">
-              <StartupScreen 
-                onStart={handleStart} 
-                isLoading={isLoading}
-                availableIcons={availableIcons}
-              />
-            </div>
-          ) : (
-            <ReactFlowProvider>
-              <Map 
-                nodes={nodes} 
-                edges={edges} 
-                onNodeClick={onNodeClickHandler} 
-                onNodesChange={onNodesChange}
-                onPaneClick={onPaneClick}
-                onSelectionChange={onSelectionChange}
-                nodeTypes={nodeTypes} 
-                theme={theme}
-                setReactFlowInstance={(instance) => (reactFlowInstance.current = instance)}
-              />
-            </ReactFlowProvider>
-          )}
-          {error && <p className="error-message">{error}</p>}
-          {isLoading && !isUploading && <p className="loading-message">{t('app.loading')}</p>}
         </div>
       </div>
     </NodeContext.Provider>

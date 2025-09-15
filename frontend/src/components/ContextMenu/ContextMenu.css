@@ -1,0 +1,53 @@
+/* frontend/src/components/ContextMenu/ContextMenu.css */
+.context-menu {
+    position: fixed;
+    z-index: 10000;
+    width: 200px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.context-menu-item {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    text-align: left;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    width: 100%;
+    border-radius: 0;
+}
+
+.rtl .context-menu-item {
+    text-align: right;
+    flex-direction: row-reverse;
+}
+
+.context-menu-item:hover {
+    background-color: var(--bg-secondary);
+    color: var(--accent-primary);
+}
+
+.context-menu-item.danger {
+    color: var(white);
+}
+.context-menu-item.danger:hover {
+    background-color: var(--accent-danger);
+    color: var(--text-on-accent);
+}
+
+.context-menu-separator {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 8px 0;
+}

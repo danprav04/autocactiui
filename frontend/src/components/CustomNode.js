@@ -20,7 +20,7 @@ export default memo(({ data, selected }) => {
   return (
     // The main container will now handle layout and selection styling.
     // We add position: 'relative' to serve as the positioning context for the handles.
-    <div className={`custom-node ${selected ? 'selected' : ''}`} style={{ position: 'relative' }}>
+    <div className={`custom-node ${selected ? 'selected' : ''} ${data.isPreview ? 'preview' : ''}`} style={{ position: 'relative' }}>
       {/* Both source and target handles are placed in the center. */}
       <Handle type="target" position={Position.Top} style={handleStyle} />
       <Handle type="source" position={Position.Bottom} style={handleStyle} />

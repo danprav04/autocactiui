@@ -51,8 +51,8 @@ export const useHistoryState = () => {
   }, [setHistoryData]);
 
   const resetState = useCallback(() => {
-    const initialState = getInitialState();
-    setHistoryData({ history: [initialState], index: 0 });
+    const emptyState = { nodes: [], edges: [] };
+    setHistoryData({ history: [emptyState], index: 0 });
     localStorage.removeItem('mapNodes');
     localStorage.removeItem('mapEdges');
   }, [setHistoryData]);

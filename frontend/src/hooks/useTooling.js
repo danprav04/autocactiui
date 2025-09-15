@@ -2,6 +2,19 @@
 import { useCallback } from 'react';
 import { NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
+/**
+ * Determines the rendering layer of a node.
+ * Groups are in the 'group' layer, while devices and text are in the 'device' layer.
+ * @param {object} node - The React Flow node.
+ * @returns {'group' | 'device'} The layer name.
+ */
+const getNodeLayer = (node) => {
+    if (node.type === 'group') {
+        return 'group';
+    }
+    return 'device';
+};
+
 export const useTooling = (selectedElements, setState) => {
 
   const alignElements = useCallback((direction) => {
@@ -107,30 +120,59 @@ export const useTooling = (selectedElements, setState) => {
   }, [selectedElements, setState]);
 
   const changeZIndex = useCallback((direction) => {
-      if (selectedElements.length === 0) return;
-      
-      const selectedIds = new Set(selectedElements.map(el => el.id));
-      setState(prev => {
-        const zIndexes = prev.nodes.map(n => n.zIndex || 0);
-        const minZ = Math.min(...zIndexes);
-        const maxZ = Math.max(...zIndexes);
-        
-        const newNodes = prev.nodes.map(node => {
-            if (!selectedIds.has(node.id)) return node;
-            const currentZ = node.zIndex || 0;
-            let newZ = currentZ;
+    if (selectedElements.length === 0) return;
+
+    setState(prev => {
+        const allNodes = prev.nodes.map(n => ({ ...n, zIndex: n.zIndex ?? 1 }));
+        const selectedIds = new Set(selectedElements.map(el => el.id));
+
+        if (direction === 'front' || direction === 'back') {
+            const groupNodes = allNodes.filter(n => getNodeLayer(n) === 'group').sort((a, b) => a.zIndex - b.zIndex);
+            const deviceNodes = allNodes.filter(n => getNodeLayer(n) === 'device').sort((a, b) => a.zIndex - b.zIndex);
+
+            const selectedGroups = groupNodes.filter(n => selectedIds.has(n.id));
+            const unselectedGroups = groupNodes.filter(n => !selectedIds.has(n.id));
+            const selectedDevices = deviceNodes.filter(n => selectedIds.has(n.id));
+            const unselectedDevices = deviceNodes.filter(n => !selectedIds.has(n.id));
             
-            switch(direction) {
-                case 'front': newZ = maxZ + 1; break;
-                case 'back': newZ = minZ - 1; break;
-                case 'forward': newZ = currentZ + 1; break;
-                case 'backward': newZ = currentZ - 1; break;
-                default: break;
+            const finalGroups = direction === 'front' ? [...unselectedGroups, ...selectedGroups] : [...selectedGroups, ...unselectedGroups];
+            const finalDevices = direction === 'front' ? [...unselectedDevices, ...selectedDevices] : [...selectedDevices, ...unselectedDevices];
+
+            const finalNodeOrder = [...finalGroups, ...finalDevices];
+            
+            // Re-assign sequential z-index to the entire ordered stack.
+            // This guarantees groups are always below devices.
+            const nodesWithNewZIndex = finalNodeOrder.map((node, index) => ({ ...node, zIndex: index + 1 }));
+            
+            return { ...prev, nodes: nodesWithNewZIndex };
+
+        } else { // 'forward' or 'backward'
+            const sortedNodes = allNodes.sort((a, b) => a.zIndex - b.zIndex);
+
+            if (direction === 'forward') {
+                // Iterate backwards to prevent a single node from moving multiple steps
+                for (let i = sortedNodes.length - 2; i >= 0; i--) {
+                    const currentNode = sortedNodes[i];
+                    const nextNode = sortedNodes[i + 1];
+                    // Swap only if the next node is not selected AND they are in the same layer
+                    if (selectedIds.has(currentNode.id) && !selectedIds.has(nextNode.id) && getNodeLayer(currentNode) === getNodeLayer(nextNode)) {
+                        [currentNode.zIndex, nextNode.zIndex] = [nextNode.zIndex, currentNode.zIndex];
+                    }
+                }
+            } else if (direction === 'backward') {
+                // Iterate forwards to handle multiple selections moving down together
+                for (let i = 1; i < sortedNodes.length; i++) {
+                    const currentNode = sortedNodes[i];
+                    const prevNode = sortedNodes[i - 1];
+                    // Swap only if the previous node is not selected AND they are in the same layer
+                    if (selectedIds.has(currentNode.id) && !selectedIds.has(prevNode.id) && getNodeLayer(currentNode) === getNodeLayer(prevNode)) {
+                        [currentNode.zIndex, prevNode.zIndex] = [prevNode.zIndex, currentNode.zIndex];
+                    }
+                }
             }
-            return { ...node, zIndex: newZ };
-        });
-        return { ...prev, nodes: newNodes };
-      });
+            return { ...prev, nodes: sortedNodes };
+        }
+    });
   }, [selectedElements, setState]);
   
   const selectAllByType = useCallback((iconType, updateSelection) => {
