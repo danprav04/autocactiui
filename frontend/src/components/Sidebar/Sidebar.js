@@ -2,18 +2,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import MapExportControls from './MapExportControls';
-import DeviceEditor from './DeviceEditor';
-import GroupEditor from './GroupEditor';
-import TextEditor from './TextEditor';
-import MultiSelectToolbar from './MultiSelectToolbar';
+import NeighborsList from './NeighborsList';
 import SidebarPlaceholder from './SidebarPlaceholder';
 
 const Sidebar = ({
   selectedElements,
   neighbors,
   onAddNeighbor,
-  onDeleteElements,
-  onUpdateNodeData,
   onUploadMap,
   onAddGroup,
   onAddTextNode,
@@ -27,12 +22,6 @@ const Sidebar = ({
   cactiInstallations,
   selectedCactiId,
   setSelectedCactiId,
-  alignElements,
-  distributeElements,
-  bringForward,
-  sendBackward,
-  bringToFront,
-  sendToBack,
   selectAllByType,
 }) => {
   const { t } = useTranslation();
@@ -43,58 +32,16 @@ const Sidebar = ({
     }
   };
 
-  const renderEditor = () => {
-    if (selectedElements.length === 0) {
-      return <SidebarPlaceholder isMapStarted={isMapStarted} />;
+  const renderContextualContent = () => {
+    if (selectedElements.length === 1 && selectedElements[0].type === 'custom') {
+      return (
+        <>
+          <h3>{t('sidebar.availableNeighbors')}</h3>
+          <NeighborsList neighbors={neighbors} onAddNeighbor={onAddNeighbor} />
+        </>
+      );
     }
-
-    if (selectedElements.length > 1) {
-        return (
-            <MultiSelectToolbar
-                selectedElements={selectedElements}
-                alignElements={alignElements}
-                distributeElements={distributeElements}
-                bringForward={bringForward}
-                sendBackward={sendBackward}
-                bringToFront={bringToFront}
-                sendToBack={sendToBack}
-                onDeleteElements={onDeleteElements}
-            />
-        );
-    }
-    
-    const selectedElement = selectedElements[0];
-    switch (selectedElement.type) {
-      case 'custom':
-        return (
-          <DeviceEditor
-            selectedElement={selectedElement}
-            onUpdateNodeData={onUpdateNodeData}
-            onDeleteElements={onDeleteElements}
-            availableIcons={availableIcons}
-            neighbors={neighbors}
-            onAddNeighbor={onAddNeighbor}
-          />
-        );
-      case 'group':
-        return (
-          <GroupEditor
-            selectedElement={selectedElement}
-            onUpdateNodeData={onUpdateNodeData}
-            onDeleteElements={onDeleteElements}
-          />
-        );
-      case 'text':
-        return (
-          <TextEditor
-            selectedElement={selectedElement}
-            onUpdateNodeData={onUpdateNodeData}
-            onDeleteElements={onDeleteElements}
-          />
-        );
-      default:
-        return <SidebarPlaceholder isMapStarted={isMapStarted} />;
-    }
+    return <SidebarPlaceholder isMapStarted={isMapStarted} />;
   };
 
   return (
@@ -154,8 +101,8 @@ const Sidebar = ({
 
       <hr />
 
-      <div className="neighbors-section">
-        {renderEditor()}
+      <div className="contextual-section">
+        {renderContextualContent()}
       </div>
     </div>
   );
