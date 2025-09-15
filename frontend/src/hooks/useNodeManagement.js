@@ -34,10 +34,31 @@ export const useNodeManagement = (theme, setState) => {
     if (selectedElements.length === 0) return;
     const selectedIds = new Set(selectedElements.map(el => el.id));
 
-    setState(prevState => ({
-      nodes: prevState.nodes.filter(n => !selectedIds.has(n.id)),
-      edges: prevState.edges.filter(e => !selectedIds.has(e.source) && !selectedIds.has(e.target)),
-    }));
+    setState(prevState => {
+        // Determine if any selected node is the source of the current previews
+        const shouldClearPreviews = prevState.edges.some(e => 
+            e.data.isPreview && selectedIds.has(e.source)
+        );
+
+        // Filter nodes: remove selected nodes, and also remove preview nodes if their source is being deleted.
+        const nextNodes = prevState.nodes.filter(n => {
+            if (selectedIds.has(n.id)) return false;
+            if (n.data.isPreview && shouldClearPreviews) return false;
+            return true;
+        });
+
+        // Filter edges: remove edges connected to selected nodes, and also remove preview edges if their source is deleted.
+        const nextEdges = prevState.edges.filter(e => {
+            if (selectedIds.has(e.source) || selectedIds.has(e.target)) return false;
+            if (e.data.isPreview && shouldClearPreviews) return false;
+            return true;
+        });
+
+        return {
+            nodes: nextNodes,
+            edges: nextEdges,
+        };
+    });
   }, [setState]);
 
   const handleUpdateNodeData = useCallback((nodeId, updatedData, addToHistory = true) => {

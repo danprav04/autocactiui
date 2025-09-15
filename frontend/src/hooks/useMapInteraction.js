@@ -18,7 +18,7 @@ export const useMapInteraction = (theme) => {
 
   const {
     createNodeObject,
-    handleDeleteElements,
+    handleDeleteElements: baseHandleDeleteElements,
     handleUpdateNodeData,
     handleAddGroup,
     handleAddTextNode,
@@ -224,6 +224,11 @@ export const useMapInteraction = (theme) => {
   const onSelectionChange = useCallback(({ nodes }) => {
       setSelectedElements(nodes);
   }, []);
+  
+  const handleDeleteElements = useCallback(() => {
+    baseHandleDeleteElements(selectedElements);
+    setSelectedElements([]); // Clear local selection state after deletion
+  }, [baseHandleDeleteElements, selectedElements]);
 
   const onNodesChange = useCallback((changes) => {
     const positionChange = changes.find((change) => change.type === 'position' && change.position);
@@ -280,7 +285,7 @@ export const useMapInteraction = (theme) => {
     onNodeClick,
     onPaneClick,
     onSelectionChange,
-    handleDeleteElements: () => handleDeleteElements(selectedElements),
+    handleDeleteElements,
     handleUpdateNodeData,
     handleAddGroup,
     handleAddTextNode,
