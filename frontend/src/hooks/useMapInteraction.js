@@ -14,6 +14,7 @@ export const useMapInteraction = (theme) => {
   const { nodes, edges } = state || { nodes: [], edges: [] };
 
   const [selectedElements, setSelectedElements] = useState([]);
+  const [currentNeighbors, setCurrentNeighbors] = useState([]);
   const { t } = useTranslation();
 
   const {
@@ -65,6 +66,7 @@ export const useMapInteraction = (theme) => {
 
   const handleFetchNeighbors = useCallback(async (sourceNode, setLoading, setError) => {
     setLoading(true); setError('');
+    setCurrentNeighbors([]);
     try {
       const response = await api.getDeviceNeighbors(sourceNode.id);
       const allNeighbors = response.data.neighbors;
@@ -77,6 +79,8 @@ export const useMapInteraction = (theme) => {
         
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
         const neighborsToAdd = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
+
+        setCurrentNeighbors(neighborsToAdd);
 
         // Auto-draw edges to existing nodes, regardless of whether there are new neighbors
         const currentEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
@@ -130,6 +134,7 @@ export const useMapInteraction = (theme) => {
 
   const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
     setLoading(true); setError('');
+    setCurrentNeighbors([]);
     try {
         const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
         if (deviceResponse.data.error) throw new Error(`No info for ${nodeToConfirm.id}`);
@@ -177,6 +182,13 @@ export const useMapInteraction = (theme) => {
     }
   }, [setState, createNodeObject, handleFetchNeighbors, clearPreviewElements, t]);
 
+  const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
+      const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
+      if (nodeToConfirm) {
+          confirmPreviewNode(nodeToConfirm, setLoading, setError);
+      }
+  }, [nodes, confirmPreviewNode]);
+
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
     // If a preview node is clicked, confirm it and stop further processing.
     if (node.data.isPreview) {
@@ -217,11 +229,14 @@ export const useMapInteraction = (theme) => {
     // If a single device is now selected, fetch its neighbors to show as previews.
     if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
         handleFetchNeighbors(newSelectedNodes[0], setLoading, setError);
+    } else {
+        setCurrentNeighbors([]);
     }
   }, [selectedElements, setState, clearPreviewElements, handleFetchNeighbors, confirmPreviewNode]);
 
   const onPaneClick = useCallback(() => {
     setSelectedElements([]);
+    setCurrentNeighbors([]);
     clearPreviewElements();
     setState(prev => ({
         ...prev,
@@ -229,9 +244,14 @@ export const useMapInteraction = (theme) => {
     }), true);
   }, [setState, clearPreviewElements]);
 
-  const onSelectionChange = useCallback(({ nodes }) => {
-      setSelectedElements(nodes);
-  }, []);
+  const onSelectionChange = useCallback(({ nodes: selectedNodes }) => {
+      setSelectedElements(selectedNodes);
+      // Clear preview elements if the selection is not a single device node.
+      if (selectedNodes.length !== 1 || (selectedNodes.length === 1 && selectedNodes[0].type !== 'custom')) {
+          clearPreviewElements();
+          setCurrentNeighbors([]);
+      }
+  }, [clearPreviewElements]);
   
   const handleDeleteElements = useCallback(() => {
     baseHandleDeleteElements(selectedElements);
@@ -239,45 +259,94 @@ export const useMapInteraction = (theme) => {
   }, [baseHandleDeleteElements, selectedElements]);
 
   const onNodesChange = useCallback((changes) => {
-    const positionChange = changes.find((change) => change.type === 'position' && change.position);
-    
-    if (positionChange) {
-        const isDragEnd = !positionChange.dragging;
-        setState(prev => {
-            const newNodes = prev.nodes.map((node) => {
-                if (node.id === positionChange.id) {
-                    const absolutePosition = positionChange.position;
-                    let newParent = null;
-                    if (isDragEnd) {
-                        for (const group of prev.nodes.filter(g => g.type === 'group' && g.id !== node.id)) {
-                            const nodeCenter = { x: absolutePosition.x + (node.width||NODE_WIDTH)/2, y: absolutePosition.y + (node.height||NODE_HEIGHT)/2 };
-                            if (nodeCenter.x > group.position.x && nodeCenter.x < group.position.x + group.data.width &&
-                                nodeCenter.y > group.position.y && nodeCenter.y < group.position.y + group.data.height) {
-                                newParent = group;
-                                break;
-                            }
-                        }
-                    } else {
-                        newParent = prev.nodes.find(n => n.id === node.parentNode);
-                    }
-                    if (newParent) {
-                        return { ...node, position: { x: absolutePosition.x - newParent.position.x, y: absolutePosition.y - newParent.position.y }, parentNode: newParent.id, extent: 'parent' };
-                    }
-                    const { parentNode, extent, ...rest } = node;
-                    return { ...rest, position: absolutePosition };
+    const isDragEnd = changes.some(c => c.type === 'position' && c.dragging === false);
+
+    setState(prev => {
+        const positionChanges = changes.filter(
+            c => c.type === 'position' && c.position && c.dragging
+        );
+
+        // If there are no position changes, just apply the other changes (e.g., selection)
+        if (positionChanges.length === 0) {
+            return { ...prev, nodes: applyNodeChanges(changes, prev.nodes) };
+        }
+
+        // --- GROUP DRAGGING LOGIC ---
+        // Create a map to hold the final positions of all nodes after this update.
+        const updatedNodePositions = new Map();
+        // A map to hold the calculated movement deltas for groups.
+        const groupDeltas = new Map();
+        // A set of nodes that are already being moved by the incoming `changes`.
+        const directlyMovedNodeIds = new Set(changes.map(c => c.id));
+
+        // First, calculate deltas for all moved groups.
+        for (const change of positionChanges) {
+            const originalNode = prev.nodes.find(n => n.id === change.id);
+            if (originalNode && originalNode.type === 'group') {
+                const dx = change.position.x - originalNode.position.x;
+                const dy = change.position.y - originalNode.position.y;
+                if (dx !== 0 || dy !== 0) {
+                    groupDeltas.set(originalNode.id, { dx, dy });
                 }
-                return node;
-            });
-            return { ...prev, nodes: newNodes };
-        }, !isDragEnd);
-    } else {
-        setState(prev => ({ ...prev, nodes: applyNodeChanges(changes, prev.nodes) }));
-    }
-  }, [setState]);
+            }
+        }
+        
+        // Apply the initial changes from React Flow to get a base new state.
+        const nodesAfterInitialMove = applyNodeChanges(changes, prev.nodes);
+        nodesAfterInitialMove.forEach(n => updatedNodePositions.set(n.id, n.position));
+
+        // If any groups were moved, find their "children" and move them too.
+        if (groupDeltas.size > 0) {
+            const unmovedNodes = prev.nodes.filter(n => !directlyMovedNodeIds.has(n.id));
+
+            for (const node of unmovedNodes) {
+                if (node.type === 'group') continue; // Groups cannot be children of other groups
+
+                // Find which group this node belongs to (if any).
+                // It checks against the group's ORIGINAL position.
+                // It respects z-index, so nodes belong to the topmost group.
+                const parentGroup = prev.nodes
+                    .filter(g => 
+                        g.type === 'group' &&
+                        groupDeltas.has(g.id) &&
+                        node.position.x >= g.position.x &&
+                        node.position.x <= g.position.x + g.data.width &&
+                        node.position.y >= g.position.y &&
+                        node.position.y <= g.position.y + g.data.height
+                    )
+                    .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0];
+
+                if (parentGroup) {
+                    // This node is inside a moved group and wasn't moved itself.
+                    // So, we move it by the group's delta.
+                    const delta = groupDeltas.get(parentGroup.id);
+                    updatedNodePositions.set(node.id, {
+                        x: node.position.x + delta.dx,
+                        y: node.position.y + delta.dy,
+                    });
+                }
+            }
+        }
+        
+        // Construct the final nodes array with all updated positions.
+        const finalNodes = prev.nodes.map(node => {
+            const updatedPosition = updatedNodePositions.get(node.id);
+            if (updatedPosition) {
+                const { dragging, ...restOfNode } = node; // Remove dragging property
+                return { ...restOfNode, position: updatedPosition };
+            }
+            return node;
+        });
+
+        return { ...prev, nodes: finalNodes };
+
+    }, !isDragEnd); // A history entry is only created on drag end.
+}, [setState]);
 
   const resetMap = useCallback(() => {
     resetState();
     setSelectedElements([]);
+    setCurrentNeighbors([]);
   }, [resetState]);
   
   // Expose a function that needs `updateSelection`
@@ -308,5 +377,7 @@ export const useMapInteraction = (theme) => {
     bringToFront,
     sendToBack,
     selectAllByType: selectAllByTypeHandler,
+    currentNeighbors,
+    confirmNeighbor,
   };
 };
