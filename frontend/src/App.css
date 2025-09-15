@@ -530,7 +530,7 @@ input[type="range"]::-moz-range-thumb:hover {
 /* Custom device nodes */
 .react-flow__node.export-node .custom-node {
     background-color: #ffffff !important; /* Match light theme's --node-bg */
-    border-color: #ced4da !important;
+    border: 1px solid #ced4da !important; /* Set full border property */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important; /* Add the light theme's shadow */
 }
 
