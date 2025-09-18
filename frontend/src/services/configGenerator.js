@@ -84,55 +84,92 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
   const nodeInfoMap = new Map(deviceNodes.map(node => [node.id, node]));
   let nodeCounter = 1;
 
-  // An offset to ensure link endpoints land safely inside the node's visual boundary.
-  const LINK_ENDPOINT_OFFSET = 70; 
-
-  // Iterate through the edges to create links and their required invisible nodes.
+  // Group edges by the pair of nodes they connect (e.g., '10.10.1.2-10.10.1.3')
+  const edgeGroups = new Map();
   for (const edge of edges) {
-    const sourceNodeInfo = nodeInfoMap.get(edge.source);
-    const targetNodeInfo = nodeInfoMap.get(edge.target);
+      // Create a sorted key to handle edges in either direction (A->B or B->A)
+      const key = [edge.source, edge.target].sort().join('-');
+      if (!edgeGroups.has(key)) {
+          edgeGroups.set(key, []);
+      }
+      edgeGroups.get(key).push(edge);
+  }
 
-    if (!sourceNodeInfo || !targetNodeInfo) continue;
+  // An offset to ensure link endpoints land safely inside the node's visual boundary.
+  const LINK_ENDPOINT_OFFSET = 70;
+  // The perpendicular distance between parallel links.
+  const PARALLEL_LINK_OFFSET = 15;
+
+  // Iterate through each group of edges (i.e., connections between two specific devices)
+  for (const [key, edgeGroup] of edgeGroups.entries()) {
+    const totalEdgesInGroup = edgeGroup.length;
     
-    // The link's vector should be based on the geometric center of the node component.
-    const sourceCenterX = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
-    const sourceCenterY = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
-    const targetCenterX = targetNodeInfo.position.x + (NODE_WIDTH / 2);
-    const targetCenterY = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
+    // Starting offset calculation ensures the links are centered around the true center line.
+    let initialOffset = -PARALLEL_LINK_OFFSET * (totalEdgesInGroup - 1) / 2;
 
-    const dx = targetCenterX - sourceCenterX;
-    const dy = targetCenterY - sourceCenterY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    for (let i = 0; i < totalEdgesInGroup; i++) {
+      const edge = edgeGroup[i];
+      const sourceNodeInfo = nodeInfoMap.get(edge.source);
+      const targetNodeInfo = nodeInfoMap.get(edge.target);
 
-    if (distance === 0) continue;
+      if (!sourceNodeInfo || !targetNodeInfo) continue;
 
-    // Create a unit vector to find the point along the line for the offset.
-    const ux = dx / distance;
-    const uy = dy / distance;
+      // The link's vector should be based on the geometric center of the node component.
+      const sourceCenterX = sourceNodeInfo.position.x + (NODE_WIDTH / 2);
+      const sourceCenterY = sourceNodeInfo.position.y + (NODE_HEIGHT / 2);
+      const targetCenterX = targetNodeInfo.position.x + (NODE_WIDTH / 2);
+      const targetCenterY = targetNodeInfo.position.y + (NODE_HEIGHT / 2);
 
-    // Calculate the absolute positions for the invisible dummy nodes.
-    const dummy1_x = Math.round((sourceCenterX + ux * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_X_OFFSET;
-    const dummy1_y = Math.round((sourceCenterY + uy * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_Y_OFFSET;
-    const dummy2_x = Math.round((targetCenterX - ux * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_X_OFFSET;
-    const dummy2_y = Math.round((targetCenterY - uy * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_Y_OFFSET;
+      const dx = targetCenterX - sourceCenterX;
+      const dy = targetCenterY - sourceCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-    const dummy1_id = `node${String(nodeCounter++).padStart(5, '0')}`;
-    const dummy2_id = `node${String(nodeCounter++).padStart(5, '0')}`;
+      if (distance === 0) continue;
 
-    // Add the invisible nodes required for the link to the node string list.
-    nodeStrings.push(DUMMY_NODE_TEMPLATE.replace('{id}', dummy1_id).replace('{x}', dummy1_x).replace('{y}', dummy1_y));
-    nodeStrings.push(DUMMY_NODE_TEMPLATE.replace('{id}', dummy2_id).replace('{x}', dummy2_x).replace('{y}', dummy2_y));
-    
-    // Create the link definition that connects the two dummy nodes.
-    const interfaceName = edge.data?.interface || 'unknown';
-    const populatedLink = LINK_TEMPLATE
-      .replace(/{id1}/g, dummy1_id)
-      .replace(/{id2}/g, dummy2_id)
-      .replace('{hostname}', sourceNodeInfo.data.hostname)
-      .replace('{ip}', sourceNodeInfo.data.ip)
-      .replace('{interface}', interfaceName);
+      // Create a unit vector (direction of the line)
+      const ux = dx / distance;
+      const uy = dy / distance;
 
-    linkStrings.push(populatedLink);
+      // Create a perpendicular unit vector for the offset
+      const px = -uy;
+      const py = ux;
+
+      // Calculate the current offset for this specific link
+      const currentOffset = initialOffset + i * PARALLEL_LINK_OFFSET;
+
+      // Apply the perpendicular offset to the center points
+      const offsetX = px * currentOffset;
+      const offsetY = py * currentOffset;
+      
+      const offsetSourceCenterX = sourceCenterX + offsetX;
+      const offsetSourceCenterY = sourceCenterY + offsetY;
+      const offsetTargetCenterX = targetCenterX + offsetX;
+      const offsetTargetCenterY = targetCenterY + offsetY;
+
+      // Calculate the absolute positions for the invisible dummy nodes along the offset line.
+      const dummy1_x = Math.round((offsetSourceCenterX + ux * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_X_OFFSET;
+      const dummy1_y = Math.round((offsetSourceCenterY + uy * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_Y_OFFSET;
+      const dummy2_x = Math.round((offsetTargetCenterX - ux * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_X_OFFSET;
+      const dummy2_y = Math.round((offsetTargetCenterY - uy * LINK_ENDPOINT_OFFSET) * CONFIG_SCALE_FACTOR) + CONFIG_Y_OFFSET;
+
+      const dummy1_id = `node${String(nodeCounter++).padStart(5, '0')}`;
+      const dummy2_id = `node${String(nodeCounter++).padStart(5, '0')}`;
+
+      // Add the invisible nodes required for the link to the node string list.
+      nodeStrings.push(DUMMY_NODE_TEMPLATE.replace('{id}', dummy1_id).replace('{x}', dummy1_x).replace('{y}', dummy1_y));
+      nodeStrings.push(DUMMY_NODE_TEMPLATE.replace('{id}', dummy2_id).replace('{x}', dummy2_x).replace('{y}', dummy2_y));
+      
+      // Create the link definition that connects the two dummy nodes.
+      const interfaceName = edge.data?.interface || 'unknown';
+      const populatedLink = LINK_TEMPLATE
+        .replace(/{id1}/g, dummy1_id)
+        .replace(/{id2}/g, dummy2_id)
+        .replace('{hostname}', sourceNodeInfo.data.hostname)
+        .replace('{ip}', sourceNodeInfo.data.ip)
+        .replace('{interface}', interfaceName);
+
+      linkStrings.push(populatedLink);
+    }
   }
   
   // Assemble the final configuration string.

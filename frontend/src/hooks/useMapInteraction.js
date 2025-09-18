@@ -8,6 +8,38 @@ import { useHistoryState } from './useHistoryState';
 import { useNodeManagement } from './useNodeManagement';
 import { useTooling } from './useTooling';
 
+
+/**
+ * Creates a React Flow edge object.
+ * @param {string} sourceId - The ID of the source node.
+ * @param {object} neighborInfo - The neighbor data from the API.
+ * @param {boolean} [isPreview=false] - Whether the edge is a temporary preview.
+ * @returns {object} A complete React Flow edge object.
+ */
+const createEdgeObject = (sourceId, neighborInfo, isPreview = false) => {
+    const { ip, interface: iface } = neighborInfo;
+    // A unique ID is crucial for identifying each distinct connection
+    const edgeId = `e-${sourceId}-${ip}-${iface.replace(/[/]/g, '-')}`;
+
+    const style = isPreview
+        ? { stroke: '#007bff', strokeDasharray: '5 5' }
+        // Style for a confirmed, permanent link
+        : { stroke: '#6c757d' };
+
+    return {
+        id: edgeId,
+        source: sourceId,
+        target: ip,
+        animated: !isPreview,
+        style,
+        data: {
+            isPreview,
+            interface: iface
+        }
+    };
+};
+
+
 export const useMapInteraction = (theme) => {
   const { state, setState, undo, redo, resetState } = useHistoryState();
   // Defensive fallback to prevent crash if state is ever undefined during a rapid re-render
@@ -74,54 +106,46 @@ export const useMapInteraction = (theme) => {
 
       setState(prev => {
         if (!prev) return prev;
-        // First, clear any existing preview elements from a previous selection
+        
         const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview);
         const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
-        
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
-        const neighborsToAdd = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
 
-        setCurrentNeighbors(neighborsToAdd);
+        const neighborsToConnect = allNeighbors.filter(n => nodeIdsOnMap.has(n.ip));
+        const neighborsToAddAsPreview = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
+        setCurrentNeighbors(neighborsToAddAsPreview);
 
-        // Auto-draw edges to existing nodes, regardless of whether there are new neighbors
-        const currentEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
-        const edgesToCreate = allNeighbors
-            .filter(n => nodeIdsOnMap.has(n.ip))
-            .filter(n => !currentEdgeIds.has(`e-${sourceNode.id}-${n.ip}`) && !currentEdgeIds.has(`e-${n.ip}-${sourceNode.id}`))
-            .map(n => ({ id: `e-${sourceNode.id}-${n.ip}`, source: sourceNode.id, target: n.ip, animated: true, style: { stroke: '#6c757d' }, data: { interface: n.interface } }));
-        
+        const edgesToCreate = [];
+        const existingEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
+
+        neighborsToConnect.forEach(neighbor => {
+            const newEdgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
+            if (existingEdgeIds.has(newEdgeId)) return;
+            edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor, false));
+        });
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
 
-        if (neighborsToAdd.length === 0) {
+        if (neighborsToAddAsPreview.length === 0) {
             return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
         }
         
         const previewNodes = [];
         const previewEdges = [];
         const radius = 250;
-        const angleStep = (2 * Math.PI) / neighborsToAdd.length;
+        const angleStep = (2 * Math.PI) / neighborsToAddAsPreview.length;
 
-        neighborsToAdd.forEach((neighbor, index) => {
-            const angle = angleStep * index - (Math.PI / 2); // Start from top
+        neighborsToAddAsPreview.forEach((neighbor, index) => {
+            const angle = angleStep * index - (Math.PI / 2);
             const position = {
                 x: sourceNode.position.x + radius * Math.cos(angle),
                 y: sourceNode.position.y + radius * Math.sin(angle)
             };
-            
             const previewNode = createNodeObject(
-                { ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, // Mock device info for preview
-                position
+                { ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position
             );
             previewNode.data.isPreview = true;
             previewNodes.push(previewNode);
-
-            previewEdges.push({
-                id: `e-${sourceNode.id}-${neighbor.ip}`,
-                source: sourceNode.id,
-                target: neighbor.ip,
-                style: { stroke: '#007bff', strokeDasharray: '5 5' },
-                data: { isPreview: true, interface: neighbor.interface }
-            });
+            previewEdges.push(createEdgeObject(sourceNode.id, neighbor, true));
         });
         
         return { nodes: [...nodesWithoutPreviews, ...previewNodes], edges: [...edgesWithNewConnections, ...previewEdges] };
@@ -159,9 +183,9 @@ export const useMapInteraction = (theme) => {
                 });
             
             const finalEdges = prev.edges
-                .filter(e => !e.data.isPreview || e.target === nodeToConfirm.id)
+                .filter(e => !e.data.isPreview || e.target === nodeToConfirm.id || e.source === nodeToConfirm.id)
                 .map(e => {
-                    if (e.target === nodeToConfirm.id) {
+                    if (e.target === nodeToConfirm.id || e.source === nodeToConfirm.id) {
                         return { ...e, style: { stroke: '#6c757d' }, data: { ...e.data, isPreview: false }, animated: true };
                     }
                     return e;
