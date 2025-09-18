@@ -168,22 +168,26 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     const originalNodes = [...nodes];
     const originalEdges = [...edges];
 
-    // Prepare nodes for export styling, passing the current theme.
-    const { exportNodes } = prepareElementsForExport(nodes, theme);
+    // Filter out preview elements before preparing for export.
+    const finalNodes = nodes.filter(n => !n.data?.isPreview);
+    const finalEdges = edges.filter(e => !e.data?.isPreview);
+
+    // Prepare NON-PREVIEW nodes for export styling, passing the current theme.
+    const { exportNodes } = prepareElementsForExport(finalNodes, theme);
     
-    // Set component state to render only the stylized nodes and NO edges.
+    // Set component state to render only the stylized nodes and NO edges for the screenshot.
     setNodes(exportNodes);
-    setEdges([]); // This hides the lines for the screenshot.
+    setEdges([]);
     
     mapElement.classList.add('exporting');
 
-    // Wait for React to re-render the component without edges.
+    // Wait for React to re-render the component.
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
         // Perform the export. Pass the prepared nodes for bounds calculation,
-        // but crucially, pass the ORIGINAL edges for config generation.
-        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: originalEdges, mapName, cactiId, theme });
+        // and the filtered edges for config generation.
+        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: finalEdges, mapName, cactiId, theme });
     } finally {
         // Restore the UI to its original state.
         mapElement.classList.remove('exporting');
