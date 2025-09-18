@@ -117,10 +117,23 @@ export const useMapInteraction = (theme) => {
 
         const edgesToCreate = [];
         const existingEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
+        
+        // Create a set of existing connections to prevent duplicates from the reverse direction.
+        // The key is a sorted combination of source and target IPs.
+        const existingConnections = new Set(
+            edgesWithoutPreviews.map(e => [e.source, e.target].sort().join('--'))
+        );
 
         neighborsToConnect.forEach(neighbor => {
             const newEdgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
-            if (existingEdgeIds.has(newEdgeId)) return;
+            const connectionKey = [sourceNode.id, neighbor.ip].sort().join('--');
+
+            // If an edge with this exact ID already exists OR if a connection between these two nodes
+            // has already been established (from the other direction), skip.
+            if (existingEdgeIds.has(newEdgeId) || existingConnections.has(connectionKey)) {
+                return;
+            }
+            
             edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor, false));
         });
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
