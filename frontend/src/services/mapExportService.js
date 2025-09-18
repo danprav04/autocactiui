@@ -28,7 +28,17 @@ const prepareElementsForExport = (nodes) => {
                 ...node.data,
                 color: '#212529', // Force dark text for light background
             };
+        } else if (node.type === 'group') {
+            // Ensure group color isn't pure white or too light to be seen
+            const lightColors = ['#ffffff', '#fff3cd', '#e9ecef'];
+            if (lightColors.includes(node.data.color?.toLowerCase())) {
+                 exportNode.data = {
+                    ...node.data,
+                    color: '#cfe2ff', // A safe, visible light blue
+                };
+            }
         }
+
 
         return exportNode;
     });

@@ -171,31 +171,41 @@ export const useMapInteraction = (theme) => {
   }, [setState, createNodeObject, t]);
 
   const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
-    setLoading(true); setError('');
-    setCurrentNeighbors([]);
+    setLoading(true);
+    setError('');
+    
     try {
+        // 1. Fetch all necessary data before updating state
         const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
-        if (deviceResponse.data.error) throw new Error(`No info for ${nodeToConfirm.id}`);
-        
+        if (deviceResponse.data.error) {
+            throw new Error(`No device info for ${nodeToConfirm.id}`);
+        }
         const confirmedNodeData = deviceResponse.data;
-        let confirmedNodeForFetch = null;
 
+        const neighborsResponse = await api.getDeviceNeighbors(nodeToConfirm.id);
+        const allNeighborsOfNewNode = neighborsResponse.data.neighbors || [];
+
+        // 2. Perform a single, atomic state update with all changes
         setState(prev => {
-            const otherPreviewNodeIds = new Set(prev.nodes.filter(n => n.data.isPreview && n.id !== nodeToConfirm.id).map(n => n.id));
+            // Create the new, permanent node
+            const newNode = createNodeObject(confirmedNodeData, nodeToConfirm.position);
+            newNode.selected = true;
+            setSelectedElements([newNode]); // Update local selection state
 
-            const finalNodes = prev.nodes
-                .filter(n => !otherPreviewNodeIds.has(n.id))
-                .map(n => {
-                    if (n.id === nodeToConfirm.id) {
-                        const updatedNode = createNodeObject(confirmedNodeData, n.position);
-                        updatedNode.selected = true; // Select the new node
-                        confirmedNodeForFetch = updatedNode; // Store for fetching neighbors later
-                        return updatedNode;
-                    }
-                    return {...n, selected: false}; // Deselect all other nodes
-                });
-            
-            const finalEdges = prev.edges
+            // Get a complete list of all permanent nodes that will be on the map
+            const permanentNodeIdsOnMap = new Set(
+                prev.nodes.filter(n => !n.data.isPreview).map(n => n.id)
+            );
+            permanentNodeIdsOnMap.add(newNode.id);
+
+            // Filter out the old preview nodes
+            const nextNodes = prev.nodes
+                .filter(n => !n.data.isPreview)
+                .map(n => ({ ...n, selected: false })); // Deselect old nodes
+            nextNodes.push(newNode);
+
+            // Update edges: make the preview edge permanent
+            const nextEdges = prev.edges
                 .filter(e => !e.data.isPreview || e.target === nodeToConfirm.id || e.source === nodeToConfirm.id)
                 .map(e => {
                     if (e.target === nodeToConfirm.id || e.source === nodeToConfirm.id) {
@@ -203,22 +213,51 @@ export const useMapInteraction = (theme) => {
                     }
                     return e;
                 });
-            
-            return { nodes: finalNodes, edges: finalEdges };
-        });
 
-        // After state has updated, fetch neighbors for the newly confirmed node
-        if (confirmedNodeForFetch) {
-            handleFetchNeighbors(confirmedNodeForFetch, setLoading, setError);
-        }
+            const existingEdgeIds = new Set(nextEdges.map(e => e.id));
+            const existingConnections = new Set(nextEdges.map(e => [e.source, e.target].sort().join('--')));
+            
+            // Add new permanent edges from the new node to existing nodes
+            const neighborsToConnect = allNeighborsOfNewNode.filter(n => permanentNodeIdsOnMap.has(n.ip));
+            neighborsToConnect.forEach(neighbor => {
+                const newEdgeId = `e-${newNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
+                const connectionKey = [newNode.id, neighbor.ip].sort().join('--');
+
+                if (!existingEdgeIds.has(newEdgeId) && !existingConnections.has(connectionKey)) {
+                    nextEdges.push(createEdgeObject(newNode.id, neighbor, false));
+                }
+            });
+
+            // Add new preview nodes for neighbors not yet on the map
+            const neighborsToAddAsPreview = allNeighborsOfNewNode.filter(n => !permanentNodeIdsOnMap.has(n.ip));
+            setCurrentNeighbors(neighborsToAddAsPreview); // for the sidebar list
+
+            if (neighborsToAddAsPreview.length > 0) {
+                const radius = 250;
+                const angleStep = (2 * Math.PI) / neighborsToAddAsPreview.length;
+                neighborsToAddAsPreview.forEach((neighbor, index) => {
+                    const angle = angleStep * index - (Math.PI / 2);
+                    const position = {
+                        x: newNode.position.x + radius * Math.cos(angle),
+                        y: newNode.position.y + radius * Math.sin(angle)
+                    };
+                    const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
+                    previewNode.data.isPreview = true;
+                    nextNodes.push(previewNode);
+                    nextEdges.push(createEdgeObject(newNode.id, neighbor, true));
+                });
+            }
+
+            return { nodes: nextNodes, edges: nextEdges };
+        });
 
     } catch (err) {
         setError(t('app.errorAddNeighbor', { ip: nodeToConfirm.id }));
-        clearPreviewElements(); // Clear previews on error
+        clearPreviewElements();
     } finally {
         setLoading(false);
     }
-  }, [setState, createNodeObject, handleFetchNeighbors, clearPreviewElements, t]);
+}, [setState, createNodeObject, clearPreviewElements, t]);
 
   const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
       const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
@@ -230,6 +269,7 @@ export const useMapInteraction = (theme) => {
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
     // If a preview node is clicked, confirm it and stop further processing.
     if (node.data.isPreview) {
+        // The confirm function now handles its own loading/error state.
         confirmPreviewNode(node, setLoading, setError);
         return;
     }

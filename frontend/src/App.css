@@ -527,20 +527,39 @@ input[type="range"]::-moz-range-thumb:hover {
 /* --- EXPORT OVERRIDE STYLES --- */
 /* Force a consistent light theme for map exports to ensure readability on a white background */
 
-/* Custom device nodes */
-.react-flow__node.export-node .custom-node {
-    background-color: #ffffff !important; /* Match light theme's --node-bg */
-    border: 1px solid #ced4da !important; /* Set full border property */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important; /* Add the light theme's shadow */
+/* This targets the container during export to guarantee a white canvas */
+.exporting .react-flow__viewport {
+    background-color: #ffffff !important;
 }
 
+/* Custom device nodes */
+.react-flow__node.export-node .custom-node,
+.exporting .custom-node { /* Added a more general selector as a fallback */
+    background-color: #ffffff !important;
+    border-color: #ced4da !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Ensure text within the nodes is dark and legible on the white background */
 .react-flow__node.export-node .custom-node .node-label strong,
-.react-flow__node.export-node .custom-node .node-label small {
-    color: #212529 !important; /* Force dark text */
+.exporting .custom-node .node-label strong {
+    color: #212529 !important;
+}
+
+.react-flow__node.export-node .custom-node .node-label small,
+.exporting .custom-node .node-label small {
+    color: #6c757d !important; /* Use secondary text color for IP */
 }
 
 /* Group node labels */
-.react-flow__node.export-node .group-label {
+.react-flow__node.export-node .group-label,
+.exporting .group-label {
     background-color: rgba(255, 255, 255, 0.7) !important;
+    color: #212529 !important;
+}
+
+/* Text nodes */
+.react-flow__node.export-node .text-node,
+.exporting .text-node {
     color: #212529 !important;
 }
