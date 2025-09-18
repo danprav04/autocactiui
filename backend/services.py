@@ -68,6 +68,32 @@ MOCK_NETWORK = {
         "type": "Unknown Type",
         "model": "Custom Appliance",
     },
+    # --- New Data Center Devices ---
+    "10.20.1.1": {
+        "hostname": "DC-Core-Router-1",
+        "type": "Router",
+        "model": "Cisco Nexus 9000"
+    },
+    "10.20.2.1": {
+        "hostname": "DC-Dist-Switch-C",
+        "type": "Switch",
+        "model": "Arista 7050SX"
+    },
+    "10.20.2.2": {
+        "hostname": "DC-Dist-Switch-D",
+        "type": "Switch",
+        "model": "Arista 7050SX"
+    },
+    "10.20.10.100": {
+        "hostname": "Server-A",
+        "type": "Switch", # Using switch icon for servers
+        "model": "Dell PowerEdge R740"
+    },
+     "10.20.10.101": {
+        "hostname": "Server-B",
+        "type": "Switch", # Using switch icon for servers
+        "model": "HP ProLiant DL380"
+    }
 }
 
 MOCK_NEIGHBORS = {
@@ -75,6 +101,9 @@ MOCK_NEIGHBORS = {
         {"interface": "GigabitEthernet1", "neighbor": "Dist-Switch-A", "ip": "10.10.1.2", "description": "Uplink to Dist-A"},
         {"interface": "GigabitEthernet2", "neighbor": "Dist-Switch-B", "ip": "10.10.2.2", "description": "Uplink to Dist-B"},
         {"interface": "GigabitEthernet3", "neighbor": "Dist-Switch-A", "ip": "10.10.1.2", "description": "Redundant Uplink to Dist-A"},
+        # 2 Links to new DC Core
+        {"interface": "TenGigabitEthernet4", "neighbor": "DC-Core-Router-1", "ip": "10.20.1.1", "description": "DC Interconnect 1"},
+        {"interface": "TenGigabitEthernet5", "neighbor": "DC-Core-Router-1", "ip": "10.20.1.1", "description": "DC Interconnect 2"},
     ],
     "10.10.1.2": [
         {"interface": "TenGigabitEthernet1/1/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink to Core"},
@@ -108,6 +137,44 @@ MOCK_NEIGHBORS = {
     ],
     "172.16.30.12": [
         {"interface": "eno1", "neighbor": "VPN-Encryptor-1", "ip": "172.16.20.8", "description": "Uplink"},
+    ],
+    # --- New Data Center Neighbors ---
+    "10.20.1.1": [
+        # 2 Links back to original Core
+        {"interface": "Ethernet1/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Campus Interconnect 1"},
+        {"interface": "Ethernet1/2", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Campus Interconnect 2"},
+        {"interface": "Ethernet2/1", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "To Dist-C"},
+        {"interface": "Ethernet2/2", "neighbor": "DC-Dist-Switch-D", "ip": "10.20.2.2", "description": "To Dist-D"},
+    ],
+    "10.20.2.1": [
+        {"interface": "Ethernet1", "neighbor": "DC-Core-Router-1", "ip": "10.20.1.1", "description": "Uplink to DC Core"},
+        # 3 Links to Dist-D
+        {"interface": "Ethernet48", "neighbor": "DC-Dist-Switch-D", "ip": "10.20.2.2", "description": "Peer Link 1"},
+        {"interface": "Ethernet49", "neighbor": "DC-Dist-Switch-D", "ip": "10.20.2.2", "description": "Peer Link 2"},
+        {"interface": "Ethernet50", "neighbor": "DC-Dist-Switch-D", "ip": "10.20.2.2", "description": "Peer Link 3"},
+        # 4 Links to Server-A
+        {"interface": "Ethernet10", "neighbor": "Server-A", "ip": "10.20.10.100", "description": "LACP to Server-A (1)"},
+        {"interface": "Ethernet11", "neighbor": "Server-A", "ip": "10.20.10.100", "description": "LACP to Server-A (2)"},
+        {"interface": "Ethernet12", "neighbor": "Server-A", "ip": "10.20.10.100", "description": "LACP to Server-A (3)"},
+        {"interface": "Ethernet13", "neighbor": "Server-A", "ip": "10.20.10.100", "description": "LACP to Server-A (4)"},
+    ],
+    "10.20.2.2": [
+        {"interface": "Ethernet1", "neighbor": "DC-Core-Router-1", "ip": "10.20.1.1", "description": "Uplink to DC Core"},
+        # 3 Links back to Dist-C
+        {"interface": "Ethernet48", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Peer Link 1"},
+        {"interface": "Ethernet49", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Peer Link 2"},
+        {"interface": "Ethernet50", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Peer Link 3"},
+        {"interface": "Ethernet20", "neighbor": "Server-B", "ip": "10.20.10.101", "description": "To Server-B"},
+    ],
+    "10.20.10.100": [
+        # 4 Links back to Dist-C
+        {"interface": "eth0", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Uplink 1"},
+        {"interface": "eth1", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Uplink 2"},
+        {"interface": "eth2", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Uplink 3"},
+        {"interface": "eth3", "neighbor": "DC-Dist-Switch-C", "ip": "10.20.2.1", "description": "Uplink 4"},
+    ],
+    "10.20.10.101": [
+         {"interface": "eth0", "neighbor": "DC-Dist-Switch-D", "ip": "10.20.2.2", "description": "Uplink"},
     ]
 }
 
