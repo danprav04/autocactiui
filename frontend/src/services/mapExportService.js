@@ -5,12 +5,11 @@ import { uploadMap } from './apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
 /**
- * Prepares nodes and edges for a clean export by applying specific styles.
+ * Prepares nodes for a clean export by applying specific styles.
  * @param {Array} nodes - The original array of nodes.
- * @param {Array} edges - The original array of edges.
- * @returns {{exportNodes: Array, exportEdges: Array}} An object containing stylized nodes and edges.
+ * @returns {{exportNodes: Array}} An object containing stylized nodes.
  */
-const prepareElementsForExport = (nodes, edges) => {
+const prepareElementsForExport = (nodes) => {
     const exportNodes = nodes.map(node => {
         const exportNode = {
             ...node,
@@ -33,15 +32,9 @@ const prepareElementsForExport = (nodes, edges) => {
 
         return exportNode;
     });
-    
-    const exportEdges = edges.map(edge => ({
-        ...edge,
-        animated: false,
-        type: 'straight',
-        style: { stroke: '#000000', strokeWidth: 2 }
-    }));
 
-    return { exportNodes, exportEdges };
+    // Edges are not styled because they will not be rendered on the PNG.
+    return { exportNodes };
 };
 
 /**
@@ -169,19 +162,27 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     const originalEdges = [...edges];
     const wasDarkTheme = theme === 'dark';
 
-    const { exportNodes, exportEdges } = prepareElementsForExport(nodes, edges);
+    // Prepare nodes for export styling, but ignore edges for rendering.
+    const { exportNodes } = prepareElementsForExport(nodes);
+    
+    // Set component state to render only the stylized nodes and NO edges.
     setNodes(exportNodes);
-    setEdges(exportEdges);
+    setEdges([]); // This hides the lines for the screenshot.
+    
     mapElement.classList.add('exporting');
     if (wasDarkTheme) {
         document.body.setAttribute('data-theme', 'light');
     }
 
+    // Wait for React to re-render the component without edges.
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
-        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: exportEdges, mapName, cactiId });
+        // Perform the export. Pass the prepared nodes for bounds calculation,
+        // but crucially, pass the ORIGINAL edges for config generation.
+        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: originalEdges, mapName, cactiId });
     } finally {
+        // Restore the UI to its original state.
         mapElement.classList.remove('exporting');
         if (wasDarkTheme) {
             document.body.setAttribute('data-theme', 'dark');
