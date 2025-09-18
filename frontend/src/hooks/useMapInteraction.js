@@ -1,5 +1,5 @@
 // frontend/src/hooks/useMapInteraction.js
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { applyNodeChanges } from 'react-flow-renderer';
 import { useTranslation } from 'react-i18next';
 import * as api from '../services/apiService';
@@ -16,6 +16,7 @@ export const useMapInteraction = (theme) => {
   const [selectedElements, setSelectedElements] = useState([]);
   const [currentNeighbors, setCurrentNeighbors] = useState([]);
   const { t } = useTranslation();
+  const dragContext = useRef(null); // Ref to store context across drag events
 
   const {
     createNodeObject,
@@ -259,89 +260,102 @@ export const useMapInteraction = (theme) => {
   }, [baseHandleDeleteElements, selectedElements]);
 
   const onNodesChange = useCallback((changes) => {
+    const isDrag = changes.some(c => c.type === 'position' && c.dragging);
     const isDragEnd = changes.some(c => c.type === 'position' && c.dragging === false);
 
     setState(prev => {
-        const positionChanges = changes.filter(
-            c => c.type === 'position' && c.position && c.dragging
-        );
+        // --- DRAG START: Identify children of dragged groups ---
+        if (isDrag && !dragContext.current) {
+            const context = { childrenMap: new Map() };
+            const movedGroupIds = new Set(
+                changes
+                    .map(c => prev.nodes.find(n => n.id === c.id))
+                    .filter(n => n && n.type === 'group')
+                    .map(n => n.id)
+            );
 
-        // If there are no position changes, just apply the other changes (e.g., selection)
-        if (positionChanges.length === 0) {
-            return { ...prev, nodes: applyNodeChanges(changes, prev.nodes) };
-        }
-
-        // --- GROUP DRAGGING LOGIC ---
-        // Create a map to hold the final positions of all nodes after this update.
-        const updatedNodePositions = new Map();
-        // A map to hold the calculated movement deltas for groups.
-        const groupDeltas = new Map();
-        // A set of nodes that are already being moved by the incoming `changes`.
-        const directlyMovedNodeIds = new Set(changes.map(c => c.id));
-
-        // First, calculate deltas for all moved groups.
-        for (const change of positionChanges) {
-            const originalNode = prev.nodes.find(n => n.id === change.id);
-            if (originalNode && originalNode.type === 'group') {
-                const dx = change.position.x - originalNode.position.x;
-                const dy = change.position.y - originalNode.position.y;
-                if (dx !== 0 || dy !== 0) {
-                    groupDeltas.set(originalNode.id, { dx, dy });
+            if (movedGroupIds.size > 0) {
+                const potentialChildren = prev.nodes.filter(n => n.type !== 'group');
+                for (const node of potentialChildren) {
+                    const parentGroup = prev.nodes
+                        .filter(g => movedGroupIds.has(g.id) &&
+                            // A node is a child if its entire bounding box is inside the group
+                            node.position.x >= g.position.x &&
+                            (node.position.x + (node.width || NODE_WIDTH)) <= (g.position.x + g.data.width) &&
+                            node.position.y >= g.position.y &&
+                            (node.position.y + (node.height || NODE_HEIGHT)) <= (g.position.y + g.data.height)
+                        )
+                        .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0]; // Respect z-index
+                    
+                    if (parentGroup) {
+                        if (!context.childrenMap.has(parentGroup.id)) {
+                            context.childrenMap.set(parentGroup.id, new Set());
+                        }
+                        context.childrenMap.get(parentGroup.id).add(node.id);
+                    }
                 }
             }
+            dragContext.current = context;
         }
-        
-        // Apply the initial changes from React Flow to get a base new state.
-        const nodesAfterInitialMove = applyNodeChanges(changes, prev.nodes);
-        nodesAfterInitialMove.forEach(n => updatedNodePositions.set(n.id, n.position));
 
-        // If any groups were moved, find their "children" and move them too.
-        if (groupDeltas.size > 0) {
-            const unmovedNodes = prev.nodes.filter(n => !directlyMovedNodeIds.has(n.id));
+        // --- APPLY CHANGES ---
+        let nextNodes = applyNodeChanges(changes, prev.nodes);
 
-            for (const node of unmovedNodes) {
-                if (node.type === 'group') continue; // Groups cannot be children of other groups
+        // --- GROUP DRAGGING LOGIC ---
+        // If groups are being dragged, move their pre-identified children
+        if (isDrag && dragContext.current && dragContext.current.childrenMap.size > 0) {
+            const groupDeltas = new Map();
+            const positionChanges = changes.filter(c => c.type === 'position' && c.position);
 
-                // Find which group this node belongs to (if any).
-                // It checks against the group's ORIGINAL position.
-                // It respects z-index, so nodes belong to the topmost group.
-                const parentGroup = prev.nodes
-                    .filter(g => 
-                        g.type === 'group' &&
-                        groupDeltas.has(g.id) &&
-                        node.position.x >= g.position.x &&
-                        node.position.x <= g.position.x + g.data.width &&
-                        node.position.y >= g.position.y &&
-                        node.position.y <= g.position.y + g.data.height
-                    )
-                    .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0];
-
-                if (parentGroup) {
-                    // This node is inside a moved group and wasn't moved itself.
-                    // So, we move it by the group's delta.
-                    const delta = groupDeltas.get(parentGroup.id);
-                    updatedNodePositions.set(node.id, {
-                        x: node.position.x + delta.dx,
-                        y: node.position.y + delta.dy,
+            for (const change of positionChanges) {
+                const originalNode = prev.nodes.find(n => n.id === change.id);
+                if (originalNode && originalNode.type === 'group') {
+                    groupDeltas.set(originalNode.id, {
+                        dx: change.position.x - originalNode.position.x,
+                        dy: change.position.y - originalNode.position.y,
                     });
                 }
             }
+
+            if (groupDeltas.size > 0) {
+                const directlyMovedNodeIds = new Set(positionChanges.map(c => c.id));
+                const childrenToMove = new Map();
+
+                dragContext.current.childrenMap.forEach((childIds, groupId) => {
+                    const delta = groupDeltas.get(groupId);
+                    if (delta) {
+                        childIds.forEach(childId => {
+                            if (!directlyMovedNodeIds.has(childId)) {
+                                const originalChildNode = prev.nodes.find(n => n.id === childId);
+                                if(originalChildNode) {
+                                    childrenToMove.set(childId, {
+                                        x: originalChildNode.position.x + delta.dx,
+                                        y: originalChildNode.position.y + delta.dy,
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
+
+                nextNodes = nextNodes.map(node => {
+                    if (childrenToMove.has(node.id)) {
+                        return { ...node, position: childrenToMove.get(node.id) };
+                    }
+                    return node;
+                });
+            }
         }
         
-        // Construct the final nodes array with all updated positions.
-        const finalNodes = prev.nodes.map(node => {
-            const updatedPosition = updatedNodePositions.get(node.id);
-            if (updatedPosition) {
-                const { dragging, ...restOfNode } = node; // Remove dragging property
-                return { ...restOfNode, position: updatedPosition };
-            }
-            return node;
-        });
+        return { ...prev, nodes: nextNodes };
 
-        return { ...prev, nodes: finalNodes };
+    }, !isDragEnd);
 
-    }, !isDragEnd); // A history entry is only created on drag end.
-}, [setState]);
+    // After state update, clear the context on drag end
+    if (isDragEnd) {
+        dragContext.current = null;
+    }
+  }, [setState]);
 
   const resetMap = useCallback(() => {
     resetState();
