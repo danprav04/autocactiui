@@ -525,41 +525,61 @@ input[type="range"]::-moz-range-thumb:hover {
 }
 
 /* --- EXPORT OVERRIDE STYLES --- */
-/* Force a consistent light theme for map exports to ensure readability on a white background */
+/* Styles to ensure a clean, consistent capture of the map, adapting to the selected theme. */
 
-/* This targets the container during export to guarantee a white canvas */
-.exporting .react-flow__viewport {
+/* Light Theme Export Overrides */
+[data-theme="light"] .exporting .react-flow__viewport {
     background-color: #ffffff !important;
 }
 
-/* Custom device nodes */
-.react-flow__node.export-node .custom-node,
-.exporting .custom-node { /* Added a more general selector as a fallback */
+[data-theme="light"] .exporting .custom-node {
     background-color: #ffffff !important;
     border-color: #ced4da !important;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Ensure text within the nodes is dark and legible on the white background */
-.react-flow__node.export-node .custom-node .node-label strong,
-.exporting .custom-node .node-label strong {
+[data-theme="light"] .exporting .custom-node .node-label strong {
     color: #212529 !important;
 }
 
-.react-flow__node.export-node .custom-node .node-label small,
-.exporting .custom-node .node-label small {
-    color: #6c757d !important; /* Use secondary text color for IP */
+[data-theme="light"] .exporting .custom-node .node-label small {
+    color: #6c757d !important;
 }
 
-/* Group node labels */
-.react-flow__node.export-node .group-label,
-.exporting .group-label {
+[data-theme="light"] .exporting .group-label {
     background-color: rgba(255, 255, 255, 0.7) !important;
     color: #212529 !important;
 }
 
-/* Text nodes */
-.react-flow__node.export-node .text-node,
-.exporting .text-node {
+[data-theme="light"] .exporting .text-node {
     color: #212529 !important;
+}
+
+
+/* Dark Theme Export Overrides */
+[data-theme="dark"] .exporting .react-flow__viewport {
+    background-color: #18191a !important; /* Matches dark map background */
+}
+
+[data-theme="dark"] .exporting .custom-node {
+    background-color: #3a3b3c !important; /* Matches dark node background */
+    border-color: #4d4f51 !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .exporting .custom-node .node-label strong {
+    color: #e4e6eb !important; /* Light text for dark background */
+}
+
+[data-theme="dark"] .exporting .custom-node .node-label small {
+    color: #b0b3b8 !important; /* Lighter secondary text for dark background */
+}
+
+[data-theme="dark"] .exporting .group-label {
+    background-color: rgba(0, 0, 0, 0.4) !important;
+    color: #e4e6eb !important;
+}
+
+[data-theme="dark"] .exporting .text-node {
+    color: #e4e6eb !important; /* Light text for dark background */
 }
