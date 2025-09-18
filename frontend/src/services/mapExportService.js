@@ -7,9 +7,10 @@ import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 /**
  * Prepares nodes for a clean export by applying specific styles.
  * @param {Array} nodes - The original array of nodes.
+ * @param {string} theme - The current theme ('light' or 'dark').
  * @returns {{exportNodes: Array}} An object containing stylized nodes.
  */
-const prepareElementsForExport = (nodes) => {
+const prepareElementsForExport = (nodes, theme) => {
     const exportNodes = nodes.map(node => {
         const exportNode = {
             ...node,
@@ -17,19 +18,14 @@ const prepareElementsForExport = (nodes) => {
             className: 'export-node', // Add a universal class for export styling
         };
 
-        // Force light-theme visuals for consistent exports
+        // Force theme-specific visuals for elements not controlled by CSS overrides (like image src)
         if (node.type === 'custom') {
             exportNode.data = {
                 ...node.data,
-                icon: ICONS_BY_THEME[node.data.iconType].light,
+                icon: ICONS_BY_THEME[node.data.iconType][theme],
             };
-        } else if (node.type === 'text') {
-            exportNode.data = {
-                ...node.data,
-                color: '#212529', // Force dark text for light background
-            };
-        } else if (node.type === 'group') {
-            // Ensure group color isn't pure white or too light to be seen
+        } else if (node.type === 'group' && theme === 'light') {
+            // Ensure group color isn't pure white or too light to be seen on the light background
             const lightColors = ['#ffffff', '#fff3cd', '#e9ecef'];
             if (lightColors.includes(node.data.color?.toLowerCase())) {
                  exportNode.data = {
@@ -38,7 +34,6 @@ const prepareElementsForExport = (nodes) => {
                 };
             }
         }
-
 
         return exportNode;
     });
@@ -102,7 +97,7 @@ const calculateBoundsAndTransform = (nodes) => {
  * @param {object} params - The export parameters.
  * @returns {Promise<void>}
  */
-export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiId }) => {
+export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiId, theme }) => {
     const viewport = mapElement.querySelector('.react-flow__viewport');
     if (!viewport) {
         throw new Error('Could not find map viewport for export.');
@@ -112,11 +107,13 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
     const originalTransform = viewport.style.transform;
     viewport.style.transform = transform; 
 
+    const backgroundColor = theme === 'dark' ? '#18191a' : '#ffffff';
+
     try {
         const blob = await toBlob(viewport, {
             width: width,
             height: height,
-            backgroundColor: '#ffffff',
+            backgroundColor: backgroundColor,
             filter: (node) => (node.className !== 'react-flow__controls'),
         });
 
@@ -170,19 +167,15 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
 export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, cactiId, theme, setNodes, setEdges }) => {
     const originalNodes = [...nodes];
     const originalEdges = [...edges];
-    const wasDarkTheme = theme === 'dark';
 
-    // Prepare nodes for export styling, but ignore edges for rendering.
-    const { exportNodes } = prepareElementsForExport(nodes);
+    // Prepare nodes for export styling, passing the current theme.
+    const { exportNodes } = prepareElementsForExport(nodes, theme);
     
     // Set component state to render only the stylized nodes and NO edges.
     setNodes(exportNodes);
     setEdges([]); // This hides the lines for the screenshot.
     
     mapElement.classList.add('exporting');
-    if (wasDarkTheme) {
-        document.body.setAttribute('data-theme', 'light');
-    }
 
     // Wait for React to re-render the component without edges.
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -190,13 +183,10 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     try {
         // Perform the export. Pass the prepared nodes for bounds calculation,
         // but crucially, pass the ORIGINAL edges for config generation.
-        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: originalEdges, mapName, cactiId });
+        await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: originalEdges, mapName, cactiId, theme });
     } finally {
         // Restore the UI to its original state.
         mapElement.classList.remove('exporting');
-        if (wasDarkTheme) {
-            document.body.setAttribute('data-theme', 'dark');
-        }
         setNodes(originalNodes);
         setEdges(originalEdges);
     }
