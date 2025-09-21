@@ -47,6 +47,7 @@ function App() {
     nodes, setNodes,
     edges, setEdges,
     selectedElements,
+    snapLines, // Get snapLines from the hook
     onNodesChange,
     onNodeClick,
     onPaneClick,
@@ -236,6 +237,7 @@ function App() {
                 <Map 
                   nodes={nodes} 
                   edges={edges} 
+                  snapLines={snapLines} // Pass snapLines to the Map
                   onNodeClick={onNodeClickHandler} 
                   onNodesChange={onNodesChange}
                   onPaneClick={onPaneClickHandler}

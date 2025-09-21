@@ -7,6 +7,7 @@ import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 import { useHistoryState } from './useHistoryState';
 import { useNodeManagement } from './useNodeManagement';
 import { useTooling } from './useTooling';
+import { calculateSnaps } from './useSnapping';
 
 
 /**
@@ -47,6 +48,7 @@ export const useMapInteraction = (theme) => {
 
   const [selectedElements, setSelectedElements] = useState([]);
   const [currentNeighbors, setCurrentNeighbors] = useState([]);
+  const [snapLines, setSnapLines] = useState([]); // State for snap lines
   const { t } = useTranslation();
   const dragContext = useRef(null); // Ref to store context across drag events
 
@@ -340,6 +342,10 @@ export const useMapInteraction = (theme) => {
     const isDrag = changes.some(c => c.type === 'position' && c.dragging);
     const isDragEnd = changes.some(c => c.type === 'position' && c.dragging === false);
 
+    if (!isDrag && !isDragEnd) {
+        setSnapLines([]); // Clear lines if not dragging
+    }
+
     setState(prev => {
         // --- DRAG START: Identify children of dragged groups ---
         if (isDrag && !dragContext.current) {
@@ -373,6 +379,29 @@ export const useMapInteraction = (theme) => {
                 }
             }
             dragContext.current = context;
+        }
+
+        // --- SNAPPING LOGIC ---
+        if (isDrag) {
+            const draggedNodeIds = new Set(changes.filter(c => c.dragging).map(c => c.id));
+            const draggedNodes = prev.nodes.filter(n => draggedNodeIds.has(n.id));
+            
+            // We need to apply the current drag delta to the nodes before calculating snaps
+            const updatedDraggedNodes = draggedNodes.map(dn => {
+                const change = changes.find(c => c.id === dn.id && c.position);
+                return change ? { ...dn, position: change.position } : dn;
+            });
+            
+            const { snapLines, positionAdjustment } = calculateSnaps(updatedDraggedNodes, prev.nodes);
+            setSnapLines(snapLines);
+
+            // Apply snap adjustment to the changes
+            changes.forEach(change => {
+                if (draggedNodeIds.has(change.id) && change.position) {
+                    change.position.x += positionAdjustment.x;
+                    change.position.y += positionAdjustment.y;
+                }
+            });
         }
 
         // --- APPLY CHANGES ---
@@ -431,6 +460,7 @@ export const useMapInteraction = (theme) => {
     // After state update, clear the context on drag end
     if (isDragEnd) {
         dragContext.current = null;
+        setSnapLines([]); // Also clear lines on drag end
     }
   }, [setState]);
 
@@ -449,6 +479,7 @@ export const useMapInteraction = (theme) => {
     nodes, setNodes: (newNodes) => setState(prev => ({...prev, nodes: typeof newNodes === 'function' ? newNodes(prev.nodes) : newNodes}), true),
     edges, setEdges: (newEdges) => setState(prev => ({...prev, edges: typeof newEdges === 'function' ? newEdges(prev.edges) : newEdges}), true),
     selectedElements,
+    snapLines, // Expose snap lines
     onNodesChange,
     onNodeClick,
     onPaneClick,

@@ -5,6 +5,7 @@ import ReactFlow, {
   Controls,
   MiniMap,
   useReactFlow,
+  useViewport,
 } from 'react-flow-renderer';
 
 const MarqueeSelection = ({ startPos, endPos }) => {
@@ -20,7 +21,29 @@ const MarqueeSelection = ({ startPos, endPos }) => {
     return <div className="marquee-selection" style={style} />;
 };
 
-const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu }) => {
+const SnapLines = ({ lines }) => {
+    const { x, y, zoom } = useViewport();
+    if (!lines.length) return null;
+
+    return (
+        <div className="snap-lines-container" style={{ transform: `translate(${x}px, ${y}px) scale(${zoom})` }}>
+            {lines.map((line, i) => (
+                <div
+                    key={i}
+                    className={`snap-line ${line.type}`}
+                    style={
+                        line.type === 'vertical'
+                            ? { left: line.x, top: line.y1, height: line.y2 - line.y1 }
+                            : { top: line.y, left: line.x1, width: line.x2 - line.x1 }
+                    }
+                />
+            ))}
+        </div>
+    );
+};
+
+
+const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu, snapLines }) => {
   
   const [marqueeStart, setMarqueeStart] = useState(null);
   const [marqueeEnd, setMarqueeEnd] = useState(null);
@@ -128,6 +151,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         <MiniMap nodeColor={minimapNodeColor} />
         <Controls />
         <Background color={theme === 'dark' ? '#404040' : '#ddd'} gap={24} />
+        <SnapLines lines={snapLines} />
       </ReactFlow>
       <MarqueeSelection startPos={marqueeStart} endPos={marqueeEnd} />
     </div>
