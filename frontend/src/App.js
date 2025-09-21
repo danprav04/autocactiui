@@ -79,9 +79,6 @@ function App() {
         } else if (event.key === 'y') {
           event.preventDefault();
           redo();
-        } else if (event.key === 'a') {
-          event.preventDefault();
-          onSelectionChange({nodes: nodes.map(n => ({...n, selected: true})), edges: []});
         }
       }
     };
@@ -91,7 +88,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [undo, redo, nodes, onSelectionChange]);
+  }, [undo, redo]);
 
 
   // --- Authentication Handlers ---
