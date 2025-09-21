@@ -22,23 +22,26 @@ const MarqueeSelection = ({ startPos, endPos }) => {
 };
 
 const SnapLines = ({ lines }) => {
-    const { x, y, zoom } = useViewport();
+    const { zoom } = useViewport();
     if (!lines.length) return null;
 
+    // By rendering the lines as children of ReactFlow, they are automatically
+    // positioned within the pane. We just need to counteract the zoom's effect
+    // on the line thickness (width/height).
     return (
-        <div className="snap-lines-container" style={{ transform: `translate(${x}px, ${y}px) scale(${zoom})` }}>
+        <>
             {lines.map((line, i) => (
                 <div
                     key={i}
                     className={`snap-line ${line.type}`}
                     style={
                         line.type === 'vertical'
-                            ? { left: line.x, top: line.y1, height: line.y2 - line.y1 }
-                            : { top: line.y, left: line.x1, width: line.x2 - line.x1 }
+                            ? { left: line.x, top: line.y1, height: line.y2 - line.y1, width: `${1 / zoom}px` }
+                            : { top: line.y, left: line.x1, width: line.x2 - line.x1, height: `${1 / zoom}px` }
                     }
                 />
             ))}
-        </div>
+        </>
     );
 };
 
@@ -151,8 +154,8 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         <MiniMap nodeColor={minimapNodeColor} />
         <Controls />
         <Background color={theme === 'dark' ? '#404040' : '#ddd'} gap={24} />
+        <SnapLines lines={snapLines} />
       </ReactFlow>
-      <SnapLines lines={snapLines} />
       <MarqueeSelection startPos={marqueeStart} endPos={marqueeEnd} />
     </div>
   );
