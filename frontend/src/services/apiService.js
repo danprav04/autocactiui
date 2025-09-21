@@ -6,7 +6,7 @@ const apiClient = axios.create({
     baseURL: process.env.REACT_APP_API_URL
 });
 
-// Use an interceptor to automatically add the auth token to every request.
+// Use a request interceptor to automatically add the auth token to every request.
 apiClient.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
@@ -19,6 +19,27 @@ apiClient.interceptors.request.use(
         return Promise.reject(error);
     }
 );
+
+// Use a response interceptor to handle 401 Unauthorized errors globally.
+apiClient.interceptors.response.use(
+    (response) => {
+        // If the request is successful, just return the response.
+        return response;
+    },
+    (error) => {
+        // Check if the error is a 401 Unauthorized response.
+        if (error.response && error.response.status === 401) {
+            // Clear the invalid/expired token from storage.
+            localStorage.removeItem('token');
+            // Redirect the user to the login page by reloading the application.
+            // The App component will detect the absence of a token and show the LoginScreen.
+            window.location.href = '/';
+        }
+        // For all other errors, reject the promise to allow for local error handling.
+        return Promise.reject(error);
+    }
+);
+
 
 /**
  * Authenticates a user against the backend.
