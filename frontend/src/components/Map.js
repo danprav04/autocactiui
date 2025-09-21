@@ -21,26 +21,60 @@ const MarqueeSelection = ({ startPos, endPos }) => {
     return <div className="marquee-selection" style={style} />;
 };
 
+// Fixed SnapLines component in Map.js
 const SnapLines = ({ lines }) => {
-    const { zoom } = useViewport();
+    const { zoom, x, y } = useViewport();
     if (!lines.length) return null;
 
-    // By rendering the lines as children of ReactFlow, they are automatically
-    // positioned within the pane. We just need to counteract the zoom's effect
-    // on the line thickness (width/height).
+    // Transform ReactFlow coordinates to screen coordinates
+    // ReactFlow applies: translate(x, y) scale(zoom) to the viewport
     return (
         <>
-            {lines.map((line, i) => (
-                <div
-                    key={i}
-                    className={`snap-line ${line.type}`}
-                    style={
-                        line.type === 'vertical'
-                            ? { left: line.x, top: line.y1, height: line.y2 - line.y1, width: `${1 / zoom}px` }
-                            : { top: line.y, left: line.x1, width: line.x2 - line.x1, height: `${1 / zoom}px` }
-                    }
-                />
-            ))}
+            {lines.map((line, i) => {
+                if (line.type === 'vertical') {
+                    const screenX = line.x * zoom + x;
+                    const screenY1 = line.y1 * zoom + y;
+                    const screenY2 = line.y2 * zoom + y;
+                    
+                    return (
+                        <div
+                            key={i}
+                            className="snap-line vertical"
+                            style={{
+                                position: 'absolute',
+                                left: screenX,
+                                top: Math.min(screenY1, screenY2),
+                                height: Math.abs(screenY2 - screenY1),
+                                width: '1px',
+                                backgroundColor: 'var(--snap-line-color)',
+                                zIndex: 1000,
+                                pointerEvents: 'none'
+                            }}
+                        />
+                    );
+                } else {
+                    const screenY = line.y * zoom + y;
+                    const screenX1 = line.x1 * zoom + x;
+                    const screenX2 = line.x2 * zoom + x;
+                    
+                    return (
+                        <div
+                            key={i}
+                            className="snap-line horizontal"
+                            style={{
+                                position: 'absolute',
+                                top: screenY,
+                                left: Math.min(screenX1, screenX2),
+                                width: Math.abs(screenX2 - screenX1),
+                                height: '1px',
+                                backgroundColor: 'var(--snap-line-color)',
+                                zIndex: 1000,
+                                pointerEvents: 'none'
+                            }}
+                        />
+                    );
+                }
+            })}
         </>
     );
 };
