@@ -57,7 +57,24 @@ body, html, #root {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   transition: background-color 0.2s ease, color 0.2s ease;
+  /* Prevent text selection on the general UI */
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE/Edge */
 }
+
+/* Allow text selection on elements where it's expected, like form inputs */
+input,
+textarea,
+.group-label-input,
+.text-node-input {
+  user-select: auto;
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
+}
+
 
 /* --- MAIN LAYOUT --- */
 .app-container {
