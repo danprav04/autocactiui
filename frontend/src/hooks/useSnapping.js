@@ -94,7 +94,6 @@ export const calculateSnaps = (draggedNodes, allNodes) => {
     
     const draggedIds = new Set(draggedNodes.map(n => n.id));
     // Add parent group info to all nodes for contextual snapping.
-    // This is crucial for the original getNodeSnapPoints logic to work.
     const processedNodes = allNodes.map(n => {
         if (n.parentNode) {
             return { ...n, parentNode: allNodes.find(p => p.id === n.parentNode) };
@@ -103,26 +102,24 @@ export const calculateSnaps = (draggedNodes, allNodes) => {
     });
 
     const staticNodes = processedNodes.filter(n => !draggedIds.has(n.id));
+    if (staticNodes.length === 0) {
+         return { snapLines: [], positionAdjustment: { x: 0, y: 0 } };
+    }
 
-    // Create a map of updated positions for quick lookup.
+    // Map updated positions for quick lookup.
     const newPositions = new Map(draggedNodes.map(n => [n.id, n.position]));
     
-    // Get the dragged nodes from the processed list (so they have parentNode objects)
-    // and apply their new, updated positions from the drag event.
     const enrichedDraggedNodes = processedNodes
         .filter(n => draggedIds.has(n.id))
         .map(n => ({
             ...n,
-            position: newPositions.get(n.id) || n.position // Fallback to old position
+            position: newPositions.get(n.id) || n.position
         }));
 
     const staticNodePoints = staticNodes.map(getNodeSnapPoints);
-    const snapLines = [];
-    
-    // Initialize with a large value
     let positionAdjustment = { x: SNAP_THRESHOLD, y: SNAP_THRESHOLD };
 
-    // Find the best snap for each dragged node
+    // --- 1. Find the single best snap adjustment for the entire selection ---
     enrichedDraggedNodes.forEach(draggedNode => {
         const draggedNodePoints = getNodeSnapPoints(draggedNode);
         staticNodePoints.forEach(staticPoints => {
@@ -134,66 +131,54 @@ export const calculateSnaps = (draggedNodes, allNodes) => {
     if (Math.abs(positionAdjustment.x) === SNAP_THRESHOLD) positionAdjustment.x = 0;
     if (Math.abs(positionAdjustment.y) === SNAP_THRESHOLD) positionAdjustment.y = 0;
 
-    // --- Generate Snap Line visuals ---
-    // After adjustments are calculated, find which lines to draw
-    if (positionAdjustment.x !== 0) {
-        // Use the first dragged node as a reference
-        const referenceNode = enrichedDraggedNodes[0];
-        const finalX = referenceNode.position.x + positionAdjustment.x;
-        const finalPoints = getNodeSnapPoints({...referenceNode, position: {x: finalX, y: referenceNode.position.y}});
-
-        for (const key in finalPoints.x) {
-            const finalCoord = finalPoints.x[key];
-            // FIX: Check against all of a static node's points, not just the same 'key'.
-            const matchingStaticPoints = staticNodePoints.filter(sp => 
-                Object.values(sp.x).some(val => Math.abs(val - finalCoord) < 1)
-            );
-
-            if (matchingStaticPoints.length > 0) {
-                let minY = Infinity, maxY = -Infinity;
-                 enrichedDraggedNodes.forEach(dn => {
-                    const dnPoints = getNodeSnapPoints({ ...dn, position: { ...dn.position, x: dn.position.x + positionAdjustment.x } });
-                    minY = Math.min(minY, dnPoints.y.top);
-                    maxY = Math.max(maxY, dnPoints.y.bottom);
-                });
-                matchingStaticPoints.forEach(msp => {
-                    minY = Math.min(minY, msp.y.top);
-                    maxY = Math.max(maxY, msp.y.bottom);
-                });
-                snapLines.push({ type: 'vertical', x: finalCoord, y1: minY, y2: maxY });
-                break; // Found a snap for this axis, no need to check other keys (left, center, right, etc.)
-            }
-        }
-    }
-    
-    if (positionAdjustment.y !== 0) {
-        const referenceNode = enrichedDraggedNodes[0];
-        const finalY = referenceNode.position.y + positionAdjustment.y;
-        const finalPoints = getNodeSnapPoints({...referenceNode, position: {x: referenceNode.position.x, y: finalY}});
-
-        for (const key in finalPoints.y) {
-            const finalCoord = finalPoints.y[key];
-            // FIX: Check against all of a static node's points.
-            const matchingStaticPoints = staticNodePoints.filter(sp => 
-                Object.values(sp.y).some(val => Math.abs(val - finalCoord) < 1)
-            );
-
-            if (matchingStaticPoints.length > 0) {
-                 let minX = Infinity, maxX = -Infinity;
-                 enrichedDraggedNodes.forEach(dn => {
-                    const dnPoints = getNodeSnapPoints({ ...dn, position: { ...dn.position, y: dn.position.y + positionAdjustment.y } });
-                    minX = Math.min(minX, dnPoints.x.left);
-                    maxX = Math.max(maxX, dnPoints.x.right);
-                });
-                matchingStaticPoints.forEach(msp => {
-                    minX = Math.min(minX, msp.x.left);
-                    maxX = Math.max(maxX, msp.x.right);
-                });
-                snapLines.push({ type: 'horizontal', y: finalCoord, x1: minX, x2: maxX });
-                break;
-            }
-        }
+    // --- 2. Generate individual visual snap lines based on the final adjusted position ---
+    const snapLines = [];
+    if (positionAdjustment.x === 0 && positionAdjustment.y === 0) {
+        return { snapLines: [], positionAdjustment };
     }
 
-    return { snapLines, positionAdjustment };
+    enrichedDraggedNodes.forEach(draggedNode => {
+        // Calculate the node's final position after snapping
+        const finalPosition = {
+            x: draggedNode.position.x + positionAdjustment.x,
+            y: draggedNode.position.y + positionAdjustment.y
+        };
+        const finalDraggedPoints = getNodeSnapPoints({ ...draggedNode, position: finalPosition });
+
+        staticNodes.forEach(staticNode => {
+            const staticPoints = getNodeSnapPoints(staticNode);
+
+            // Check for vertical alignment
+            if (positionAdjustment.x !== 0) {
+                for (const dragKey of Object.keys(finalDraggedPoints.x)) {
+                    for (const staticKey of Object.keys(staticPoints.x)) {
+                        // Check if the points align after adjustment
+                        if (Math.abs(finalDraggedPoints.x[dragKey] - staticPoints.x[staticKey]) < 1) {
+                            const y1 = Math.min(finalDraggedPoints.y.top, staticPoints.y.top);
+                            const y2 = Math.max(finalDraggedPoints.y.bottom, staticPoints.y.bottom);
+                            snapLines.push({ type: 'vertical', x: staticPoints.x[staticKey], y1, y2 });
+                        }
+                    }
+                }
+            }
+            
+            // Check for horizontal alignment
+            if (positionAdjustment.y !== 0) {
+                 for (const dragKey of Object.keys(finalDraggedPoints.y)) {
+                    for (const staticKey of Object.keys(staticPoints.y)) {
+                        if (Math.abs(finalDraggedPoints.y[dragKey] - staticPoints.y[staticKey]) < 1) {
+                            const x1 = Math.min(finalDraggedPoints.x.left, staticPoints.x.left);
+                            const x2 = Math.max(finalDraggedPoints.x.right, staticPoints.x.right);
+                            snapLines.push({ type: 'horizontal', y: staticPoints.y[staticKey], x1, x2 });
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    // Deduplicate lines to avoid drawing the same line multiple times
+    const uniqueLines = Array.from(new Map(snapLines.map(line => [`${line.type}-${line.x || line.y}-${line.x1 || line.y1}`, line])).values());
+
+    return { snapLines: uniqueLines, positionAdjustment };
 };
