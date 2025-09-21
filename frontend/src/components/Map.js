@@ -151,8 +151,8 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         <MiniMap nodeColor={minimapNodeColor} />
         <Controls />
         <Background color={theme === 'dark' ? '#404040' : '#ddd'} gap={24} />
-        <SnapLines lines={snapLines} />
       </ReactFlow>
+      <SnapLines lines={snapLines} />
       <MarqueeSelection startPos={marqueeStart} endPos={marqueeEnd} />
     </div>
   );
