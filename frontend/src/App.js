@@ -17,6 +17,7 @@ import StartupScreen from './components/Startup/StartupScreen';
 import LoginScreen from './components/Login/LoginScreen';
 import TopToolbar from './components/TopToolbar/TopToolbar';
 import ContextMenu from './components/ContextMenu/ContextMenu';
+import UploadSuccessPopup from './components/common/UploadSuccessPopup';
 
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
@@ -24,6 +25,8 @@ import { ICONS_BY_THEME } from './config/constants';
 import './App.css';
 import './components/TopToolbar/TopToolbar.css';
 import './components/ContextMenu/ContextMenu.css';
+import './components/common/UploadSuccessPopup.css';
+
 
 export const NodeContext = React.createContext(null);
 
@@ -34,10 +37,12 @@ function App() {
   const [mapName, setMapName] = useState('My-Network-Map');
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [contextMenu, setContextMenu] = useState(null);
+  const [uploadSuccessData, setUploadSuccessData] = useState(null);
   
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
   const reactFlowInstance = useRef(null);
+  const pollingTimeoutRef = useRef(null);
 
   // --- Custom Hooks for State and Logic Management ---
   const { theme, toggleTheme } = useThemeManager();
@@ -137,14 +142,46 @@ function App() {
     }
   };
 
+  // Clear any pending polling timeouts when component unmounts
+  useEffect(() => {
+    return () => {
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleUploadMap = async () => {
     if (!reactFlowWrapper.current || nodes.length === 0) { setError(t('app.errorEmptyMap')); return; }
     if (!selectedCactiId) { setError(t('app.errorSelectCacti')); return; }
     
     setIsUploading(true);
     setError('');
+
+    const pollTaskStatus = (taskId) => {
+        api.getTaskStatus(taskId)
+            .then(response => {
+                const { status } = response.data;
+                if (status === 'SUCCESS') {
+                    setUploadSuccessData(response.data);
+                    setIsUploading(false);
+                } else if (status === 'FAILURE') {
+                    setError(t('app.uploadFailed'));
+                    setIsUploading(false);
+                } else {
+                    // Continue polling
+                    pollingTimeoutRef.current = setTimeout(() => pollTaskStatus(taskId), 2000);
+                }
+            })
+            .catch(err => {
+                setError(t('app.uploadFailed'));
+                setIsUploading(false);
+                console.error(err);
+            });
+    };
+    
     try {
-      await handleUploadProcess({
+      const taskId = await handleUploadProcess({
         mapElement: reactFlowWrapper.current,
         nodes,
         edges,
@@ -154,11 +191,11 @@ function App() {
         setNodes,
         setEdges
       });
+      pollTaskStatus(taskId);
     } catch (err) {
       setError(t('app.errorUpload'));
-      console.error(err);
-    } finally {
       setIsUploading(false);
+      console.error(err);
     }
   };
 
@@ -260,7 +297,8 @@ function App() {
               />
             )}
             {error && <p className="error-message">{error}</p>}
-            {isLoading && !isUploading && <p className="loading-message">{t('app.loading')}</p>}
+            {(isLoading || isUploading) && <p className="loading-message">{isUploading ? t('app.processingMap') : t('app.loading')}</p>}
+            <UploadSuccessPopup data={uploadSuccessData} onClose={() => setUploadSuccessData(null)} />
           </div>
         </div>
       </div>

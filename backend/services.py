@@ -3,6 +3,9 @@ import uuid
 import re
 from PIL import Image
 from werkzeug.security import check_password_hash
+import time
+from datetime import datetime
+import map_renderer
 
 # --- Mock Authentication Data ---
 # In a real application, this would be replaced with a proper database
@@ -12,6 +15,11 @@ MOCK_USERS = {
         "hash": "pbkdf2:sha256:600000$hUSaowPe1mJ14sCt$0392e20b3a323a6368d1502446a0c0a911765c92471f09c647b593685f6f7051"
     }
 }
+
+# --- Mock Task Queue ---
+# In a real application, this would be managed by a system like Celery and Redis.
+MOCK_TASKS = {}
+
 
 def verify_user(username, password):
     """Verifies user credentials against the mock database."""
@@ -231,7 +239,10 @@ def save_uploaded_map(map_image_file, config_content, map_name):
     # Save Image
     image_filename = f"{map_name}_{unique_id}.png"
     image_path = os.path.join(maps_dir, image_filename)
-    image = Image.open(map_image_file.stream)
+    
+    # Handle both FileStorage and in-memory BytesIO objects
+    image_stream = getattr(map_image_file, 'stream', map_image_file)
+    image = Image.open(image_stream)
     image.save(image_path)
     
     # --- MODIFICATION ---
@@ -254,3 +265,57 @@ def save_uploaded_map(map_image_file, config_content, map_name):
         f.write(modified_config_content)
 
     return {"image_path": image_path, "config_path": config_path}
+
+def process_map_task(task_id, map_image_bytes, config_content, map_name):
+    """
+    Simulates a long-running task to process and render a map.
+    This function runs in a background thread.
+    """
+    try:
+        # Update task status to PROCESSING
+        MOCK_TASKS[task_id].update({
+            'status': 'PROCESSING',
+            'message': 'Saving uploaded map components...',
+            'updated_at': datetime.utcnow().isoformat()
+        })
+        
+        # Simulate some processing time
+        time.sleep(2)
+
+        # Step 1: Save the uploaded background image and the modified .conf file
+        saved_paths = save_uploaded_map(map_image_bytes, config_content, map_name)
+        config_path = saved_paths['config_path']
+        
+        MOCK_TASKS[task_id].update({
+            'status': 'PROCESSING',
+            'message': 'Rendering final map image...',
+            'updated_at': datetime.utcnow().isoformat()
+        })
+        
+        # Simulate more processing time
+        time.sleep(3)
+        
+        # Step 2: Define the output path for the final rendered map
+        config_filename = os.path.basename(config_path)
+        final_map_filename = config_filename.replace('.conf', '.png')
+        final_map_path = os.path.join('static/final_maps', final_map_filename)
+
+        # Step 3: Render the final map by drawing lines on the background and save it
+        map_renderer.render_and_save_map(config_path, final_map_path)
+        
+        # Step 4: Update task to SUCCESS
+        MOCK_TASKS[task_id].update({
+            'status': 'SUCCESS',
+            # The final URL will be constructed in the /task-status endpoint
+            'message': 'Placeholder for final map URL.',
+            'final_map_filename': final_map_filename,
+            'updated_at': datetime.utcnow().isoformat()
+        })
+
+    except Exception as e:
+        print(f"Error during map processing for task {task_id}: {e}")
+        MOCK_TASKS[task_id].update({
+            'status': 'FAILURE',
+            'message': f'An internal error occurred: {e}',
+            'updated_at': datetime.utcnow().isoformat()
+        })

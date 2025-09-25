@@ -88,12 +88,21 @@ export const getInitialDevice = (ip) => {
 };
 
 /**
- * Uploads the generated map image and configuration file to the backend.
+ * Uploads the generated map image and configuration file to the backend to start a task.
  * @param {FormData} formData - The form data containing the image, config, map name, and Cacti ID.
- * @returns {Promise<object>} A promise that resolves with the result of the upload.
+ * @returns {Promise<object>} A promise that resolves with the task creation response.
  */
 export const uploadMap = (formData) => {
     return apiClient.post('/upload-map', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
     });
+};
+
+/**
+ * Retrieves the status of a background map creation task.
+ * @param {string} taskId - The ID of the task to check.
+ * @returns {Promise<object>} A promise that resolves with the current task status.
+ */
+export const getTaskStatus = (taskId) => {
+    return apiClient.get(`/task-status/${taskId}`);
 };

@@ -6,6 +6,9 @@ import map_renderer
 import jwt
 from functools import wraps
 from datetime import datetime, timedelta
+import threading
+import uuid
+from io import BytesIO
 
 app = Flask(__name__)
 
@@ -105,13 +108,15 @@ def get_all_cacti_installations_endpoint():
 @token_required
 def upload_map_endpoint():
     """
-    Uploads a weathermap image and config, then renders and saves a final
-    composite image with lines drawn on it.
+    Accepts map data, starts a background process for rendering, and returns a task ID.
     """
     if 'map_image' not in request.files:
         return jsonify({"error": "Map image is required"}), 400
     
-    map_image = request.files['map_image']
+    map_image_file = request.files['map_image']
+    # Read the file into memory to pass it to the background thread safely
+    map_image_bytes = BytesIO(map_image_file.read())
+
     cacti_id = request.form.get('cacti_installation_id')
     map_name = request.form.get('map_name')
     config_content = request.form.get('config_content')
@@ -119,33 +124,43 @@ def upload_map_endpoint():
     if not all([cacti_id, map_name, config_content]):
         return jsonify({"error": "Missing required form data: cacti_installation_id, map_name, or config_content"}), 400
 
-    try:
-        # Step 1: Save the uploaded background image and the modified .conf file
-        saved_paths = services.save_uploaded_map(map_image, config_content, map_name)
-        config_path = saved_paths['config_path']
-        
-        # Step 2: Define the output path for the final rendered map
-        config_filename = os.path.basename(config_path)
-        final_map_filename = config_filename.replace('.conf', '.png')
-        final_map_path = os.path.join('static/final_maps', final_map_filename)
+    task_id = str(uuid.uuid4())
+    
+    # Store the initial task status
+    services.MOCK_TASKS[task_id] = {
+        'id': task_id,
+        'status': 'PENDING',
+        'message': 'Map creation task has been queued.',
+        'updated_at': datetime.utcnow().isoformat()
+    }
+    
+    # Run the long-running map processing task in a background thread
+    thread = threading.Thread(
+        target=services.process_map_task,
+        args=(task_id, map_image_bytes, config_content, map_name)
+    )
+    thread.start()
 
-        # Step 3: Render the final map by drawing lines on the background and save it
-        map_renderer.render_and_save_map(config_path, final_map_path)
+    return jsonify({
+        "task_id": task_id,
+        "message": "Map creation process has been started and is running in the background."
+    }), 202
 
-        # Step 4: Generate a URL for the newly created final map
-        # Use url_for for proper URL generation, pointing to the static file
-        final_map_url = url_for('static', filename=f'final_maps/{final_map_filename}', _external=True)
+@app.route('/task-status/<task_id>', methods=['GET'])
+@token_required
+def get_task_status_endpoint(task_id):
+    """Polls for the status of a background task."""
+    task = services.MOCK_TASKS.get(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    
+    # If the task is successful, generate the final map URL dynamically
+    if task['status'] == 'SUCCESS':
+        final_map_filename = task.get('final_map_filename')
+        if final_map_filename:
+            task['message'] = url_for('static', filename=f'final_maps/{final_map_filename}', _external=True)
 
-        return jsonify({
-            "success": True,
-            "message": f"Map '{map_name}' processed and final image saved successfully.",
-            "map_name": map_name,
-            "paths": saved_paths,
-            "final_map_url": final_map_url
-        })
-    except Exception as e:
-        print(f"Error during map upload and rendering process: {e}")
-        return jsonify({"error": "An internal error occurred while processing the map"}), 500
+    return jsonify(task)
 
 @app.route('/api/devices', methods=['POST'])
 @token_required
