@@ -186,12 +186,13 @@
 
 .close-button {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 0.5rem;   /* reduced so it hugs the corner tighter */
+    right: 0.5rem; /* same here */
     background: none;
+    width: 3rem;
     border: none;
     cursor: pointer;
-    padding: 0.5rem;
+    padding: 0.25rem; /* smaller padding so it doesn’t float inward */
     border-radius: 6px;
     color: #a0aec0;
     transition: all 0.2s ease;
@@ -199,6 +200,7 @@
     align-items: center;
     justify-content: center;
 }
+
 
 .close-button:hover {
     background: rgba(74, 85, 104, 0.3);
