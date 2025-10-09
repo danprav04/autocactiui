@@ -43,6 +43,7 @@
     position: absolute;
     top: 12px;
     right: 12px;
+    width: 2rem;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -94,7 +95,7 @@
 .search-bar .search-icon {
     position: absolute;
     top: 50%;
-    left: 14px;
+    right: 14px;
     transform: translateY(-50%);
     width: 20px;
     height: 20px;
@@ -176,6 +177,7 @@
 
 .add-neighbor-button {
     padding: 6px 14px;
+    width: 4rem;
     font-size: 0.875rem;
     font-weight: 600;
     background-color: var(--accent-success);
