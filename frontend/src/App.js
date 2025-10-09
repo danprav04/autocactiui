@@ -18,6 +18,7 @@ import LoginScreen from './components/Login/LoginScreen';
 import TopToolbar from './components/TopToolbar/TopToolbar';
 import ContextMenu from './components/ContextMenu/ContextMenu';
 import UploadSuccessPopup from './components/common/UploadSuccessPopup';
+import NeighborsPopup from './components/common/NeighborsPopup';
 
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
@@ -26,6 +27,7 @@ import './App.css';
 import './components/TopToolbar/TopToolbar.css';
 import './components/ContextMenu/ContextMenu.css';
 import './components/common/UploadSuccessPopup.css';
+import './components/common/NeighborsPopup.css';
 
 
 export const NodeContext = React.createContext(null);
@@ -38,11 +40,21 @@ function App() {
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [contextMenu, setContextMenu] = useState(null);
   const [uploadSuccessData, setUploadSuccessData] = useState(null);
+  const [neighborPopup, setNeighborPopup] = useState({ isOpen: false, neighbors: [], sourceNode: null });
   
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
   const reactFlowInstance = useRef(null);
   const pollingTimeoutRef = useRef(null);
+
+  // --- Popup Handlers ---
+  const handleShowNeighborPopup = useCallback((neighbors, sourceNode) => {
+    setNeighborPopup({ isOpen: true, neighbors, sourceNode });
+  }, []);
+
+  const handleCloseNeighborPopup = useCallback(() => {
+    setNeighborPopup(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
   // --- Custom Hooks for State and Logic Management ---
   const { theme, toggleTheme } = useThemeManager();
@@ -52,7 +64,7 @@ function App() {
     nodes, setNodes,
     edges, setEdges,
     selectedElements,
-    snapLines, // Get snapLines from the hook
+    snapLines,
     onNodesChange,
     onNodeClick,
     onPaneClick,
@@ -72,7 +84,8 @@ function App() {
     bringToFront,
     sendToBack,
     selectAllByType,
-  } = useMapInteraction(theme);
+    confirmPreviewNode,
+  } = useMapInteraction(theme, handleShowNeighborPopup);
 
   // --- Keyboard Shortcuts for Undo/Redo ---
   useEffect(() => {
@@ -141,6 +154,35 @@ function App() {
       setIsLoading(false);
     }
   };
+
+  const handleAddNeighborFromPopup = useCallback((neighbor) => {
+    const { sourceNode } = neighborPopup;
+    if (!sourceNode) return;
+
+    // To add the node, we reuse the robust `confirmPreviewNode` function.
+    // We create a "dummy" preview node object with just enough information for that function to work.
+    const radius = 250;
+    const angle = Math.random() * 2 * Math.PI; // Position randomly in a circle
+    const position = {
+        x: sourceNode.position.x + radius * Math.cos(angle),
+        y: sourceNode.position.y + radius * Math.sin(angle),
+    };
+
+    const dummyNodeToConfirm = {
+        id: neighbor.ip,
+        position,
+        data: { isPreview: true, hostname: neighbor.neighbor },
+    };
+
+    confirmPreviewNode(dummyNodeToConfirm, setIsLoading, setError);
+
+    // Remove the added neighbor from the popup list to prevent duplicates
+    setNeighborPopup(prev => ({
+        ...prev,
+        neighbors: prev.neighbors.filter(n => n.ip !== neighbor.ip)
+    }));
+
+  }, [neighborPopup, confirmPreviewNode]);
 
   // Clear any pending polling timeouts when component unmounts
   useEffect(() => {
@@ -299,6 +341,13 @@ function App() {
             {error && <p className="error-message">{error}</p>}
             {(isLoading || isUploading) && <p className="loading-message">{isUploading ? t('app.processingMap') : t('app.loading')}</p>}
             <UploadSuccessPopup data={uploadSuccessData} onClose={() => setUploadSuccessData(null)} />
+            <NeighborsPopup
+              isOpen={neighborPopup.isOpen}
+              neighbors={neighborPopup.neighbors}
+              sourceHostname={neighborPopup.sourceNode?.data?.hostname}
+              onAddNeighbor={handleAddNeighborFromPopup}
+              onClose={handleCloseNeighborPopup}
+            />
           </div>
         </div>
       </div>

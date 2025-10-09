@@ -34,6 +34,7 @@
     "availableNeighbors": "Available Neighbors",
     "add": "Add",
     "noNeighbors": "No new neighbors to add.",
+    "tooManyNeighbors": "{{count}} neighbors found. Please use the popup to add devices.",
     "placeholderClickNode": "Click a device or drag on the map to select multiple items.",
     "editGroup": "Edit Group",
     "groupLabel": "Group Label",
@@ -104,5 +105,11 @@
     "username": "Username",
     "password": "Password",
     "button": "Login"
+  },
+  "neighborsPopup": {
+    "title": "Neighbors of {{hostname}}",
+    "subtitle": "{{count}} available neighbors found.",
+    "searchPlaceholder": "Search by name or IP...",
+    "noResults": "No neighbors match your search."
   }
 }

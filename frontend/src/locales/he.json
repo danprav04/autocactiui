@@ -34,6 +34,7 @@
     "availableNeighbors": "שכנים זמינים",
     "add": "הוסף",
     "noNeighbors": "אין שכנים חדשים להוספה.",
+    "tooManyNeighbors": "נמצאו {{count}} שכנים. אנא השתמש בחלון הקופץ להוספת רכיבים.",
     "placeholderClickNode": "לחץ על רכיב או גרור על המפה כדי לבחור מספר פריטים.",
     "editGroup": "ערוך קבוצה",
     "groupLabel": "תווית קבוצה",
@@ -104,5 +105,11 @@
     "username": "שם משתמש",
     "password": "סיסמה",
     "button": "התחבר"
+  },
+  "neighborsPopup": {
+    "title": "שכנים של {{hostname}}",
+    "subtitle": "נמצאו {{count}} שכנים זמינים.",
+    "searchPlaceholder": "חפש לפי שם או IP...",
+    "noResults": "לא נמצאו שכנים התואמים לחיפוש."
   }
 }

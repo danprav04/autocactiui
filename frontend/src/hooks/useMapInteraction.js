@@ -41,7 +41,7 @@ const createEdgeObject = (sourceId, neighborInfo, isPreview = false) => {
 };
 
 
-export const useMapInteraction = (theme) => {
+export const useMapInteraction = (theme, onShowNeighborPopup) => {
   const { state, setState, undo, redo, resetState } = useHistoryState();
   // Defensive fallback to prevent crash if state is ever undefined during a rapid re-render
   const { nodes, edges } = state || { nodes: [], edges: [] };
@@ -115,13 +115,9 @@ export const useMapInteraction = (theme) => {
 
         const neighborsToConnect = allNeighbors.filter(n => nodeIdsOnMap.has(n.ip));
         const neighborsToAddAsPreview = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
-        setCurrentNeighbors(neighborsToAddAsPreview);
-
+        
         const edgesToCreate = [];
         const existingEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
-        
-        // Create a set of existing connections to prevent duplicates from the reverse direction.
-        // The key is a sorted combination of source and target IPs.
         const existingConnections = new Set(
             edgesWithoutPreviews.map(e => [e.source, e.target].sort().join('--'))
         );
@@ -129,17 +125,22 @@ export const useMapInteraction = (theme) => {
         neighborsToConnect.forEach(neighbor => {
             const newEdgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
             const connectionKey = [sourceNode.id, neighbor.ip].sort().join('--');
-
-            // If an edge with this exact ID already exists OR if a connection between these two nodes
-            // has already been established (from the other direction), skip.
             if (existingEdgeIds.has(newEdgeId) || existingConnections.has(connectionKey)) {
                 return;
             }
-            
             edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor, false));
         });
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
 
+        // --- NEW LOGIC: Decide between popup and on-map previews ---
+        if (neighborsToAddAsPreview.length > 10) {
+            onShowNeighborPopup(neighborsToAddAsPreview, sourceNode);
+            setCurrentNeighbors(neighborsToAddAsPreview); // For sidebar message
+            // Return state with only permanent elements added/cleaned
+            return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
+        }
+
+        setCurrentNeighbors(neighborsToAddAsPreview);
         if (neighborsToAddAsPreview.length === 0) {
             return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
         }
@@ -170,14 +171,13 @@ export const useMapInteraction = (theme) => {
     } finally {
       setLoading(false);
     }
-  }, [setState, createNodeObject, t]);
+  }, [setState, createNodeObject, t, onShowNeighborPopup]);
 
   const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
     setLoading(true);
     setError('');
     
     try {
-        // 1. Fetch all necessary data before updating state
         const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
         if (deviceResponse.data.error) {
             throw new Error(`No device info for ${nodeToConfirm.id}`);
@@ -187,26 +187,21 @@ export const useMapInteraction = (theme) => {
         const neighborsResponse = await api.getDeviceNeighbors(nodeToConfirm.id);
         const allNeighborsOfNewNode = neighborsResponse.data.neighbors || [];
 
-        // 2. Perform a single, atomic state update with all changes
         setState(prev => {
-            // Create the new, permanent node
             const newNode = createNodeObject(confirmedNodeData, nodeToConfirm.position);
             newNode.selected = true;
-            setSelectedElements([newNode]); // Update local selection state
+            setSelectedElements([newNode]);
 
-            // Get a complete list of all permanent nodes that will be on the map
             const permanentNodeIdsOnMap = new Set(
                 prev.nodes.filter(n => !n.data.isPreview).map(n => n.id)
             );
             permanentNodeIdsOnMap.add(newNode.id);
 
-            // Filter out the old preview nodes
             const nextNodes = prev.nodes
-                .filter(n => !n.data.isPreview)
-                .map(n => ({ ...n, selected: false })); // Deselect old nodes
+                .filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id) // Also filter out the placeholder if it exists
+                .map(n => ({ ...n, selected: false }));
             nextNodes.push(newNode);
 
-            // Update edges: make the preview edge permanent
             const nextEdges = prev.edges
                 .filter(e => !e.data.isPreview || e.target === nodeToConfirm.id || e.source === nodeToConfirm.id)
                 .map(e => {
@@ -219,22 +214,23 @@ export const useMapInteraction = (theme) => {
             const existingEdgeIds = new Set(nextEdges.map(e => e.id));
             const existingConnections = new Set(nextEdges.map(e => [e.source, e.target].sort().join('--')));
             
-            // Add new permanent edges from the new node to existing nodes
             const neighborsToConnect = allNeighborsOfNewNode.filter(n => permanentNodeIdsOnMap.has(n.ip));
             neighborsToConnect.forEach(neighbor => {
                 const newEdgeId = `e-${newNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
                 const connectionKey = [newNode.id, neighbor.ip].sort().join('--');
-
                 if (!existingEdgeIds.has(newEdgeId) && !existingConnections.has(connectionKey)) {
                     nextEdges.push(createEdgeObject(newNode.id, neighbor, false));
                 }
             });
 
-            // Add new preview nodes for neighbors not yet on the map
             const neighborsToAddAsPreview = allNeighborsOfNewNode.filter(n => !permanentNodeIdsOnMap.has(n.ip));
-            setCurrentNeighbors(neighborsToAddAsPreview); // for the sidebar list
-
-            if (neighborsToAddAsPreview.length > 0) {
+            
+            // --- RE-APPLY POPUP LOGIC for the newly added node ---
+            if (neighborsToAddAsPreview.length > 10) {
+                onShowNeighborPopup(neighborsToAddAsPreview, newNode);
+                setCurrentNeighbors(neighborsToAddAsPreview);
+            } else if (neighborsToAddAsPreview.length > 0) {
+                setCurrentNeighbors(neighborsToAddAsPreview);
                 const radius = 250;
                 const angleStep = (2 * Math.PI) / neighborsToAddAsPreview.length;
                 neighborsToAddAsPreview.forEach((neighbor, index) => {
@@ -248,6 +244,8 @@ export const useMapInteraction = (theme) => {
                     nextNodes.push(previewNode);
                     nextEdges.push(createEdgeObject(newNode.id, neighbor, true));
                 });
+            } else {
+                 setCurrentNeighbors([]);
             }
 
             return { nodes: nextNodes, edges: nextEdges };
@@ -259,7 +257,7 @@ export const useMapInteraction = (theme) => {
     } finally {
         setLoading(false);
     }
-}, [setState, createNodeObject, clearPreviewElements, t]);
+  }, [setState, createNodeObject, clearPreviewElements, t, onShowNeighborPopup]);
 
   const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
       const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
@@ -269,16 +267,13 @@ export const useMapInteraction = (theme) => {
   }, [nodes, confirmPreviewNode]);
 
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
-    // If a preview node is clicked, confirm it and stop further processing.
     if (node.data.isPreview) {
-        // The confirm function now handles its own loading/error state.
         confirmPreviewNode(node, setLoading, setError);
         return;
     }
     
     const isNodeAlreadySelected = selectedElements.some(el => el.id === node.id);
 
-    // If it's a context menu click on an already selected node, do nothing to the selection.
     if (isContextMenu && isNodeAlreadySelected) {
         return;
     }
@@ -291,13 +286,9 @@ export const useMapInteraction = (theme) => {
             ? selectedElements.filter(el => el.id !== node.id)
             : [...selectedElements, node];
     } else {
-        // This case now handles:
-        // - Plain left-click (always re-selects)
-        // - Context menu on a new node (selects it)
         newSelectedNodes = [node];
     }
 
-    // Update selection state and clear any old previews
     setSelectedElements(newSelectedNodes);
     clearPreviewElements();
 
@@ -306,7 +297,6 @@ export const useMapInteraction = (theme) => {
         nodes: prev.nodes.map(n => ({...n, selected: newSelectedNodes.some(sn => sn.id === n.id)}))
     }), true);
 
-    // If a single device is now selected, fetch its neighbors to show as previews.
     if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
         handleFetchNeighbors(newSelectedNodes[0], setLoading, setError);
     } else {
@@ -326,7 +316,6 @@ export const useMapInteraction = (theme) => {
 
   const onSelectionChange = useCallback(({ nodes: selectedNodes }) => {
       setSelectedElements(selectedNodes);
-      // Clear preview elements if the selection is not a single device node.
       if (selectedNodes.length !== 1 || (selectedNodes.length === 1 && selectedNodes[0].type !== 'custom')) {
           clearPreviewElements();
           setCurrentNeighbors([]);
@@ -335,7 +324,7 @@ export const useMapInteraction = (theme) => {
   
   const handleDeleteElements = useCallback(() => {
     baseHandleDeleteElements(selectedElements);
-    setSelectedElements([]); // Clear local selection state after deletion
+    setSelectedElements([]);
   }, [baseHandleDeleteElements, selectedElements]);
 
   const onNodesChange = useCallback((changes) => {
@@ -343,11 +332,10 @@ export const useMapInteraction = (theme) => {
     const isDragEnd = changes.some(c => c.type === 'position' && c.dragging === false);
 
     if (!isDrag && !isDragEnd) {
-        setSnapLines([]); // Clear lines if not dragging
+        setSnapLines([]);
     }
 
     setState(prev => {
-        // --- DRAG START: Identify children of dragged groups ---
         if (isDrag && !dragContext.current) {
             const context = { childrenMap: new Map() };
             const movedGroupIds = new Set(
@@ -362,13 +350,12 @@ export const useMapInteraction = (theme) => {
                 for (const node of potentialChildren) {
                     const parentGroup = prev.nodes
                         .filter(g => movedGroupIds.has(g.id) &&
-                            // A node is a child if its entire bounding box is inside the group
                             node.position.x >= g.position.x &&
                             (node.position.x + (node.width || NODE_WIDTH)) <= (g.position.x + g.data.width) &&
                             node.position.y >= g.position.y &&
                             (node.position.y + (node.height || NODE_HEIGHT)) <= (g.position.y + g.data.height)
                         )
-                        .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0]; // Respect z-index
+                        .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0];
                     
                     if (parentGroup) {
                         if (!context.childrenMap.has(parentGroup.id)) {
@@ -381,12 +368,10 @@ export const useMapInteraction = (theme) => {
             dragContext.current = context;
         }
 
-        // --- SNAPPING LOGIC ---
         if (isDrag) {
             const draggedNodeIds = new Set(changes.filter(c => c.dragging).map(c => c.id));
             const draggedNodes = prev.nodes.filter(n => draggedNodeIds.has(n.id));
             
-            // We need to apply the current drag delta to the nodes before calculating snaps
             const updatedDraggedNodes = draggedNodes.map(dn => {
                 const change = changes.find(c => c.id === dn.id && c.position);
                 return change ? { ...dn, position: change.position } : dn;
@@ -395,7 +380,6 @@ export const useMapInteraction = (theme) => {
             const { snapLines, positionAdjustment } = calculateSnaps(updatedDraggedNodes, prev.nodes);
             setSnapLines(snapLines);
 
-            // Apply snap adjustment to the changes
             changes.forEach(change => {
                 if (draggedNodeIds.has(change.id) && change.position) {
                     change.position.x += positionAdjustment.x;
@@ -404,11 +388,8 @@ export const useMapInteraction = (theme) => {
             });
         }
 
-        // --- APPLY CHANGES ---
         let nextNodes = applyNodeChanges(changes, prev.nodes);
 
-        // --- GROUP DRAGGING LOGIC ---
-        // If groups are being dragged, move their pre-identified children
         if (isDrag && dragContext.current && dragContext.current.childrenMap.size > 0) {
             const groupDeltas = new Map();
             const positionChanges = changes.filter(c => c.type === 'position' && c.position);
@@ -457,10 +438,9 @@ export const useMapInteraction = (theme) => {
 
     }, !isDragEnd);
 
-    // After state update, clear the context on drag end
     if (isDragEnd) {
         dragContext.current = null;
-        setSnapLines([]); // Also clear lines on drag end
+        setSnapLines([]);
     }
   }, [setState]);
 
@@ -470,7 +450,6 @@ export const useMapInteraction = (theme) => {
     setCurrentNeighbors([]);
   }, [resetState]);
   
-  // Expose a function that needs `updateSelection`
   const selectAllByTypeHandler = useCallback((iconType) => {
     selectAllByType(iconType, setSelectedElements);
   }, [selectAllByType, setSelectedElements]);
@@ -479,7 +458,7 @@ export const useMapInteraction = (theme) => {
     nodes, setNodes: (newNodes) => setState(prev => ({...prev, nodes: typeof newNodes === 'function' ? newNodes(prev.nodes) : newNodes}), true),
     edges, setEdges: (newEdges) => setState(prev => ({...prev, edges: typeof newEdges === 'function' ? newEdges(prev.edges) : newEdges}), true),
     selectedElements,
-    snapLines, // Expose snap lines
+    snapLines,
     onNodesChange,
     onNodeClick,
     onPaneClick,
@@ -501,5 +480,6 @@ export const useMapInteraction = (theme) => {
     selectAllByType: selectAllByTypeHandler,
     currentNeighbors,
     confirmNeighbor,
+    confirmPreviewNode,
   };
 };
