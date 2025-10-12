@@ -34,13 +34,14 @@ export const NodeContext = React.createContext(null);
 
 function App() {
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false); // Renamed for clarity on what it blocks
   const [isUploading, setIsUploading] = useState(false);
   const [mapName, setMapName] = useState('My-Network-Map');
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [contextMenu, setContextMenu] = useState(null);
   const [uploadSuccessData, setUploadSuccessData] = useState(null);
   const [neighborPopup, setNeighborPopup] = useState({ isOpen: false, neighbors: [], sourceNode: null });
+  const [mapInteractionLoading, setMapInteractionLoading] = useState(false); // New state for loading during map interaction
   
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
@@ -64,6 +65,7 @@ function App() {
     edges, setEdges,
     selectedElements,
     snapLines,
+    currentNeighbors, // Added currentNeighbors from hook
     onNodesChange,
     onNodeClick,
     onPaneClick,
@@ -84,7 +86,25 @@ function App() {
     sendToBack,
     selectAllByType,
     confirmPreviewNode,
+    confirmNeighbor,
+    setLoading: setMapHookLoading, // Use setter from map hook
+    setError: setMapHookError, // Use setter from map hook
   } = useMapInteraction(theme, handleShowNeighborPopup);
+
+  // Sync the hook's loading/error states with App.js for global notifications
+  const setIsLoading = useCallback((value) => {
+      setMapInteractionLoading(value);
+      setMapHookLoading(value);
+  }, [setMapHookLoading]);
+
+  const setAppError = useCallback((message) => {
+      setError(message);
+      setMapHookError(message);
+      // Clear error after a delay
+      if (message) {
+          setTimeout(() => setError(''), 5000);
+      }
+  }, [setMapHookError]);
 
   // --- Keyboard Shortcuts for Undo/Redo ---
   useEffect(() => {
@@ -110,17 +130,17 @@ function App() {
 
   // --- Authentication Handlers ---
   const handleLogin = async (username, password) => {
-    setIsLoading(true);
-    setError('');
+    setIsAuthLoading(true);
+    setAppError('');
     try {
       const response = await api.login(username, password);
       const newToken = response.data.token;
       localStorage.setItem('token', newToken);
       setToken(newToken);
     } catch (err) {
-      setError(t('app.errorLogin'));
+      setAppError(t('app.errorLogin'));
     } finally {
-      setIsLoading(false);
+      setIsAuthLoading(false);
     }
   };
 
@@ -135,10 +155,10 @@ function App() {
   const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
   
   const handleStart = async (ip, initialIconName) => {
-    if (!ip) { setError(t('app.errorStartIp')); return; }
+    if (!ip) { setAppError(t('app.errorStartIp')); return; }
     
-    setIsLoading(true);
-    setError('');
+    setIsLoading(true); // This sets both App.js and the hook's loading state
+    setAppError('');
     
     try {
       const response = await api.getInitialDevice(ip);
@@ -146,9 +166,10 @@ function App() {
       setNodes([newNode]);
       setEdges([]);
       // Simulate click to select the first node and fetch its neighbors
-      onNodeClick(null, newNode, setIsLoading, setError);
+      // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
+      onNodeClick(null, newNode, setIsLoading, setAppError); 
     } catch (err) {
-      setError(t('app.errorInitialDevice'));
+      setAppError(t('app.errorInitialDevice'));
       resetMap();
       setIsLoading(false);
     }
@@ -157,23 +178,9 @@ function App() {
   const handleAddNeighborFromPopup = useCallback((neighbor) => {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
-
-    // To add the node, we reuse the robust `confirmPreviewNode` function.
-    // We create a "dummy" preview node object with just enough information for that function to work.
-    const radius = 250;
-    const angle = Math.random() * 2 * Math.PI; // Position randomly in a circle
-    const position = {
-        x: sourceNode.position.x + radius * Math.cos(angle),
-        y: sourceNode.position.y + radius * Math.sin(angle),
-    };
-
-    const dummyNodeToConfirm = {
-        id: neighbor.ip,
-        position,
-        data: { isPreview: true, hostname: neighbor.neighbor },
-    };
-
-    confirmPreviewNode(dummyNodeToConfirm, setIsLoading, setError);
+    
+    // To add the node, we call the hook's function to confirm the neighbor.
+    confirmNeighbor(neighbor, setIsLoading, setAppError);
 
     // Remove the added neighbor from the popup list to prevent duplicates
     setNeighborPopup(prev => ({
@@ -181,14 +188,14 @@ function App() {
         neighbors: prev.neighbors.filter(n => n.ip !== neighbor.ip)
     }));
 
-  }, [neighborPopup, confirmPreviewNode]);
+  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError]);
 
   const handleCreateMap = async () => {
-    if (!reactFlowWrapper.current || nodes.length === 0) { setError(t('app.errorEmptyMap')); return; }
-    if (!selectedCactiGroupId) { setError(t('app.errorSelectCacti')); return; }
+    if (!reactFlowWrapper.current || nodes.length === 0) { setAppError(t('app.errorEmptyMap')); return; }
+    if (!selectedCactiGroupId) { setAppError(t('app.errorSelectCacti')); return; }
     
     setIsUploading(true);
-    setError('');
+    setAppError('');
     
     try {
       const taskResponse = await handleUploadProcess({
@@ -203,7 +210,7 @@ function App() {
       });
       setUploadSuccessData(taskResponse);
     } catch (err) {
-      setError(t('app.errorUpload'));
+      setAppError(t('app.errorUpload'));
       console.error(err);
     } finally {
       setIsUploading(false);
@@ -212,8 +219,9 @@ function App() {
 
   const onNodeClickHandler = useCallback((event, node) => {
       setContextMenu(null); // Close context menu on any node click
-      onNodeClick(event, node, setIsLoading, setError);
-  }, [onNodeClick]);
+      // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
+      onNodeClick(event, node, setIsLoading, setAppError); 
+  }, [onNodeClick, setIsLoading, setAppError]);
 
   const onPaneClickHandler = useCallback(() => {
     onPaneClick();
@@ -223,13 +231,16 @@ function App() {
   const handleNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
     // Trigger selection logic before opening the menu
-    onNodeClick(event, node, setIsLoading, setError, true);
+    // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
+    onNodeClick(event, node, setIsLoading, setAppError, true);
     setContextMenu({ node, top: event.clientY, left: event.clientX });
-  }, [onNodeClick]);
+  }, [onNodeClick, setIsLoading, setAppError]);
 
   if (!token) {
-    return <LoginScreen onLogin={handleLogin} error={error} isLoading={isLoading} />;
+    return <LoginScreen onLogin={handleLogin} error={error} isLoading={isAuthLoading} />;
   }
+
+  const selectedCustomNode = selectedElements.length === 1 && selectedElements[0].type === 'custom' ? selectedElements[0] : null;
 
   return (
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
@@ -257,6 +268,8 @@ function App() {
           sendBackward={sendBackward}
           bringToFront={bringToFront}
           sendToBack={sendToBack}
+          neighbors={selectedCustomNode ? currentNeighbors.filter(n => !nodes.some(node => node.id === n.ip)) : []}
+          onAddNeighbor={confirmNeighbor}
         />
         <div className="main-content" ref={reactFlowWrapper}>
           <TopToolbar
@@ -273,7 +286,7 @@ function App() {
               <div className="startup-wrapper">
                 <StartupScreen 
                   onStart={handleStart} 
-                  isLoading={isLoading}
+                  isLoading={isAuthLoading || mapInteractionLoading}
                   availableIcons={availableIcons}
                 />
               </div>
@@ -308,7 +321,11 @@ function App() {
               />
             )}
             {error && <p className="error-message">{error}</p>}
-            {(isLoading || isUploading) && <p className="loading-message">{isUploading ? t('app.processingMap') : t('app.loading')}</p>}
+            {(isAuthLoading || isUploading || mapInteractionLoading) && (
+              <p className="loading-message">
+                {isUploading ? t('app.processingMap') : t('app.loading')}
+              </p>
+            )}
             <UploadSuccessPopup data={uploadSuccessData} onClose={() => setUploadSuccessData(null)} />
             <NeighborsPopup
               isOpen={neighborPopup.isOpen}

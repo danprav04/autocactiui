@@ -49,6 +49,8 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   const [selectedElements, setSelectedElements] = useState([]);
   const [currentNeighbors, setCurrentNeighbors] = useState([]);
   const [snapLines, setSnapLines] = useState([]); // State for snap lines
+  const [isLoading, setIsLoading] = useState(false); // Local loading state (for API calls)
+  const [error, setError] = useState(''); // Local error state
   const { t } = useTranslation();
   const dragContext = useRef(null); // Ref to store context across drag events
 
@@ -88,7 +90,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   // Helper to remove temporary preview nodes and edges
   const clearPreviewElements = useCallback(() => {
       setState(prev => {
-          if (!prev) return;
+          if (!prev) return prev;
           const nextNodes = prev.nodes.filter(n => !n.data.isPreview);
           const nextEdges = prev.edges.filter(e => !e.data.isPreview);
           // Only update state if there were changes
@@ -109,8 +111,13 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
       setState(prev => {
         if (!prev) return prev;
         
-        const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview);
+        // Remove existing previews, but maintain selection state
+        const nodesWithoutPreviews = prev.nodes
+          .filter(n => !n.data.isPreview)
+          .map(n => ({ ...n, selected: n.id === sourceNode.id })); // Ensure sourceNode remains selected
+          
         const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
+        
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
 
         const neighborsToConnect = allNeighbors.filter(n => nodeIdsOnMap.has(n.ip));
@@ -136,12 +143,13 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         if (neighborsToAddAsPreview.length > 10) {
             onShowNeighborPopup(neighborsToAddAsPreview, sourceNode);
             setCurrentNeighbors(neighborsToAddAsPreview); // For sidebar message
-            // Return state with only permanent elements added/cleaned
+            setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id)); 
             return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
         }
 
         setCurrentNeighbors(neighborsToAddAsPreview);
         if (neighborsToAddAsPreview.length === 0) {
+            setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id));
             return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
         }
         
@@ -164,6 +172,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             previewEdges.push(createEdgeObject(sourceNode.id, neighbor, true));
         });
         
+        setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id));
         return { nodes: [...nodesWithoutPreviews, ...previewNodes], edges: [...edgesWithNewConnections, ...previewEdges] };
       });
     } catch (err) {
@@ -171,12 +180,15 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     } finally {
       setLoading(false);
     }
-  }, [setState, createNodeObject, t, onShowNeighborPopup]);
+  }, [setState, createNodeObject, t, onShowNeighborPopup, setSelectedElements]);
 
   const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
     setLoading(true);
     setError('');
     
+    // Find the ID of the node that initiated the preview
+    const sourceNodeId = edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview)?.source;
+
     try {
         const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
         if (deviceResponse.data.error) {
@@ -189,31 +201,35 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
 
         setState(prev => {
             const newNode = createNodeObject(confirmedNodeData, nodeToConfirm.position);
-            newNode.selected = true;
-            setSelectedElements([newNode]);
+            newNode.selected = false; 
 
-            const permanentNodeIdsOnMap = new Set(
-                prev.nodes.filter(n => !n.data.isPreview).map(n => n.id)
-            );
-            permanentNodeIdsOnMap.add(newNode.id);
-
-            const nextNodes = prev.nodes
-                .filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id) // Also filter out the placeholder if it exists
-                .map(n => ({ ...n, selected: false }));
+            // Filter out all existing preview elements
+            const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview);
+            const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
+            
+            // Remove the node that was just confirmed (it was a preview node in the previous state)
+            const nextNodes = nodesWithoutPreviews.filter(n => n.id !== nodeToConfirm.id);
             nextNodes.push(newNode);
 
-            const nextEdges = prev.edges
-                .filter(e => !e.data.isPreview || e.target === nodeToConfirm.id || e.source === nodeToConfirm.id)
-                .map(e => {
-                    if (e.target === nodeToConfirm.id || e.source === nodeToConfirm.id) {
-                        return { ...e, style: { stroke: '#6c757d' }, data: { ...e.data, isPreview: false }, animated: true };
-                    }
-                    return e;
-                });
+            // Re-select the source node that was selected BEFORE the new one was added
+            const sourceNode = nextNodes.find(n => n.id === sourceNodeId);
+            if (sourceNode) {
+                // Ensure only the source node is selected
+                nextNodes.forEach(n => n.selected = n.id === sourceNodeId); 
+            }
+            
+            // Promote preview edges connected to the new node to permanent
+            const edgesToPromote = prev.edges
+                .filter(e => e.data.isPreview && (e.target === nodeToConfirm.id || e.source === nodeToConfirm.id))
+                .map(e => ({ ...e, style: { stroke: '#6c757d' }, data: { ...e.data, isPreview: false }, animated: false }));
+            
+            const nextEdges = [...edgesWithoutPreviews, ...edgesToPromote];
 
+            const permanentNodeIdsOnMap = new Set(nextNodes.filter(n => !n.data.isPreview).map(n => n.id));
             const existingEdgeIds = new Set(nextEdges.map(e => e.id));
             const existingConnections = new Set(nextEdges.map(e => [e.source, e.target].sort().join('--')));
             
+            // Add any new connections for the added device to existing permanent nodes
             const neighborsToConnect = allNeighborsOfNewNode.filter(n => permanentNodeIdsOnMap.has(n.ip));
             neighborsToConnect.forEach(neighbor => {
                 const newEdgeId = `e-${newNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
@@ -222,32 +238,47 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
                     nextEdges.push(createEdgeObject(newNode.id, neighbor, false));
                 }
             });
-
-            const neighborsToAddAsPreview = allNeighborsOfNewNode.filter(n => !permanentNodeIdsOnMap.has(n.ip));
             
-            // --- RE-APPLY POPUP LOGIC for the newly added node ---
-            if (neighborsToAddAsPreview.length > 10) {
-                onShowNeighborPopup(neighborsToAddAsPreview, newNode);
-                setCurrentNeighbors(neighborsToAddAsPreview);
-            } else if (neighborsToAddAsPreview.length > 0) {
-                setCurrentNeighbors(neighborsToAddAsPreview);
+            // --- Re-apply neighbor/preview logic for the source node ---
+            if (sourceNode) {
+                // Find the original source node's full list of neighbors
+                const sourceNeighbors = currentNeighbors;
+
+                const remainingNeighbors = sourceNeighbors.filter(n => !permanentNodeIdsOnMap.has(n.ip));
+                setCurrentNeighbors(remainingNeighbors); // Update remaining neighbors in state
+                
+                // If the source node has many remaining neighbors, open the popup
+                if (remainingNeighbors.length > 10) {
+                    onShowNeighborPopup(remainingNeighbors, sourceNode);
+                    // No on-map previews needed
+                    return { nodes: nextNodes, edges: nextEdges };
+                }
+
+                // Otherwise, generate previews for the remaining neighbors
+                const previewNodes = [];
+                const previewEdges = [];
                 const radius = 250;
-                const angleStep = (2 * Math.PI) / neighborsToAddAsPreview.length;
-                neighborsToAddAsPreview.forEach((neighbor, index) => {
+                const angleStep = (2 * Math.PI) / remainingNeighbors.length;
+                
+                remainingNeighbors.forEach((neighbor, index) => {
                     const angle = angleStep * index - (Math.PI / 2);
                     const position = {
-                        x: newNode.position.x + radius * Math.cos(angle),
-                        y: newNode.position.y + radius * Math.sin(angle)
+                        x: sourceNode.position.x + radius * Math.cos(angle),
+                        y: sourceNode.position.y + radius * Math.sin(angle)
                     };
                     const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
                     previewNode.data.isPreview = true;
-                    nextNodes.push(previewNode);
-                    nextEdges.push(createEdgeObject(newNode.id, neighbor, true));
+                    previewNodes.push(previewNode);
+                    previewEdges.push(createEdgeObject(sourceNode.id, neighbor, true));
                 });
-            } else {
-                 setCurrentNeighbors([]);
+
+                setSelectedElements([sourceNode]);
+                return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
             }
 
+            // Fallback for unexpected selection state
+            setSelectedElements([]);
+            setCurrentNeighbors([]);
             return { nodes: nextNodes, edges: nextEdges };
         });
 
@@ -257,12 +288,24 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     } finally {
         setLoading(false);
     }
-  }, [setState, createNodeObject, clearPreviewElements, t, onShowNeighborPopup]);
+  }, [edges, currentNeighbors, setState, createNodeObject, clearPreviewElements, t, onShowNeighborPopup, setSelectedElements]);
 
   const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
+      // Find the preview node by IP (if it exists)
       const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
+      
       if (nodeToConfirm) {
+          // If a preview node exists, click it to confirm
           confirmPreviewNode(nodeToConfirm, setLoading, setError);
+      } else {
+          // If no preview node exists (e.g., adding from a popup), create one manually
+          // The coordinates here are placeholders, but the core logic handles the confirmation.
+          const dummyNodeToConfirm = {
+              id: neighbor.ip,
+              position: {x: 0, y: 0}, 
+              data: { isPreview: true, hostname: neighbor.neighbor },
+          };
+          confirmPreviewNode(dummyNodeToConfirm, setLoading, setError);
       }
   }, [nodes, confirmPreviewNode]);
 
@@ -298,7 +341,8 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     }), true);
 
     if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
-        handleFetchNeighbors(newSelectedNodes[0], setLoading, setError);
+        // Pass the App.js-scoped setters for error/loading notification
+        handleFetchNeighbors(newSelectedNodes[0], setLoading, setError); 
     } else {
         setCurrentNeighbors([]);
     }
@@ -330,7 +374,8 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   const onNodesChange = useCallback((changes) => {
     const isDrag = changes.some(c => c.type === 'position' && c.dragging);
     const isDragEnd = changes.some(c => c.type === 'position' && c.dragging === false);
-
+    
+    // Crucially, we DO NOT check the `isLoading` state here. Dragging is always allowed.
     if (!isDrag && !isDragEnd) {
         setSnapLines([]);
     }
@@ -481,5 +526,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     currentNeighbors,
     confirmNeighbor,
     confirmPreviewNode,
+    setLoading: setIsLoading, // Expose local loading state setter
+    setError: setError, // Expose local error state setter
   };
 };

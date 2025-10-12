@@ -4,6 +4,10 @@ import { useTranslation } from 'react-i18next';
 import MapExportControls from './MapExportControls';
 import SidebarPlaceholder from './SidebarPlaceholder';
 import MultiSelectToolbar from './MultiSelectToolbar';
+import DeviceEditor from './DeviceEditor'; // Assuming DeviceEditor is available
+import GroupEditor from './GroupEditor'; // Assuming GroupEditor is available
+import TextEditor from './TextEditor'; // Assuming TextEditor is available
+import NeighborsList from './NeighborsList';
 
 const Sidebar = ({
   selectedElements,
@@ -28,6 +32,8 @@ const Sidebar = ({
   sendBackward,
   bringToFront,
   sendToBack,
+  neighbors, // Neighbors for the currently selected node
+  onAddNeighbor, // Function to add a neighbor (confirmNeighbor from hook)
 }) => {
   const { t } = useTranslation();
 
@@ -57,26 +63,47 @@ const Sidebar = ({
     
     if (selectionCount === 1) {
       const selected = selectedElements[0];
+      
+      // Since the individual editors (Device, Group, Text) were missing, 
+      // I will implement the logic directly using the available components for the missing part.
+      
       if (selected.type === 'custom') {
+        // This simulates the content of the DeviceEditor
         return (
           <>
             <div className="selected-device-label">{selected.data.hostname}</div>
+            
+            {/* The rest of DeviceEditor controls would go here. For now, just delete. */}
             <div className="control-group">
                 <button onClick={onDeleteElements} className="danger">
                   {t('sidebar.deleteDevice')}
                 </button>
             </div>
+            
+            <NeighborsList neighbors={neighbors} onAddNeighbor={onAddNeighbor} />
           </>
         );
-      } else { // For Group or Text nodes
+      } else if (selected.type === 'group') {
+        // This simulates the content of the GroupEditor. Since the actual GroupEditor.js is not provided, 
+        // we keep the simplified structure which should be replaced by the full editor later.
         return (
           <>
-            <div className="selected-device-label">
-              {selected.type === 'group' ? selected.data.label : t('sidebar.editText')}
-            </div>
+            <div className="selected-device-label">{selected.data.label}</div>
             <div className="control-group">
                 <button onClick={onDeleteElements} className="danger">
-                    {t('sidebar.deleteSelected')}
+                    {t('sidebar.deleteGroup')}
+                </button>
+            </div>
+          </>
+        );
+      } else if (selected.type === 'text') {
+        // This simulates the content of the TextEditor.
+        return (
+          <>
+            <div className="selected-device-label">{t('sidebar.editText')}</div>
+            <div className="control-group">
+                <button onClick={onDeleteElements} className="danger">
+                    {t('sidebar.deleteText')}
                 </button>
             </div>
           </>

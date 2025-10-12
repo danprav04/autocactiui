@@ -6,6 +6,66 @@ const apiClient = axios.create({
     baseURL: process.env.REACT_APP_API_URL
 });
 
+// --- Caching Configuration ---
+const cache = {};
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+/**
+ * Checks cache for a GET request. If found and valid, returns a resolved Promise with the cached data.
+ * @param {string} url - The URL to check in the cache.
+ * @returns {Promise<object> | null} A resolved Promise with the cached data if hit, otherwise null.
+ */
+const getFromCache = (url) => {
+    const cachedEntry = cache[url];
+    const now = Date.now();
+
+    if (cachedEntry && now < cachedEntry.expiry) {
+        // Return a mock Axios response object wrapped in a resolved promise
+        const mockResponse = {
+            data: cachedEntry.data,
+            status: 200,
+            statusText: 'OK (Cached)',
+            headers: {},
+            config: { url },
+            isCached: true // Custom flag for debugging/logging if needed
+        };
+        return Promise.resolve(mockResponse);
+    }
+    return null;
+};
+
+/**
+ * Stores data in the cache for a GET request.
+ * @param {string} url - The URL key for the cache.
+ * @param {object} data - The data to cache.
+ */
+const setToCache = (url, data) => {
+    cache[url] = {
+        data: data,
+        expiry: Date.now() + CACHE_DURATION
+    };
+};
+
+/**
+ * A wrapper for all GET requests to implement caching.
+ * Only non-transient data like device info, neighbors, and cacti groups are cached.
+ * Task status is NOT cached.
+ * @param {string} url - The API endpoint.
+ * @param {object} [config={}] - Axios request config.
+ * @returns {Promise<object>} The Axios response.
+ */
+const cachedGet = (url, config = {}) => {
+    const cachedPromise = getFromCache(url);
+    if (cachedPromise) {
+        return cachedPromise;
+    }
+    
+    return apiClient.get(url, config).then(response => {
+        setToCache(url, response.data);
+        return response;
+    });
+};
+
 // Use a request interceptor to automatically add the auth token to every request.
 apiClient.interceptors.request.use(
     (config) => {
@@ -23,7 +83,6 @@ apiClient.interceptors.request.use(
 // Use a response interceptor to handle 401 Unauthorized errors globally.
 apiClient.interceptors.response.use(
     (response) => {
-        // If the request is successful, just return the response.
         return response;
     },
     (error) => {
@@ -32,7 +91,6 @@ apiClient.interceptors.response.use(
             // Clear the invalid/expired token from storage.
             localStorage.removeItem('token');
             // Redirect the user to the login page by reloading the application.
-            // The App component will detect the absence of a token and show the LoginScreen.
             window.location.href = '/';
         }
         // For all other errors, reject the promise to allow for local error handling.
@@ -57,7 +115,7 @@ export const login = (username, password) => {
  * @returns {Promise<object>} A promise that resolves to the device's information.
  */
 export const getDeviceInfo = (ip) => {
-    return apiClient.get(`/get-device-info/${ip}`);
+    return cachedGet(`/get-device-info/${ip}`);
 };
 
 /**
@@ -66,7 +124,7 @@ export const getDeviceInfo = (ip) => {
  * @returns {Promise<object>} A promise that resolves to the list of neighbors.
  */
 export const getDeviceNeighbors = (ip) => {
-    return apiClient.get(`/get-device-neighbors/${ip}`);
+    return cachedGet(`/get-device-neighbors/${ip}`);
 };
 
 /**
@@ -74,7 +132,7 @@ export const getDeviceNeighbors = (ip) => {
  * @returns {Promise<object>} A promise that resolves to the list of Cacti groups.
  */
 export const getCactiGroups = () => {
-    return apiClient.get('/groups');
+    return cachedGet('/groups');
 };
 
 /**
@@ -104,5 +162,6 @@ export const createMap = (formData) => {
  * @returns {Promise<object>} A promise that resolves with the current task status.
  */
 export const getTaskStatus = (taskId) => {
+    // Task status is transient and must not be cached.
     return apiClient.get(`/task-status/${taskId}`);
 };
