@@ -20,8 +20,8 @@
     border-radius: 12px;
     box-shadow: 0 10px 30px var(--shadow-color);
     width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
+    max-width: 850px; /* Increased width for horizontal layout */
+    height: 70vh; /* Use height instead of max-height */
     display: flex;
     flex-direction: column;
     position: relative;
@@ -70,26 +70,51 @@
     height: 20px;
 }
 
-.neighbor-popup-content h2 {
+.neighbor-popup-header {
+    flex-shrink: 0;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color-light);
+    margin-bottom: 16px;
+}
+
+.neighbor-popup-header h2 {
     margin: 0 0 4px 0;
     font-size: 1.5rem;
     color: var(--text-primary);
-    padding-right: 40px; /* Space for close button */
+    padding-right: 40px;
 }
-.rtl .neighbor-popup-content h2 {
+.rtl .neighbor-popup-header h2 {
     padding-right: 0;
     padding-left: 40px;
 }
 
-.neighbor-popup-content p {
-    margin: 0 0 20px 0;
+.neighbor-popup-header p {
+    margin: 0;
     color: var(--text-secondary);
     font-size: 1rem;
 }
 
+.neighbor-popup-body {
+    display: flex;
+    flex-direction: column; /* Changed back to column to stack grid below header */
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.neighbor-grid-panel {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 10px; /* Space for scrollbar */
+}
+.rtl .neighbor-grid-panel {
+    padding-right: 0;
+    padding-left: 10px;
+}
+
 .search-bar {
     position: relative;
-    margin-bottom: 16px;
+    width: 100%;
+    margin-top: .5rem;
 }
 
 .search-bar .search-icon {
@@ -103,13 +128,13 @@
     pointer-events: none;
 }
 .rtl .search-bar .search-icon {
-    left: auto;
-    right: 14px;
+    left: 14px;
+    right: auto;
 }
 
 .search-bar input {
     width: 100%;
-    padding: 12px 12px 12px 45px;
+    padding: 12px 45px 12px 12px; /* Padding for right icon */
     font-size: 1rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -119,7 +144,7 @@
     transition: border-color 0.2s;
 }
 .rtl .search-bar input {
-    padding: 12px 45px 12px 12px;
+    padding: 12px 12px 12px 45px; /* RTL padding */
 }
 
 .search-bar input:focus {
@@ -127,57 +152,62 @@
     border-color: var(--accent-primary);
 }
 
-.neighbor-list {
+.neighbor-grid {
     list-style: none;
     padding: 0;
     margin: 0;
-    overflow-y: auto;
-    flex-grow: 1; /* Takes up remaining space */
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* Enforces 5 items per row */
+    gap: 16px;
 }
 
-.neighbor-list li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 8px;
-    border-bottom: 1px solid var(--border-color-light);
-    transition: background-color 0.2s;
-}
-
-.neighbor-list li:last-child {
-    border-bottom: none;
-}
-
-.neighbor-list li:hover {
+.neighbor-item {
+    aspect-ratio: 1 / 1;
     background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color-light);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-.neighbor-list li.no-results {
-    justify-content: center;
-    color: var(--text-secondary);
-    padding: 24px;
-    font-style: italic;
+.neighbor-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 8px var(--shadow-color);
 }
 
 .neighbor-info {
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1; /* Pushes button down */
+    width: 100%;
+    overflow: hidden;
 }
 
 .neighbor-info strong {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--text-primary);
+    word-break: break-word; /* Handle long names */
 }
 
 .neighbor-info small {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
+    margin-top: 4px;
 }
 
 .add-neighbor-button {
     padding: 6px 14px;
-    width: 4rem;
+    width: auto;
     font-size: 0.875rem;
     font-weight: 600;
     background-color: var(--accent-success);
@@ -186,30 +216,44 @@
     border-radius: 6px;
     cursor: pointer;
     transition: opacity 0.2s;
+    margin-top: auto; /* Aligns to bottom */
+    flex-shrink: 0;
 }
 
 .add-neighbor-button:hover {
     opacity: 0.85;
 }
 
+.no-results {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 1.1rem;
+    grid-column: 1 / -1; /* Make no-results span all columns */
+}
+
+
 /* --- SCROLLBAR STYLES --- */
-/* Works on Chrome, Edge, Safari, and other WebKit browsers */
-::-webkit-scrollbar {
+.neighbor-grid-panel::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
 
-::-webkit-scrollbar-track {
+.neighbor-grid-panel::-webkit-scrollbar-track {
   background: var(--bg-secondary);
+  border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb {
+.neighbor-grid-panel::-webkit-scrollbar-thumb {
   background-color: var(--accent-secondary);
   border-radius: 20px;
-  /* Create padding around thumb */
   border: 3px solid var(--bg-secondary);
 }
 
-::-webkit-scrollbar-thumb:hover {
+.neighbor-grid-panel::-webkit-scrollbar-thumb:hover {
   background-color: var(--accent-primary);
 }
