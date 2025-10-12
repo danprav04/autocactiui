@@ -5,28 +5,28 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 20000;
-    animation: fadeIn 0.3s ease;
+    animation: fadeIn 0.25s ease;
 }
 
 .neighbor-popup-content {
     background: var(--bg-primary);
-    padding: 24px;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px var(--shadow-color);
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     width: 90%;
-    max-width: 850px; /* Increased width for horizontal layout */
-    height: 70vh; /* Use height instead of max-height */
+    max-width: 900px;
+    height: 75vh;
     display: flex;
     flex-direction: column;
     position: relative;
     border: 1px solid var(--border-color);
-    animation: slideIn 0.3s ease-out;
+    animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeIn {
@@ -35,68 +35,82 @@
 }
 
 @keyframes slideIn {
-    from { transform: translateY(-20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from { 
+        transform: translateY(-30px) scale(0.95); 
+        opacity: 0; 
+    }
+    to { 
+        transform: translateY(0) scale(1); 
+        opacity: 1; 
+    }
 }
 
 .neighbor-popup-close-button {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 2rem;
-    background: transparent;
-    border: none;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color-light);
     cursor: pointer;
     color: var(--text-secondary);
-    padding: 8px;
-    border-radius: 50%;
+    padding: 0;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.2s, color 0.2s;
+    transition: all 0.2s ease;
 }
+
 .rtl .neighbor-popup-close-button {
     right: auto;
-    left: 12px;
+    left: 16px;
 }
 
 .neighbor-popup-close-button:hover {
     background-color: var(--bg-secondary);
     color: var(--text-primary);
+    border-color: var(--border-color);
+    transform: scale(1.05);
 }
 
 .neighbor-popup-close-button svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
 .neighbor-popup-header {
     flex-shrink: 0;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border-color-light);
-    margin-bottom: 16px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--border-color-light);
+    margin-bottom: 20px;
 }
 
 .neighbor-popup-header h2 {
-    margin: 0 0 4px 0;
-    font-size: 1.5rem;
+    margin: 0 0 8px 0;
+    font-size: 1.75rem;
+    font-weight: 700;
     color: var(--text-primary);
-    padding-right: 40px;
+    padding-right: 50px;
+    letter-spacing: -0.02em;
 }
+
 .rtl .neighbor-popup-header h2 {
     padding-right: 0;
-    padding-left: 40px;
+    padding-left: 50px;
 }
 
 .neighbor-popup-header p {
-    margin: 0;
+    margin: 0 0 16px 0;
     color: var(--text-secondary);
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
 }
 
 .neighbor-popup-body {
     display: flex;
-    flex-direction: column; /* Changed back to column to stack grid below header */
+    flex-direction: column;
     flex-grow: 1;
     min-height: 0;
 }
@@ -104,52 +118,66 @@
 .neighbor-grid-panel {
     flex-grow: 1;
     overflow-y: auto;
-    padding-right: 10px; /* Space for scrollbar */
+    padding-right: 12px;
+    margin-right: -4px;
 }
+
 .rtl .neighbor-grid-panel {
     padding-right: 0;
-    padding-left: 10px;
+    padding-left: 12px;
+    margin-right: 0;
+    margin-left: -4px;
 }
 
 .search-bar {
     position: relative;
     width: 100%;
-    margin-top: .5rem;
 }
 
 .search-bar .search-icon {
     position: absolute;
     top: 50%;
-    right: 14px;
+    right: 16px;
     transform: translateY(-50%);
     width: 20px;
     height: 20px;
     color: var(--text-secondary);
     pointer-events: none;
+    opacity: 0.6;
 }
+
 .rtl .search-bar .search-icon {
-    left: 14px;
+    left: 16px;
     right: auto;
 }
 
 .search-bar input {
     width: 100%;
-    padding: 12px 45px 12px 12px; /* Padding for right icon */
-    font-size: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    padding: 14px 48px 14px 16px;
+    font-size: 0.95rem;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     box-sizing: border-box;
-    transition: border-color 0.2s;
+    transition: all 0.2s ease;
+    font-weight: 500;
 }
+
 .rtl .search-bar input {
-    padding: 12px 12px 12px 45px; /* RTL padding */
+    padding: 14px 16px 14px 48px;
+}
+
+.search-bar input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
 }
 
 .search-bar input:focus {
     outline: none;
     border-color: var(--accent-primary);
+    background-color: var(--bg-primary);
+    box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb, 59, 130, 246), 0.1);
 }
 
 .neighbor-grid {
@@ -157,29 +185,31 @@
     padding: 0;
     margin: 0;
     display: grid;
-    grid-template-columns: repeat(5, 1fr); /* Enforces 5 items per row */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 16px;
 }
 
 .neighbor-item {
     aspect-ratio: 1 / 1;
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color-light);
-    border-radius: 8px;
-    padding: 12px;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-secondary) 100%);
+    border: 2px solid var(--border-color-light);
+    border-radius: 12px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     text-align: center;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
 }
 
 .neighbor-item:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     border-color: var(--accent-primary);
-    box-shadow: 0 4px 8px var(--shadow-color);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    background: var(--bg-primary);
 }
 
 .neighbor-info {
@@ -187,73 +217,120 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    flex-grow: 1; /* Pushes button down */
+    flex-grow: 1;
     width: 100%;
     overflow: hidden;
+    gap: 4px;
 }
 
 .neighbor-info strong {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
     color: var(--text-primary);
-    word-break: break-word; /* Handle long names */
+    word-break: break-word;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
 }
 
 .neighbor-info small {
     font-size: 0.8rem;
     color: var(--text-secondary);
-    margin-top: 4px;
+    font-weight: 500;
+    font-family: 'Courier New', monospace;
 }
 
 .add-neighbor-button {
-    padding: 6px 14px;
-    width: auto;
-    font-size: 0.875rem;
-    font-weight: 600;
-    background-color: var(--accent-success);
+    padding: 8px 16px;
+    width: 100%;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-success) 0%, var(--accent-success) 100%);
     color: var(--text-on-accent);
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
-    transition: opacity 0.2s;
-    margin-top: auto; /* Aligns to bottom */
+    transition: all 0.2s ease;
+    margin-top: 12px;
     flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .add-neighbor-button:hover {
-    opacity: 0.85;
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    filter: brightness(1.1);
+}
+
+.add-neighbor-button:active {
+    transform: scale(0.98);
 }
 
 .no-results {
     width: 100%;
     height: 100%;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     color: var(--text-secondary);
-    font-style: italic;
     font-size: 1.1rem;
-    grid-column: 1 / -1; /* Make no-results span all columns */
+    grid-column: 1 / -1;
+    gap: 12px;
+    padding: 48px 24px;
 }
 
+.no-results::before {
+    content: "🔍";
+    font-size: 3rem;
+    opacity: 0.3;
+}
+
+.no-results-text {
+    font-weight: 600;
+    opacity: 0.7;
+}
 
 /* --- SCROLLBAR STYLES --- */
 .neighbor-grid-panel::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+    width: 10px;
 }
 
 .neighbor-grid-panel::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-  border-radius: 10px;
+    background: transparent;
+    border-radius: 10px;
 }
 
 .neighbor-grid-panel::-webkit-scrollbar-thumb {
-  background-color: var(--accent-secondary);
-  border-radius: 20px;
-  border: 3px solid var(--bg-secondary);
+    background-color: var(--accent-secondary);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
 }
 
 .neighbor-grid-panel::-webkit-scrollbar-thumb:hover {
-  background-color: var(--accent-primary);
+    background-color: var(--accent-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .neighbor-popup-content {
+        width: 95%;
+        height: 85vh;
+        padding: 24px;
+    }
+
+    .neighbor-popup-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .neighbor-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+    }
+
+    .neighbor-item {
+        padding: 12px;
+    }
 }

@@ -37,9 +37,27 @@ const NeighborsPopup = ({
 
   React.useEffect(() => {
     if (isOpen) {
-      setSearchTerm(""); // Reset search when popup opens
+      setSearchTerm("");
     }
   }, [isOpen]);
+
+  React.useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -103,7 +121,11 @@ const NeighborsPopup = ({
                 ))}
               </ul>
             ) : (
-              <div className="no-results">{t("neighborsPopup.noResults")}</div>
+              <div className="no-results">
+                <span className="no-results-text">
+                  {t("neighborsPopup.noResults")}
+                </span>
+              </div>
             )}
           </div>
         </div>
