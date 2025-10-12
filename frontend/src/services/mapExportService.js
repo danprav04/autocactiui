@@ -1,7 +1,7 @@
 // frontend/src/services/mapExportService.js
 import { toBlob } from 'html-to-image';
 import { generateCactiConfig } from './configGenerator';
-import { uploadMap } from './apiService';
+import { createMap } from './apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
 /**
@@ -97,7 +97,7 @@ const calculateBoundsAndTransform = (nodes) => {
  * @param {object} params - The export parameters.
  * @returns {Promise<object>} The API response from starting the task.
  */
-export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiId, theme }) => {
+export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiGroupId, theme }) => {
     const viewport = mapElement.querySelector('.react-flow__viewport');
     if (!viewport) {
         throw new Error('Could not find map viewport for export.');
@@ -150,9 +150,9 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
         formData.append('map_image', blob, `${mapName}.png`);
         formData.append('config_content', configContent);
         formData.append('map_name', mapName);
-        formData.append('cacti_installation_id', cactiId);
+        formData.append('cacti_group_id', cactiGroupId);
 
-        return await uploadMap(formData);
+        return await createMap(formData);
 
     } finally {
         viewport.style.transform = originalTransform;
@@ -164,7 +164,7 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
  * @param {object} params - The export parameters, plus state setters.
  * @returns {Promise<string>} A promise that resolves with the task ID.
  */
-export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, cactiId, theme, setNodes, setEdges }) => {
+export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, cactiGroupId, theme, setNodes, setEdges }) => {
     const originalNodes = [...nodes];
     const originalEdges = [...edges];
 
@@ -186,8 +186,8 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     
     try {
         // Perform the export and get the initial task response.
-        const response = await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: finalEdges, mapName, cactiId, theme });
-        return response.data.task_id;
+        const response = await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: finalEdges, mapName, cactiGroupId, theme });
+        return response.data;
     } finally {
         // Restore the UI to its original state.
         mapElement.classList.remove('exporting');

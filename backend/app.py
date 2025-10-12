@@ -97,53 +97,72 @@ def get_device_neighbors_endpoint(ip_address):
         return jsonify(neighbors)
     return jsonify({"error": "Device not found or has no neighbors"}), 404
 
-@app.route('/get-all-cacti-installations', methods=['GET'])
+@app.route('/groups', methods=['GET'])
 @token_required
-def get_all_cacti_installations_endpoint():
-    """Retrieves all registered Cacti installations."""
-    installations = services.get_all_cacti_installations()
-    return jsonify(installations)
+def get_cacti_groups_endpoint():
+    """Retrieves all registered Cacti installation groups."""
+    groups = services.get_cacti_groups()
+    return jsonify(groups)
 
-@app.route('/upload-map', methods=['POST'])
+@app.route('/create-map', methods=['POST'])
 @token_required
-def upload_map_endpoint():
+def create_map_endpoint():
     """
-    Accepts map data, starts a background process for rendering, and returns a task ID.
+    Accepts map data for a group of Cacti installations, starts multiple background
+    processes for rendering, and returns a list of task IDs.
     """
     if 'map_image' not in request.files:
         return jsonify({"error": "Map image is required"}), 400
     
     map_image_file = request.files['map_image']
-    # Read the file into memory to pass it to the background thread safely
     map_image_bytes = BytesIO(map_image_file.read())
 
-    cacti_id = request.form.get('cacti_installation_id')
+    cacti_group_id = request.form.get('cacti_group_id')
     map_name = request.form.get('map_name')
     config_content = request.form.get('config_content')
 
-    if not all([cacti_id, map_name, config_content]):
-        return jsonify({"error": "Missing required form data: cacti_installation_id, map_name, or config_content"}), 400
+    if not all([cacti_group_id, map_name, config_content]):
+        return jsonify({"error": "Missing required form data: cacti_group_id, map_name, or config_content"}), 400
 
-    task_id = str(uuid.uuid4())
+    try:
+        cacti_group_id = int(cacti_group_id)
+    except ValueError:
+        return jsonify({"error": "Invalid cacti_group_id format"}), 400
+
+    installations = services.get_installations_by_group_id(cacti_group_id)
+    if not installations:
+        return jsonify({"error": f"Cacti group with ID {cacti_group_id} not found"}), 404
+
+    created_tasks = []
     
-    # Store the initial task status
-    services.MOCK_TASKS[task_id] = {
-        'id': task_id,
-        'status': 'PENDING',
-        'message': 'Map creation task has been queued.',
-        'updated_at': datetime.utcnow().isoformat()
-    }
-    
-    # Run the long-running map processing task in a background thread
-    thread = threading.Thread(
-        target=services.process_map_task,
-        args=(task_id, map_image_bytes, config_content, map_name)
-    )
-    thread.start()
+    for installation in installations:
+        task_id = str(uuid.uuid4())
+        
+        services.MOCK_TASKS[task_id] = {
+            'id': task_id,
+            'status': 'PENDING',
+            'message': 'Map creation task has been queued.',
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        # We need to create a new BytesIO object for each thread
+        map_image_bytes.seek(0)
+        thread_map_image = BytesIO(map_image_bytes.read())
+
+        thread = threading.Thread(
+            target=services.process_map_task,
+            args=(task_id, thread_map_image, config_content, map_name)
+        )
+        thread.start()
+
+        created_tasks.append({
+            "hostname": installation['hostname'],
+            "task_id": task_id
+        })
 
     return jsonify({
-        "task_id": task_id,
-        "message": "Map creation process has been started and is running in the background."
+        "message": f"Map creation process has been started for {len(installations)} installations.",
+        "tasks": created_tasks
     }), 202
 
 @app.route('/task-status/<task_id>', methods=['GET'])

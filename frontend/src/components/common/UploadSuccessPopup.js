@@ -1,15 +1,135 @@
 // frontend/src/components/common/UploadSuccessPopup.js
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import * as api from '../../services/apiService';
 import './UploadSuccessPopup.css';
+
+// --- SVG Icons for Task Status ---
+
+const SpinnerIcon = () => (
+    <svg className="status-spinner" viewBox="0 0 50 50">
+        <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5"></circle>
+    </svg>
+);
+
+const SuccessIcon = () => (
+    <svg className="status-icon" viewBox="0 0 24 24">
+        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+    </svg>
+);
+
+const ErrorIcon = () => (
+    <svg className="status-icon error" viewBox="0 0 24 24">
+        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    </svg>
+);
+
 
 const UploadSuccessPopup = ({ data, onClose }) => {
     const { t } = useTranslation();
+    const [tasks, setTasks] = useState([]);
+    const pollingRef = useRef(null);
 
-    if (!data) return null;
+    // Initialize or reset state when the popup is opened with new data
+    useEffect(() => {
+        if (data && data.tasks) {
+            const initialTasks = data.tasks.map(task => ({
+                ...task,
+                status: 'PENDING',
+                url: null,
+                error: null,
+            }));
+            setTasks(initialTasks);
+        } else {
+            setTasks([]); // Clear tasks if popup is closed/data is removed
+        }
+    }, [data]);
 
-    // The backend now provides the final URL in the 'message' field upon success
-    const mapUrl = data.message;
+    // Effect to handle the polling logic
+    useEffect(() => {
+        const pollTasks = async () => {
+            let allTasksAreDone = true;
+
+            const updatedTasks = await Promise.all(
+                tasks.map(async (task) => {
+                    // Don't poll tasks that have already finished
+                    if (task.status === 'SUCCESS' || task.status === 'FAILURE') {
+                        return task;
+                    }
+
+                    allTasksAreDone = false; // Mark that at least one task is still running
+
+                    try {
+                        const response = await api.getTaskStatus(task.task_id);
+                        const { status, message } = response.data;
+
+                        if (status === 'SUCCESS') {
+                            return { ...task, status: 'SUCCESS', url: message };
+                        }
+                        if (status === 'FAILURE') {
+                            return { ...task, status: 'FAILURE', error: message };
+                        }
+                        // Keep its current status (e.g., PENDING or PROCESSING)
+                        return { ...task, status };
+                    } catch (err) {
+                        console.error(`Failed to get status for task ${task.task_id}:`, err);
+                        return { ...task, status: 'FAILURE', error: t('app.errorTaskStatus') };
+                    }
+                })
+            );
+
+            setTasks(updatedTasks);
+
+            // If all tasks have finished, stop polling
+            if (allTasksAreDone && pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+            }
+        };
+
+        // Start polling only if there are tasks and no interval is already running
+        if (tasks.length > 0 && !pollingRef.current) {
+            pollTasks(); // Poll immediately on start
+            pollingRef.current = setInterval(pollTasks, 3000); // Then poll every 3 seconds
+        }
+
+        // Cleanup: stop polling when the component unmounts (popup is closed)
+        return () => {
+            if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+            }
+        };
+    }, [tasks, t]);
+
+    if (!data || !data.tasks || data.tasks.length === 0) {
+        return null;
+    }
+
+    const renderTaskStatus = (task) => {
+        switch (task.status) {
+            case 'SUCCESS':
+                return (
+                    <a href={task.url} target="_blank" rel="noopener noreferrer" className="popup-button primary task-action-button">
+                        <SuccessIcon /> {t('app.goToMap')}
+                    </a>
+                );
+            case 'FAILURE':
+                return (
+                    <div className="task-status-indicator error" title={task.error}>
+                        <ErrorIcon />
+                        <span>{t('app.statusFailed')}</span>
+                    </div>
+                );
+            default: // PENDING or PROCESSING
+                return (
+                    <div className="task-status-indicator pending">
+                        <SpinnerIcon />
+                        <span>{t('app.statusProcessing')}</span>
+                    </div>
+                );
+        }
+    };
 
     return (
         <div className="popup-overlay" onClick={onClose}>
@@ -21,15 +141,23 @@ const UploadSuccessPopup = ({ data, onClose }) => {
                     </svg>
                 </div>
                 <h2>{t('app.uploadSuccessTitle')}</h2>
-                <p>{t('app.uploadSuccessMessage')}</p>
+                <p>{data.message}</p>
+                
+                <ul className="task-list-container">
+                    {tasks.map(task => (
+                        <li key={task.task_id} className="task-list-item">
+                            <span className="task-hostname">{task.hostname}</span>
+                            {renderTaskStatus(task)}
+                        </li>
+                    ))}
+                </ul>
+
                 <div className="popup-actions">
-                    <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="popup-button primary" onClick={onClose}>
-                        {t('app.goToMap')}
-                    </a>
                     <button onClick={onClose} className="popup-button secondary">
                         {t('app.close')}
                     </button>
                 </div>
+
                 <button className="close-button" onClick={onClose} aria-label="Close">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

@@ -15,7 +15,10 @@
     "goToMap": "עבור למפה",
     "close": "סגור",
     "processingMap": "מעבד מפה... התהליך עשוי לקחת מספר רגעים.",
-    "uploadFailed": "יצירת המפה נכשלה. אנא בדוק את הלוגים ונסה שוב."
+    "uploadFailed": "יצירת המפה נכשלה. אנא בדוק את הלוגים ונסה שוב.",
+    "statusProcessing": "מעבד...",
+    "statusFailed": "נכשל",
+    "errorTaskStatus": "לא ניתן היה לקבל סטטוס משימה."
   },
   "sidebar": {
     "controls": "הגדרות",

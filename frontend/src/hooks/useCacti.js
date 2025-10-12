@@ -4,29 +4,29 @@ import { useTranslation } from 'react-i18next';
 import * as api from '../services/apiService';
 
 export const useCacti = (setError, token) => {
-  const [cactiInstallations, setCactiInstallations] = useState([]);
-  const [selectedCactiId, setSelectedCactiId] = useState('');
+  const [cactiGroups, setCactiGroups] = useState([]);
+  const [selectedCactiGroupId, setSelectedCactiGroupId] = useState('');
   const { t } = useTranslation();
 
   useEffect(() => {
     // Only fetch data if the user is authenticated (token exists)
     if (!token) return;
 
-    const fetchCactiInstallations = async () => {
+    const fetchCactiGroups = async () => {
       try {
-        const response = await api.getAllCactiInstallations();
-        const installations = response.data.data;
-        if (response.data.status === 'success' && installations.length > 0) {
-          setCactiInstallations(installations);
-          setSelectedCactiId(installations[0].id);
+        const response = await api.getCactiGroups();
+        const groups = response.data.data;
+        if (response.data.status === 'success' && groups.length > 0) {
+          setCactiGroups(groups);
+          setSelectedCactiGroupId(groups[0].id);
         }
       } catch (err) {
         setError(t('app.errorCacti'));
         console.error(err);
       }
     };
-    fetchCactiInstallations();
+    fetchCactiGroups();
   }, [t, setError, token]);
 
-  return { cactiInstallations, selectedCactiId, setSelectedCactiId };
+  return { cactiGroups, selectedCactiGroupId, setSelectedCactiGroupId };
 };

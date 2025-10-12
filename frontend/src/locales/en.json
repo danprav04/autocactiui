@@ -15,7 +15,10 @@
     "goToMap": "Go to Map",
     "close": "Close",
     "processingMap": "Processing map... This may take a moment.",
-    "uploadFailed": "Map creation failed. Please check the logs and try again."
+    "uploadFailed": "Map creation failed. Please check the logs and try again.",
+    "statusProcessing": "Processing...",
+    "statusFailed": "Failed",
+    "errorTaskStatus": "Could not retrieve task status."
   },
   "sidebar": {
     "controls": "Controls",

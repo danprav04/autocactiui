@@ -277,22 +277,62 @@ MOCK_NEIGHBORS = {
     "10.100.15.1": [{"interface": "GigabitEthernet0/0/0", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "WAN Link"}],
 }
 
-MOCK_CACTI_INSTALLATIONS = [
-    {
+# --- NEW MOCK Cacti Data Structure ---
+
+# A flat dictionary of all possible Cacti installations for easy lookup by ID.
+MOCK_CACTI_INSTALLATIONS_DB = {
+    1: {
         "id": 1,
         "hostname": "cacti-main-dc",
         "ip": "192.168.1.100",
-        "user": "admin",
-        "password": "password123"
     },
-    {
+    2: {
         "id": 2,
         "hostname": "cacti-prod-london",
         "ip": "10.200.5.10",
-        "user": "cacti_user",
-        "password": "secure_password"
+    },
+    3: { 
+        "id": 3,
+        "hostname": "221.250.1.2",
+        "ip": "221.250.1.2",
+    },
+    4: {
+        "id": 4,
+        "hostname": "221.252.1.2",
+        "ip": "221.252.1.2",
+    }
+}
+
+# The new grouped structure that the API will return.
+MOCK_CACTI_GROUPS = [
+    {
+        "id": 1,
+        "name": "Main-Cacti-Group",
+        "installations": [
+            MOCK_CACTI_INSTALLATIONS_DB[3],
+            MOCK_CACTI_INSTALLATIONS_DB[4]
+        ]
+    },
+    {
+        "id": 2,
+        "name": "Legacy-Group",
+        "installations": [
+            MOCK_CACTI_INSTALLATIONS_DB[1],
+            MOCK_CACTI_INSTALLATIONS_DB[2]
+        ]
     }
 ]
+
+def get_cacti_groups():
+    """Retrieves all Cacti installation groups."""
+    return {"status": "success", "data": MOCK_CACTI_GROUPS}
+
+def get_installations_by_group_id(group_id):
+    """Finds a Cacti group by its ID and returns its installations."""
+    for group in MOCK_CACTI_GROUPS:
+        if group['id'] == group_id:
+            return group['installations']
+    return None
 
 def get_device_info(ip_address):
     """Fetches device type, model, and hostname by IP address."""
@@ -311,10 +351,6 @@ def get_device_neighbors(ip_address):
     if ip_address in MOCK_NEIGHBORS:
         return {"neighbors": MOCK_NEIGHBORS[ip_address]}
     return None
-
-def get_all_cacti_installations():
-    """Retrieves all registered Cacti installations."""
-    return {"status": "success", "data": MOCK_CACTI_INSTALLATIONS}
 
 def save_uploaded_map(map_image_file, config_content, map_name):
     """Saves the uploaded map image and config file to the designated folders."""

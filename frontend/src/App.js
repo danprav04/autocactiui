@@ -45,7 +45,6 @@ function App() {
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
   const reactFlowInstance = useRef(null);
-  const pollingTimeoutRef = useRef(null);
 
   // --- Popup Handlers ---
   const handleShowNeighborPopup = useCallback((neighbors, sourceNode) => {
@@ -59,7 +58,7 @@ function App() {
   // --- Custom Hooks for State and Logic Management ---
   const { theme, toggleTheme } = useThemeManager();
   useLocalizationManager();
-  const { cactiInstallations, selectedCactiId, setSelectedCactiId } = useCacti(setError, token);
+  const { cactiGroups, selectedCactiGroupId, setSelectedCactiGroupId } = useCacti(setError, token);
   const {
     nodes, setNodes,
     edges, setEdges,
@@ -184,60 +183,30 @@ function App() {
 
   }, [neighborPopup, confirmPreviewNode]);
 
-  // Clear any pending polling timeouts when component unmounts
-  useEffect(() => {
-    return () => {
-      if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleUploadMap = async () => {
+  const handleCreateMap = async () => {
     if (!reactFlowWrapper.current || nodes.length === 0) { setError(t('app.errorEmptyMap')); return; }
-    if (!selectedCactiId) { setError(t('app.errorSelectCacti')); return; }
+    if (!selectedCactiGroupId) { setError(t('app.errorSelectCacti')); return; }
     
     setIsUploading(true);
     setError('');
-
-    const pollTaskStatus = (taskId) => {
-        api.getTaskStatus(taskId)
-            .then(response => {
-                const { status } = response.data;
-                if (status === 'SUCCESS') {
-                    setUploadSuccessData(response.data);
-                    setIsUploading(false);
-                } else if (status === 'FAILURE') {
-                    setError(t('app.uploadFailed'));
-                    setIsUploading(false);
-                } else {
-                    // Continue polling
-                    pollingTimeoutRef.current = setTimeout(() => pollTaskStatus(taskId), 2000);
-                }
-            })
-            .catch(err => {
-                setError(t('app.uploadFailed'));
-                setIsUploading(false);
-                console.error(err);
-            });
-    };
     
     try {
-      const taskId = await handleUploadProcess({
+      const taskResponse = await handleUploadProcess({
         mapElement: reactFlowWrapper.current,
         nodes,
         edges,
         mapName,
-        cactiId: selectedCactiId,
+        cactiGroupId: selectedCactiGroupId,
         theme,
         setNodes,
         setEdges
       });
-      pollTaskStatus(taskId);
+      setUploadSuccessData(taskResponse);
     } catch (err) {
       setError(t('app.errorUpload'));
-      setIsUploading(false);
       console.error(err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -267,7 +236,7 @@ function App() {
       <div className="app-container">
         <Sidebar 
           selectedElements={selectedElements}
-          onUploadMap={handleUploadMap}
+          onUploadMap={handleCreateMap}
           onAddGroup={handleAddGroup}
           onAddTextNode={handleAddTextNode}
           onResetMap={resetMap}
@@ -277,9 +246,9 @@ function App() {
           setMapName={setMapName}
           isMapStarted={nodes.length > 0}
           isUploading={isUploading}
-          cactiInstallations={cactiInstallations}
-          selectedCactiId={selectedCactiId}
-          setSelectedCactiId={setSelectedCactiId}
+          cactiGroups={cactiGroups}
+          selectedCactiGroupId={selectedCactiGroupId}
+          setSelectedCactiGroupId={setSelectedCactiGroupId}
           selectAllByType={selectAllByType}
           onDeleteElements={handleDeleteElements}
           alignElements={alignElements}

@@ -70,11 +70,11 @@ export const getDeviceNeighbors = (ip) => {
 };
 
 /**
- * Fetches all registered Cacti installations from the backend.
- * @returns {Promise<object>} A promise that resolves to the list of Cacti installations.
+ * Fetches all registered Cacti groups from the backend.
+ * @returns {Promise<object>} A promise that resolves to the list of Cacti groups.
  */
-export const getAllCactiInstallations = () => {
-    return apiClient.get('/get-all-cacti-installations');
+export const getCactiGroups = () => {
+    return apiClient.get('/groups');
 };
 
 /**
@@ -89,11 +89,11 @@ export const getInitialDevice = (ip) => {
 
 /**
  * Uploads the generated map image and configuration file to the backend to start a task.
- * @param {FormData} formData - The form data containing the image, config, map name, and Cacti ID.
+ * @param {FormData} formData - The form data containing the image, config, map name, and Cacti group ID.
  * @returns {Promise<object>} A promise that resolves with the task creation response.
  */
-export const uploadMap = (formData) => {
-    return apiClient.post('/upload-map', formData, {
+export const createMap = (formData) => {
+    return apiClient.post('/create-map', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
     });
 };

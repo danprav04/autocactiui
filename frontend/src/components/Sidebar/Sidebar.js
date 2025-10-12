@@ -17,9 +17,9 @@ const Sidebar = ({
   setMapName,
   isMapStarted,
   isUploading,
-  cactiInstallations,
-  selectedCactiId,
-  setSelectedCactiId,
+  cactiGroups,
+  selectedCactiGroupId,
+  setSelectedCactiGroupId,
   selectAllByType,
   onDeleteElements,
   alignElements,
@@ -92,9 +92,9 @@ const Sidebar = ({
       <MapExportControls
         mapName={mapName}
         setMapName={setMapName}
-        cactiInstallations={cactiInstallations}
-        selectedCactiId={selectedCactiId}
-        setSelectedCactiId={setSelectedCactiId}
+        cactiGroups={cactiGroups}
+        selectedCactiGroupId={selectedCactiGroupId}
+        setSelectedCactiGroupId={setSelectedCactiGroupId}
         onUploadMap={onUploadMap}
         isUploading={isUploading}
         isMapStarted={isMapStarted}

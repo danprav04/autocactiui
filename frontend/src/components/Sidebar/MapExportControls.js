@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 const MapExportControls = ({
   mapName,
   setMapName,
-  cactiInstallations,
-  selectedCactiId,
-  setSelectedCactiId,
+  cactiGroups,
+  selectedCactiGroupId,
+  setSelectedCactiGroupId,
   onUploadMap,
   isUploading,
   isMapStarted,
@@ -33,23 +33,23 @@ const MapExportControls = ({
         <select
           id="cacti-selector"
           className="icon-selector"
-          value={selectedCactiId}
-          onChange={(e) => setSelectedCactiId(e.target.value)}
-          disabled={!isMapStarted || cactiInstallations.length === 0}
+          value={selectedCactiGroupId}
+          onChange={(e) => setSelectedCactiGroupId(e.target.value)}
+          disabled={!isMapStarted || cactiGroups.length === 0}
         >
-          {cactiInstallations.length === 0 ? (
+          {cactiGroups.length === 0 ? (
             <option>{t('sidebar.cactiLoading')}</option>
           ) : (
-            cactiInstallations.map((inst) => (
-              <option key={inst.id} value={inst.id}>
-                {inst.hostname} ({inst.ip})
+            cactiGroups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
               </option>
             ))
           )}
         </select>
       </div>
       <div className="control-group">
-        <button onClick={onUploadMap} disabled={!isMapStarted || isUploading || !selectedCactiId}>
+        <button onClick={onUploadMap} disabled={!isMapStarted || isUploading || !selectedCactiGroupId}>
           {isUploading ? t('sidebar.uploading') : t('sidebar.uploadToCacti')}
         </button>
       </div>
