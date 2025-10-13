@@ -168,6 +168,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     const isEndDevice = !nodeToConfirm.data.ip;
     const isFromList = nodeToConfirm.data.isFromList;
 
+    // --- Unified Logic to get Source Info ---
     const { sourceNodeId, neighborInfo } = (() => {
         if (isFromList) {
             return { sourceNodeId: nodeToConfirm.data.sourceNodeId, neighborInfo: nodeToConfirm.data };
@@ -176,7 +177,10 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         return { sourceNodeId: edge?.source, neighborInfo: { ...nodeToConfirm.data, interface: edge?.data.interface }};
     })();
 
-    if (!sourceNodeId) {
+    // --- Unified Hostname Extraction ---
+    const hostname = neighborInfo.neighbor || neighborInfo.hostname;
+
+    if (!sourceNodeId || !hostname) {
         setError(t('app.errorAddNeighborGeneric'));
         setLoading(false);
         return;
@@ -198,7 +202,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         const permanentNodeIpsOnMap = new Set(nextNodes.filter(n => n.data.ip).map(n => n.data.ip));
         const remainingNeighbors = currentNeighbors.filter(n => {
             if (n.ip) return !permanentNodeIpsOnMap.has(n.ip);
-            return !(n.neighbor === neighborInfo.neighbor && n.interface === neighborInfo.interface);
+            return !(n.neighbor === hostname && n.interface === neighborInfo.interface);
         });
         setCurrentNeighbors(remainingNeighbors);
 
@@ -226,7 +230,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
             if (!sourceNode) return prev;
             const position = { x: sourceNode.position.x + (Math.random() * 300 - 150), y: sourceNode.position.y + 200 };
-            const newNode = createNodeObject({ ip: '', hostname: neighborInfo.neighbor, type: 'Switch' }, position);
+            const newNode = createNodeObject({ ip: '', hostname: hostname, type: 'Switch' }, position);
             const newEdge = createEdgeObject(sourceNodeId, newNode.id, neighborInfo, false);
             return handleStateUpdate(prev, newNode, [newEdge]);
         });
@@ -279,13 +283,14 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   }, [edges, currentNeighbors, setState, createNodeObject, clearPreviewElements, t, onShowNeighborPopup, setSelectedElements]);
 
   const confirmNeighbor = useCallback((neighbor, sourceNodeId, setLoading, setError) => {
-    const onMapPreviewNode = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
+    const onMapPreviewNode = neighbor.ip ? nodes.find(n => n.id === neighbor.ip && n.data.isPreview) : null;
 
     if (onMapPreviewNode) {
         confirmPreviewNode(onMapPreviewNode, setLoading, setError);
     } else {
+        const dummyId = neighbor.ip || `temp-id-${neighbor.neighbor}-${neighbor.interface}`;
         const dummyNodeToConfirm = {
-            id: neighbor.ip || `temp-id-${neighbor.neighbor}-${neighbor.interface}`,
+            id: dummyId,
             position: { x: 0, y: 0 },
             data: { ...neighbor, isPreview: true, isFromList: true, sourceNodeId: sourceNodeId },
         };

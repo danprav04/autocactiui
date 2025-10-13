@@ -183,7 +183,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         fitView
-        selectionOnDrag={false} // Disable default drag selection
+        selectNodesOnDrag={false} // Corrected prop name
       >
         <MiniMap nodeColor={minimapNodeColor} />
         <Controls />
