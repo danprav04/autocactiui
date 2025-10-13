@@ -91,6 +91,44 @@ function App() {
     setError: setMapHookError, // Use setter from map hook
   } = useMapInteraction(theme, handleShowNeighborPopup);
 
+  // --- Memos and Derived State (Called Unconditionally) ---
+  const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode, text: TextNode }), []);
+  const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
+
+  const selectedCustomNode = useMemo(() => 
+    selectedElements.length === 1 && selectedElements[0].type === 'custom' ? selectedElements[0] : null,
+    [selectedElements]
+  );
+
+  const availableNeighbors = useMemo(() => {
+      if (!selectedCustomNode) return [];
+
+      // Get all existing connections for the selected node to check against.
+      const existingConnections = new Set(
+          edges
+              .filter(e => e.source === selectedCustomNode.id || e.target === selectedCustomNode.id)
+              .map(e => {
+                  const targetNode = nodes.find(n => n.id === e.target);
+                  // For end devices, create a unique key based on source, hostname, and interface.
+                  if (targetNode && !targetNode.data.ip) {
+                      return `${e.source}-${targetNode.data.hostname}-${e.data.interface}`;
+                  }
+                  // For regular devices, the IP is sufficient.
+                  return e.target;
+              })
+      );
+
+      return currentNeighbors.filter(n => {
+          if (n.ip) {
+              return !nodes.some(node => node.id === n.ip);
+          }
+          // For end devices, check if a connection with the same signature already exists.
+          const connectionKey = `${selectedCustomNode.id}-${n.neighbor}-${n.interface}`;
+          return !existingConnections.has(connectionKey);
+      });
+  }, [selectedCustomNode, currentNeighbors, nodes, edges]);
+
+
   // Sync the hook's loading/error states with App.js for global notifications
   const setIsLoading = useCallback((value) => {
       setMapInteractionLoading(value);
@@ -150,10 +188,6 @@ function App() {
     resetMap(); // Also clear the map on logout
   };
 
-  // --- Memos for Performance ---
-  const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode, text: TextNode }), []);
-  const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
-  
   const handleStart = async (ip, initialIconName) => {
     if (!ip) { setAppError(t('app.errorStartIp')); return; }
     
@@ -239,8 +273,6 @@ function App() {
     return <LoginScreen onLogin={handleLogin} error={error} isLoading={isAuthLoading} />;
   }
 
-  const selectedCustomNode = selectedElements.length === 1 && selectedElements[0].type === 'custom' ? selectedElements[0] : null;
-
   return (
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
       <div className="app-container">
@@ -267,7 +299,7 @@ function App() {
           sendBackward={sendBackward}
           bringToFront={bringToFront}
           sendToBack={sendToBack}
-          neighbors={selectedCustomNode ? currentNeighbors.filter(n => !nodes.some(node => node.id === n.ip)) : []}
+          neighbors={availableNeighbors}
           onAddNeighbor={(neighbor) => {
             if (selectedCustomNode) {
               confirmNeighbor(neighbor, selectedCustomNode.id, setIsLoading, setAppError);

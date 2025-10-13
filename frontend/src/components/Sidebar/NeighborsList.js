@@ -7,7 +7,7 @@ const NeighborsList = ({ neighbors, onAddNeighbor }) => {
 
   // If there are more than 10 neighbors, the popup will be shown.
   // This message clarifies why the list isn't rendered in the sidebar.
-  if (neighbors.length > 10) {
+  if (neighbors.length > 1) {
     return (
       <>
         <h3>{t('sidebar.availableNeighbors')}</h3>

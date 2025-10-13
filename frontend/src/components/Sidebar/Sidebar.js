@@ -70,9 +70,7 @@ const Sidebar = ({
           return (
             <DeviceEditor
               selectedElement={selected}
-              onUpdateNodeData={onUpdateNodeData}
               onDeleteElements={onDeleteElements}
-              availableIcons={availableIcons}
               neighbors={neighbors}
               onAddNeighbor={onAddNeighbor}
             />

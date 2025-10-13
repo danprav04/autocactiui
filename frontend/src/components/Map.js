@@ -21,7 +21,6 @@ const MarqueeSelection = ({ startPos, endPos }) => {
     return <div className="marquee-selection" style={style} />;
 };
 
-// Fixed SnapLines component in Map.js
 const SnapLines = ({ lines }) => {
     const { zoom, x, y } = useViewport();
     if (!lines.length) return null;
@@ -79,7 +78,6 @@ const SnapLines = ({ lines }) => {
     );
 };
 
-
 const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu, snapLines }) => {
   
   const [marqueeStart, setMarqueeStart] = useState(null);
@@ -131,6 +129,15 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
   };
   
   const handlePaneMouseUp = useCallback((event) => {
+      // If the mouseup event originates from a node, edge, or their handles, do nothing here.
+      // This allows onNodeClick and other specific handlers to manage the event without
+      // it being misinterpreted as a generic pane click.
+      if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge') || event.target.closest('.react-flow__handle')) {
+          setMarqueeStart(null);
+          setMarqueeEnd(null);
+          return;
+      }
+
       if (marqueeStart && marqueeEnd) {
           const selectionRect = {
               x: Math.min(marqueeStart.x, marqueeEnd.x),
@@ -157,12 +164,21 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
               });
               onSelectionChange({ nodes: selectedNodes, edges: [] });
           }
-      } else if (event.button === 0) { // Handle simple clicks that didn't start a marquee
+      } else if (event.button === 0) {
         onPaneClick(event);
       }
       setMarqueeStart(null);
       setMarqueeEnd(null);
   }, [marqueeStart, marqueeEnd, reactFlowInstance, onSelectionChange, onPaneClick]);
+
+  const handleNodeMouseUp = (event) => {
+    // When a mouseup event occurs on a node, we stop it from propagating
+    // to the map's pane. This prevents the pane's onMouseUp handler from
+    // firing, which would incorrectly interpret the action as a pane click
+    // and clear the selection or previews. This is crucial for fixing the bug
+    // where clicking a preview node clears all previews.
+    event.stopPropagation();
+  };
 
   return (
     <div 
@@ -176,6 +192,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         nodes={nodes}
         edges={edges}
         onNodeClick={onNodeClick}
+        onNodeMouseUp={handleNodeMouseUp}
         onNodesChange={onNodesChange}
         onNodeContextMenu={onNodeContextMenu}
         // Use custom pane interaction handlers instead of onPaneClick
@@ -183,7 +200,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         fitView
-        selectNodesOnDrag={false} // Corrected prop name
+        selectNodesOnDrag={false}
       >
         <MiniMap nodeColor={minimapNodeColor} />
         <Controls />

@@ -125,7 +125,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         });
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
 
-        if (neighborsToAddAsPreview.length > 10) {
+        if (neighborsToAddAsPreview.length > 1) {
             onShowNeighborPopup(neighborsToAddAsPreview, sourceNode);
             setCurrentNeighbors(neighborsToAddAsPreview);
             setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id)); 
@@ -207,20 +207,20 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         setCurrentNeighbors(remainingNeighbors);
 
         const previewNodes = [], previewEdges = [];
-        if (remainingNeighbors.length > 0 && remainingNeighbors.length <= 10) {
-            const radius = 250;
-            const angleStep = (2 * Math.PI) / remainingNeighbors.length;
-            remainingNeighbors.forEach((neighbor, index) => {
-                const angle = angleStep * index - (Math.PI / 2);
-                const pos = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
-                const pNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, pos);
-                pNode.data.isPreview = true;
-                previewNodes.push(pNode);
-                previewEdges.push(createEdgeObject(sourceNode.id, pNode.id, neighbor, true));
-            });
-        } else if (remainingNeighbors.length > 10) {
+        // if (remainingNeighbors.length > 0 && remainingNeighbors.length <= 1) {
+        //     const radius = 250;
+        //     const angleStep = (2 * Math.PI) / remainingNeighbors.length;
+        //     remainingNeighbors.forEach((neighbor, index) => {
+        //         const angle = angleStep * index - (Math.PI / 2);
+        //         const pos = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
+        //         const pNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, pos);
+        //         pNode.data.isPreview = true;
+        //         previewNodes.push(pNode);
+        //         previewEdges.push(createEdgeObject(sourceNode.id, pNode.id, neighbor, true));
+        //     });
+        // } else if (remainingNeighbors.length > 1) {
             onShowNeighborPopup(remainingNeighbors, sourceNode);
-        }
+        // }
 
         return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
     };
@@ -300,6 +300,8 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
 
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
     if (node.data.isPreview) {
+        // Stop the click from bubbling up to the pane, which would clear the previews.
+        if (event) event.stopPropagation();
         confirmPreviewNode(node, setLoading, setError);
         return;
     }
