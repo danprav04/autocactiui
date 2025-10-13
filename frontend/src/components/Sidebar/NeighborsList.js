@@ -22,11 +22,11 @@ const NeighborsList = ({ neighbors, onAddNeighbor }) => {
       {neighbors.length > 0 ? (
         <ul>
           {neighbors.map((neighbor) => (
-            <li key={neighbor.ip + neighbor.interface}>
+            <li key={neighbor.neighbor + neighbor.interface}>
               <span>
                 {neighbor.neighbor}
                 <br />
-                <small>{neighbor.ip}</small>
+                <small>{neighbor.ip || t('sidebar.endDeviceIdentifier')}</small>
               </span>
               <button onClick={() => onAddNeighbor(neighbor)}>{t('sidebar.add')}</button>
             </li>

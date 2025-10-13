@@ -9,6 +9,7 @@
     "errorUpload": "Failed to start map upload process.",
     "errorFetchNeighbors": "Could not fetch neighbors for IP {{ip}}.",
     "errorAddNeighbor": "Failed to add neighbor {{ip}}.",
+    "errorAddNeighborGeneric": "Could not add neighbor. Source device information is missing.",
     "errorLogin": "Login failed. Please check your username and password.",
     "uploadSuccessTitle": "Upload Successful",
     "uploadSuccessMessage": "Your map has been generated and saved in Cacti.",

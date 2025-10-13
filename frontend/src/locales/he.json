@@ -9,6 +9,7 @@
     "errorUpload": "התנעת תהליך העלאת המפה נכשלה.",
     "errorFetchNeighbors": "לא ניתן היה לאחזר שכנים עבור כתובת {{ip}}.",
     "errorAddNeighbor": "הוספת השכן {{ip}} נכשלה.",
+    "errorAddNeighborGeneric": "לא ניתן להוסיף שכן. פרטי התקן המקור חסרים.",
     "errorLogin": "ההתחברות נכשלה. אנא בדוק את שם המשתמש והסיסמה.",
     "uploadSuccessTitle": "ההעלאה הושלמה",
     "uploadSuccessMessage": "המפה נוצרה ונשמרה בהצלחה ב-Cacti.",

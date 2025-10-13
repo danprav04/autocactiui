@@ -20,12 +20,11 @@ import { calculateSnaps } from './useSnapping';
  */
 const createEdgeObject = (sourceId, targetId, neighborInfo, isPreview = false) => {
     const { interface: iface } = neighborInfo;
-    // A unique ID is crucial for identifying each distinct connection
-    const edgeId = `e-${sourceId}-${targetId}-${iface.replace(/[/]/g, '-')}`;
+    const safeInterface = iface ? iface.replace(/[/]/g, '-') : 'unknown';
+    const edgeId = `e-${sourceId}-${targetId}-${safeInterface}`;
 
     const style = isPreview
         ? { stroke: '#007bff', strokeDasharray: '5 5' }
-        // Style for a confirmed, permanent link
         : { stroke: '#6c757d' };
 
     return {
@@ -44,16 +43,15 @@ const createEdgeObject = (sourceId, targetId, neighborInfo, isPreview = false) =
 
 export const useMapInteraction = (theme, onShowNeighborPopup) => {
   const { state, setState, undo, redo, resetState } = useHistoryState();
-  // Defensive fallback to prevent crash if state is ever undefined during a rapid re-render
   const { nodes, edges } = state || { nodes: [], edges: [] };
 
   const [selectedElements, setSelectedElements] = useState([]);
   const [currentNeighbors, setCurrentNeighbors] = useState([]);
-  const [snapLines, setSnapLines] = useState([]); // State for snap lines
-  const [isLoading, setIsLoading] = useState(false); // Local loading state (for API calls)
-  const [error, setError] = useState(''); // Local error state
+  const [snapLines, setSnapLines] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const { t } = useTranslation();
-  const dragContext = useRef(null); // Ref to store context across drag events
+  const dragContext = useRef(null);
 
   const {
     createNodeObject,
@@ -73,7 +71,6 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     selectAllByType,
   } = useTooling(selectedElements, setState);
 
-  // Update icons when theme changes
   useEffect(() => {
     setState(prev => ({
       ...prev,
@@ -85,21 +82,19 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         }
         return node;
       })
-    }), true); // Overwrite state, no history change for theme
+    }), true);
   }, [theme, setState]);
   
-  // Helper to remove temporary preview nodes and edges
   const clearPreviewElements = useCallback(() => {
       setState(prev => {
           if (!prev) return prev;
           const nextNodes = prev.nodes.filter(n => !n.data.isPreview);
           const nextEdges = prev.edges.filter(e => !e.data.isPreview);
-          // Only update state if there were changes
           if (nextNodes.length < prev.nodes.length || nextEdges.length < prev.edges.length) {
               return { nodes: nextNodes, edges: nextEdges };
           }
           return prev;
-      }, true); // Overwrite state, no history for this cleanup
+      }, true);
   }, [setState]);
 
   const handleFetchNeighbors = useCallback(async (sourceNode, setLoading, setError) => {
@@ -112,43 +107,27 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
       setState(prev => {
         if (!prev) return prev;
         
-        // Remove existing previews, but maintain selection state
-        const nodesWithoutPreviews = prev.nodes
-          .filter(n => !n.data.isPreview)
-          .map(n => ({ ...n, selected: n.id === sourceNode.id })); // Ensure sourceNode remains selected
-          
+        const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview).map(n => ({ ...n, selected: n.id === sourceNode.id }));
         const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
-        
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
 
         const neighborsToConnect = allNeighbors.filter(n => n.ip && nodeIdsOnMap.has(n.ip));
-        const neighborsToAddAsPreview = allNeighbors.filter(n => {
-            // Add if it has an IP and is not on the map
-            if (n.ip) return !nodeIdsOnMap.has(n.ip);
-            // Always add end devices as previews (they don't have stable IDs to check)
-            return true;
-        });
+        const neighborsToAddAsPreview = allNeighbors.filter(n => n.ip ? !nodeIdsOnMap.has(n.ip) : true);
         
         const edgesToCreate = [];
-        const existingEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
-        const existingConnections = new Set(
-            edgesWithoutPreviews.map(e => [e.source, e.target].sort().join('--'))
-        );
+        const existingConnections = new Set(edgesWithoutPreviews.map(e => [e.source, e.target].sort().join('--')));
 
         neighborsToConnect.forEach(neighbor => {
-            const newEdgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
             const connectionKey = [sourceNode.id, neighbor.ip].sort().join('--');
-            if (existingEdgeIds.has(newEdgeId) || existingConnections.has(connectionKey)) {
-                return;
+            if (!existingConnections.has(connectionKey)) {
+                edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor.ip, neighbor, false));
             }
-            edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor.ip, neighbor, false));
         });
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
 
-        // --- NEW LOGIC: Decide between popup and on-map previews ---
         if (neighborsToAddAsPreview.length > 10) {
             onShowNeighborPopup(neighborsToAddAsPreview, sourceNode);
-            setCurrentNeighbors(neighborsToAddAsPreview); // For sidebar message
+            setCurrentNeighbors(neighborsToAddAsPreview);
             setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id)); 
             return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
         }
@@ -159,20 +138,14 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
         }
         
-        const previewNodes = [];
-        const previewEdges = [];
+        const previewNodes = [], previewEdges = [];
         const radius = 250;
         const angleStep = (2 * Math.PI) / neighborsToAddAsPreview.length;
 
         neighborsToAddAsPreview.forEach((neighbor, index) => {
             const angle = angleStep * index - (Math.PI / 2);
-            const position = {
-                x: sourceNode.position.x + radius * Math.cos(angle),
-                y: sourceNode.position.y + radius * Math.sin(angle)
-            };
-            const previewNode = createNodeObject(
-                { ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position
-            );
+            const position = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
+            const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
             previewNode.data.isPreview = true;
             previewNodes.push(previewNode);
             previewEdges.push(createEdgeObject(sourceNode.id, previewNode.id, neighbor, true));
@@ -188,161 +161,136 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     }
   }, [setState, createNodeObject, t, onShowNeighborPopup, setSelectedElements]);
 
-  const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
+    const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
     setLoading(true);
     setError('');
-    
-    // Handle end devices (no IP) by skipping API calls
-    if (!nodeToConfirm.data.ip) {
+
+    const isEndDevice = !nodeToConfirm.data.ip;
+    const isFromList = nodeToConfirm.data.isFromList;
+
+    const { sourceNodeId, neighborInfo } = (() => {
+        if (isFromList) {
+            return { sourceNodeId: nodeToConfirm.data.sourceNodeId, neighborInfo: nodeToConfirm.data };
+        }
+        const edge = edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview);
+        return { sourceNodeId: edge?.source, neighborInfo: { ...nodeToConfirm.data, interface: edge?.data.interface }};
+    })();
+
+    if (!sourceNodeId) {
+        setError(t('app.errorAddNeighborGeneric'));
+        setLoading(false);
+        return;
+    }
+
+    const handleStateUpdate = (prev, newNode, newEdges = []) => {
+        const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
+        if (!sourceNode) return prev;
+        
+        const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id);
+        const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
+        
+        const nextNodes = [...nodesWithoutPreviews, newNode];
+        nextNodes.forEach(n => n.selected = n.id === sourceNodeId);
+        
+        const nextEdges = [...edgesWithoutPreviews, ...newEdges];
+        setSelectedElements([sourceNode]);
+
+        const permanentNodeIpsOnMap = new Set(nextNodes.filter(n => n.data.ip).map(n => n.data.ip));
+        const remainingNeighbors = currentNeighbors.filter(n => {
+            if (n.ip) return !permanentNodeIpsOnMap.has(n.ip);
+            return !(n.neighbor === neighborInfo.neighbor && n.interface === neighborInfo.interface);
+        });
+        setCurrentNeighbors(remainingNeighbors);
+
+        const previewNodes = [], previewEdges = [];
+        if (remainingNeighbors.length > 0 && remainingNeighbors.length <= 10) {
+            const radius = 250;
+            const angleStep = (2 * Math.PI) / remainingNeighbors.length;
+            remainingNeighbors.forEach((neighbor, index) => {
+                const angle = angleStep * index - (Math.PI / 2);
+                const pos = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
+                const pNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, pos);
+                pNode.data.isPreview = true;
+                previewNodes.push(pNode);
+                previewEdges.push(createEdgeObject(sourceNode.id, pNode.id, neighbor, true));
+            });
+        } else if (remainingNeighbors.length > 10) {
+            onShowNeighborPopup(remainingNeighbors, sourceNode);
+        }
+
+        return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
+    };
+
+    if (isEndDevice) {
         setState(prev => {
-            const previewEdge = prev.edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview);
-            if (!previewEdge) return prev; // Should not happen
-
-            const sourceNodeId = previewEdge.source;
-            const confirmedNeighborInterface = previewEdge.data.interface;
-
-            const newNode = createNodeObject(
-                { ip: '', hostname: nodeToConfirm.data.hostname, type: 'Switch' },
-                nodeToConfirm.position
-            );
-            newNode.selected = false;
-
-            const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id);
-            const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
-            
-            const nextNodes = [...nodesWithoutPreviews, newNode];
-            const nextEdges = [...edgesWithoutPreviews, createEdgeObject(sourceNodeId, newNode.id, { interface: confirmedNeighborInterface }, false)];
-
-            const sourceNode = nextNodes.find(n => n.id === sourceNodeId);
-            if (sourceNode) {
-                 nextNodes.forEach(n => n.selected = n.id === sourceNodeId);
-                 setSelectedElements([sourceNode]);
-
-                const permanentNodeIpsOnMap = new Set(nextNodes.filter(n => n.data.ip).map(n => n.data.ip));
-                const remainingNeighbors = currentNeighbors.filter(n => {
-                    if (n.ip) return !permanentNodeIpsOnMap.has(n.ip);
-                    return n.interface !== confirmedNeighborInterface;
-                });
-                
-                setCurrentNeighbors(remainingNeighbors);
-
-                if (remainingNeighbors.length > 10) {
-                    onShowNeighborPopup(remainingNeighbors, sourceNode);
-                    return { nodes: nextNodes, edges: nextEdges };
-                }
-
-                const previewNodes = [];
-                const previewEdges = [];
-                const radius = 250;
-                const angleStep = remainingNeighbors.length > 0 ? (2 * Math.PI) / remainingNeighbors.length : 0;
-                
-                remainingNeighbors.forEach((neighbor, index) => {
-                    const angle = angleStep * index - (Math.PI / 2);
-                    const position = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
-                    const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
-                    previewNode.data.isPreview = true;
-                    previewNodes.push(previewNode);
-                    previewEdges.push(createEdgeObject(sourceNode.id, previewNode.id, neighbor, true));
-                });
-                return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
-            }
-
-            return { nodes: nextNodes, edges: nextEdges };
+            const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
+            if (!sourceNode) return prev;
+            const position = { x: sourceNode.position.x + (Math.random() * 300 - 150), y: sourceNode.position.y + 200 };
+            const newNode = createNodeObject({ ip: '', hostname: neighborInfo.neighbor, type: 'Switch' }, position);
+            const newEdge = createEdgeObject(sourceNodeId, newNode.id, neighborInfo, false);
+            return handleStateUpdate(prev, newNode, [newEdge]);
         });
         setLoading(false);
         return;
     }
 
-    // Existing logic for devices with IPs
     try {
-        const sourceNodeId = edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview)?.source;
-        const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
-        if (deviceResponse.data.error) throw new Error(`No device info for ${nodeToConfirm.id}`);
+        const deviceResponse = await api.getDeviceInfo(nodeToConfirm.data.ip);
+        if (deviceResponse.data.error) throw new Error(`No device info for ${nodeToConfirm.data.ip}`);
         
         const confirmedNodeData = deviceResponse.data;
-        const neighborsResponse = await api.getDeviceNeighbors(nodeToConfirm.id);
+        const neighborsResponse = await api.getDeviceNeighbors(nodeToConfirm.data.ip);
         const allNeighborsOfNewNode = neighborsResponse.data.neighbors || [];
 
         setState(prev => {
-            const newNode = createNodeObject(confirmedNodeData, nodeToConfirm.position);
-            newNode.selected = false; 
+            const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
+            if (!sourceNode) return prev;
 
-            const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id);
-            const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
-            const nextNodes = [...nodesWithoutPreviews, newNode];
+            const position = isFromList 
+                ? { x: sourceNode.position.x + (Math.random() * 300 - 150), y: sourceNode.position.y + 200 } 
+                : nodeToConfirm.position;
 
-            if (sourceNodeId) {
-                nextNodes.forEach(n => n.selected = n.id === sourceNodeId);
-            }
+            const newNode = createNodeObject(confirmedNodeData, position);
+
+            const edgesToPromote = isFromList 
+                ? [createEdgeObject(sourceNodeId, newNode.id, neighborInfo, false)]
+                : prev.edges.filter(e => e.data.isPreview && e.target === nodeToConfirm.id).map(e => ({ ...e, id: `e-${e.source}-${newNode.id}-${e.data.interface.replace(/[/]/g, '-')}`, target: newNode.id, data: { ...e.data, isPreview: false }, animated: false, style: { stroke: '#6c757d' }}));
             
-            const edgesToPromote = prev.edges
-                .filter(e => e.data.isPreview && (e.target === nodeToConfirm.id || e.source === nodeToConfirm.id))
-                .map(e => ({ ...e, style: { stroke: '#6c757d' }, data: { ...e.data, isPreview: false }, animated: false }));
+            let tempState = handleStateUpdate(prev, newNode, edgesToPromote);
             
-            let nextEdges = [...edgesWithoutPreviews, ...edgesToPromote];
-
-            const permanentNodeIdsOnMap = new Set(nextNodes.map(n => n.id));
-            const existingConnections = new Set(nextEdges.map(e => [e.source, e.target].sort().join('--')));
+            const permanentNodeIdsOnMap = new Set(tempState.nodes.map(n => n.id));
+            const existingConnections = new Set(tempState.edges.map(e => [e.source, e.target].sort().join('--')));
             
             const neighborsToConnect = allNeighborsOfNewNode.filter(n => n.ip && permanentNodeIdsOnMap.has(n.ip));
             neighborsToConnect.forEach(neighbor => {
                 const connectionKey = [newNode.id, neighbor.ip].sort().join('--');
                 if (!existingConnections.has(connectionKey)) {
-                    nextEdges.push(createEdgeObject(newNode.id, neighbor.ip, neighbor, false));
+                    tempState.edges.push(createEdgeObject(newNode.id, neighbor.ip, neighbor, false));
                 }
             });
-            
-            const sourceNode = nextNodes.find(n => n.id === sourceNodeId);
-            if (sourceNode) {
-                setSelectedElements([sourceNode]);
-                const remainingNeighbors = currentNeighbors.filter(n => !permanentNodeIdsOnMap.has(n.ip));
-                setCurrentNeighbors(remainingNeighbors);
-                
-                if (remainingNeighbors.length > 10) {
-                    onShowNeighborPopup(remainingNeighbors, sourceNode);
-                    return { nodes: nextNodes, edges: nextEdges };
-                }
-
-                const previewNodes = [], previewEdges = [];
-                const radius = 250;
-                const angleStep = remainingNeighbors.length > 0 ? (2 * Math.PI) / remainingNeighbors.length : 0;
-                
-                remainingNeighbors.forEach((neighbor, index) => {
-                    const angle = angleStep * index - (Math.PI / 2);
-                    const position = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
-                    const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
-                    previewNode.data.isPreview = true;
-                    previewNodes.push(previewNode);
-                    previewEdges.push(createEdgeObject(sourceNode.id, previewNode.id, neighbor, true));
-                });
-                return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
-            }
-
-            return { nodes: nextNodes, edges: nextEdges };
+            return tempState;
         });
-
     } catch (err) {
-        setError(t('app.errorAddNeighbor', { ip: nodeToConfirm.id }));
+        setError(t('app.errorAddNeighbor', { ip: nodeToConfirm.data.ip }));
         clearPreviewElements();
     } finally {
         setLoading(false);
     }
   }, [edges, currentNeighbors, setState, createNodeObject, clearPreviewElements, t, onShowNeighborPopup, setSelectedElements]);
 
-  const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
-      const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
-      
-      if (nodeToConfirm) {
-          confirmPreviewNode(nodeToConfirm, setLoading, setError);
-      } else {
-          const dummyId = neighbor.ip || `end-device-${neighbor.neighbor.replace(/\s/g, '-')}-${Date.now()}`;
-          const dummyNodeToConfirm = {
-              id: dummyId,
-              position: {x: 0, y: 0},
-              data: { isPreview: true, hostname: neighbor.neighbor, ip: neighbor.ip },
-          };
-          confirmPreviewNode(dummyNodeToConfirm, setLoading, setError);
-      }
+  const confirmNeighbor = useCallback((neighbor, sourceNodeId, setLoading, setError) => {
+    const onMapPreviewNode = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
+
+    if (onMapPreviewNode) {
+        confirmPreviewNode(onMapPreviewNode, setLoading, setError);
+    } else {
+        const dummyNodeToConfirm = {
+            id: neighbor.ip || `temp-id-${neighbor.neighbor}-${neighbor.interface}`,
+            position: { x: 0, y: 0 },
+            data: { ...neighbor, isPreview: true, isFromList: true, sourceNodeId: sourceNodeId },
+        };
+        confirmPreviewNode(dummyNodeToConfirm, setLoading, setError);
+    }
   }, [nodes, confirmPreviewNode]);
 
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
@@ -416,10 +364,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         if (isDrag && !dragContext.current) {
             const context = { childrenMap: new Map() };
             const movedGroupIds = new Set(
-                changes
-                    .map(c => prev.nodes.find(n => n.id === c.id))
-                    .filter(n => n && n.type === 'group')
-                    .map(n => n.id)
+                changes.map(c => prev.nodes.find(n => n.id === c.id)).filter(n => n && n.type === 'group').map(n => n.id)
             );
 
             if (movedGroupIds.size > 0) {
@@ -427,17 +372,11 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
                 for (const node of potentialChildren) {
                     const parentGroup = prev.nodes
                         .filter(g => movedGroupIds.has(g.id) &&
-                            node.position.x >= g.position.x &&
-                            (node.position.x + (node.width || NODE_WIDTH)) <= (g.position.x + g.data.width) &&
-                            node.position.y >= g.position.y &&
-                            (node.position.y + (node.height || NODE_HEIGHT)) <= (g.position.y + g.data.height)
-                        )
-                        .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0];
-                    
+                            node.position.x >= g.position.x && (node.position.x + (node.width || NODE_WIDTH)) <= (g.position.x + g.data.width) &&
+                            node.position.y >= g.position.y && (node.position.y + (node.height || NODE_HEIGHT)) <= (g.position.y + g.data.height)
+                        ).sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))[0];
                     if (parentGroup) {
-                        if (!context.childrenMap.has(parentGroup.id)) {
-                            context.childrenMap.set(parentGroup.id, new Set());
-                        }
+                        if (!context.childrenMap.has(parentGroup.id)) context.childrenMap.set(parentGroup.id, new Set());
                         context.childrenMap.get(parentGroup.id).add(node.id);
                     }
                 }
@@ -448,15 +387,12 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         if (isDrag) {
             const draggedNodeIds = new Set(changes.filter(c => c.dragging).map(c => c.id));
             const draggedNodes = prev.nodes.filter(n => draggedNodeIds.has(n.id));
-            
             const updatedDraggedNodes = draggedNodes.map(dn => {
                 const change = changes.find(c => c.id === dn.id && c.position);
                 return change ? { ...dn, position: change.position } : dn;
             });
-            
             const { snapLines, positionAdjustment } = calculateSnaps(updatedDraggedNodes, prev.nodes);
             setSnapLines(snapLines);
-
             changes.forEach(change => {
                 if (draggedNodeIds.has(change.id) && change.position) {
                     change.position.x += positionAdjustment.x;
@@ -474,17 +410,13 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             for (const change of positionChanges) {
                 const originalNode = prev.nodes.find(n => n.id === change.id);
                 if (originalNode && originalNode.type === 'group') {
-                    groupDeltas.set(originalNode.id, {
-                        dx: change.position.x - originalNode.position.x,
-                        dy: change.position.y - originalNode.position.y,
-                    });
+                    groupDeltas.set(originalNode.id, { dx: change.position.x - originalNode.position.x, dy: change.position.y - originalNode.position.y });
                 }
             }
 
             if (groupDeltas.size > 0) {
                 const directlyMovedNodeIds = new Set(positionChanges.map(c => c.id));
                 const childrenToMove = new Map();
-
                 dragContext.current.childrenMap.forEach((childIds, groupId) => {
                     const delta = groupDeltas.get(groupId);
                     if (delta) {
@@ -492,27 +424,16 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
                             if (!directlyMovedNodeIds.has(childId)) {
                                 const originalChildNode = prev.nodes.find(n => n.id === childId);
                                 if(originalChildNode) {
-                                    childrenToMove.set(childId, {
-                                        x: originalChildNode.position.x + delta.dx,
-                                        y: originalChildNode.position.y + delta.dy,
-                                    });
+                                    childrenToMove.set(childId, { x: originalChildNode.position.x + delta.dx, y: originalChildNode.position.y + delta.dy });
                                 }
                             }
                         });
                     }
                 });
-
-                nextNodes = nextNodes.map(node => {
-                    if (childrenToMove.has(node.id)) {
-                        return { ...node, position: childrenToMove.get(node.id) };
-                    }
-                    return node;
-                });
+                nextNodes = nextNodes.map(node => childrenToMove.has(node.id) ? { ...node, position: childrenToMove.get(node.id) } : node);
             }
         }
-        
         return { ...prev, nodes: nextNodes };
-
     }, !isDragEnd);
 
     if (isDragEnd) {
@@ -558,7 +479,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     currentNeighbors,
     confirmNeighbor,
     confirmPreviewNode,
-    setLoading: setIsLoading, // Expose local loading state setter
-    setError: setError, // Expose local error state setter
+    setLoading: setIsLoading,
+    setError: setError,
   };
 };

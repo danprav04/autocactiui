@@ -179,13 +179,12 @@ function App() {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
     
-    // To add the node, we call the hook's function to confirm the neighbor.
-    confirmNeighbor(neighbor, setIsLoading, setAppError);
+    confirmNeighbor(neighbor, sourceNode.id, setIsLoading, setAppError);
 
-    // Remove the added neighbor from the popup list to prevent duplicates
+    // Correctly filter out only the added neighbor, handling end devices safely.
     setNeighborPopup(prev => ({
         ...prev,
-        neighbors: prev.neighbors.filter(n => n.ip !== neighbor.ip)
+        neighbors: prev.neighbors.filter(n => !(n.neighbor === neighbor.neighbor && n.interface === neighbor.interface))
     }));
 
   }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError]);
@@ -269,7 +268,11 @@ function App() {
           bringToFront={bringToFront}
           sendToBack={sendToBack}
           neighbors={selectedCustomNode ? currentNeighbors.filter(n => !nodes.some(node => node.id === n.ip)) : []}
-          onAddNeighbor={confirmNeighbor}
+          onAddNeighbor={(neighbor) => {
+            if (selectedCustomNode) {
+              confirmNeighbor(neighbor, selectedCustomNode.id, setIsLoading, setAppError);
+            }
+          }}
         />
         <div className="main-content" ref={reactFlowWrapper}>
           <TopToolbar
