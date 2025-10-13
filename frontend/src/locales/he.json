@@ -90,7 +90,8 @@
     "addElements": "הוסף רכיבים",
     "mapActions": "פעולות מפה",
     "quickSelect": "בחירה מהירה",
-    "selectByType": "בחר לפי סוג..."
+    "selectByType": "בחר לפי סוג...",
+    "endDeviceIdentifier": "התקן קצה (ללא IP)"
   },
   "startup": {
     "title": "יוצר מפות רשת אינטראקטיבי",

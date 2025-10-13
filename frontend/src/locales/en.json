@@ -90,7 +90,8 @@
     "addElements": "Add Elements",
     "mapActions": "Map Actions",
     "quickSelect": "Quick Select",
-    "selectByType": "Select by type..."
+    "selectByType": "Select by type...",
+    "endDeviceIdentifier": "End Device (No IP)"
   },
   "startup": {
     "title": "Interactive Network Map Creator",

@@ -13,14 +13,15 @@ import { calculateSnaps } from './useSnapping';
 /**
  * Creates a React Flow edge object.
  * @param {string} sourceId - The ID of the source node.
+ * @param {string} targetId - The ID of the target node.
  * @param {object} neighborInfo - The neighbor data from the API.
  * @param {boolean} [isPreview=false] - Whether the edge is a temporary preview.
  * @returns {object} A complete React Flow edge object.
  */
-const createEdgeObject = (sourceId, neighborInfo, isPreview = false) => {
-    const { ip, interface: iface } = neighborInfo;
+const createEdgeObject = (sourceId, targetId, neighborInfo, isPreview = false) => {
+    const { interface: iface } = neighborInfo;
     // A unique ID is crucial for identifying each distinct connection
-    const edgeId = `e-${sourceId}-${ip}-${iface.replace(/[/]/g, '-')}`;
+    const edgeId = `e-${sourceId}-${targetId}-${iface.replace(/[/]/g, '-')}`;
 
     const style = isPreview
         ? { stroke: '#007bff', strokeDasharray: '5 5' }
@@ -30,7 +31,7 @@ const createEdgeObject = (sourceId, neighborInfo, isPreview = false) => {
     return {
         id: edgeId,
         source: sourceId,
-        target: ip,
+        target: targetId,
         animated: !isPreview,
         style,
         data: {
@@ -120,8 +121,13 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
 
-        const neighborsToConnect = allNeighbors.filter(n => nodeIdsOnMap.has(n.ip));
-        const neighborsToAddAsPreview = allNeighbors.filter(n => !nodeIdsOnMap.has(n.ip));
+        const neighborsToConnect = allNeighbors.filter(n => n.ip && nodeIdsOnMap.has(n.ip));
+        const neighborsToAddAsPreview = allNeighbors.filter(n => {
+            // Add if it has an IP and is not on the map
+            if (n.ip) return !nodeIdsOnMap.has(n.ip);
+            // Always add end devices as previews (they don't have stable IDs to check)
+            return true;
+        });
         
         const edgesToCreate = [];
         const existingEdgeIds = new Set(edgesWithoutPreviews.map(e => e.id));
@@ -135,7 +141,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             if (existingEdgeIds.has(newEdgeId) || existingConnections.has(connectionKey)) {
                 return;
             }
-            edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor, false));
+            edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor.ip, neighbor, false));
         });
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
 
@@ -169,7 +175,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             );
             previewNode.data.isPreview = true;
             previewNodes.push(previewNode);
-            previewEdges.push(createEdgeObject(sourceNode.id, neighbor, true));
+            previewEdges.push(createEdgeObject(sourceNode.id, previewNode.id, neighbor, true));
         });
         
         setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id));
@@ -186,16 +192,74 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     setLoading(true);
     setError('');
     
-    // Find the ID of the node that initiated the preview
-    const sourceNodeId = edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview)?.source;
+    // Handle end devices (no IP) by skipping API calls
+    if (!nodeToConfirm.data.ip) {
+        setState(prev => {
+            const previewEdge = prev.edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview);
+            if (!previewEdge) return prev; // Should not happen
 
+            const sourceNodeId = previewEdge.source;
+            const confirmedNeighborInterface = previewEdge.data.interface;
+
+            const newNode = createNodeObject(
+                { ip: '', hostname: nodeToConfirm.data.hostname, type: 'Switch' },
+                nodeToConfirm.position
+            );
+            newNode.selected = false;
+
+            const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id);
+            const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
+            
+            const nextNodes = [...nodesWithoutPreviews, newNode];
+            const nextEdges = [...edgesWithoutPreviews, createEdgeObject(sourceNodeId, newNode.id, { interface: confirmedNeighborInterface }, false)];
+
+            const sourceNode = nextNodes.find(n => n.id === sourceNodeId);
+            if (sourceNode) {
+                 nextNodes.forEach(n => n.selected = n.id === sourceNodeId);
+                 setSelectedElements([sourceNode]);
+
+                const permanentNodeIpsOnMap = new Set(nextNodes.filter(n => n.data.ip).map(n => n.data.ip));
+                const remainingNeighbors = currentNeighbors.filter(n => {
+                    if (n.ip) return !permanentNodeIpsOnMap.has(n.ip);
+                    return n.interface !== confirmedNeighborInterface;
+                });
+                
+                setCurrentNeighbors(remainingNeighbors);
+
+                if (remainingNeighbors.length > 10) {
+                    onShowNeighborPopup(remainingNeighbors, sourceNode);
+                    return { nodes: nextNodes, edges: nextEdges };
+                }
+
+                const previewNodes = [];
+                const previewEdges = [];
+                const radius = 250;
+                const angleStep = remainingNeighbors.length > 0 ? (2 * Math.PI) / remainingNeighbors.length : 0;
+                
+                remainingNeighbors.forEach((neighbor, index) => {
+                    const angle = angleStep * index - (Math.PI / 2);
+                    const position = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
+                    const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
+                    previewNode.data.isPreview = true;
+                    previewNodes.push(previewNode);
+                    previewEdges.push(createEdgeObject(sourceNode.id, previewNode.id, neighbor, true));
+                });
+                return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
+            }
+
+            return { nodes: nextNodes, edges: nextEdges };
+        });
+        setLoading(false);
+        return;
+    }
+
+    // Existing logic for devices with IPs
     try {
+        const sourceNodeId = edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview)?.source;
         const deviceResponse = await api.getDeviceInfo(nodeToConfirm.id);
-        if (deviceResponse.data.error) {
-            throw new Error(`No device info for ${nodeToConfirm.id}`);
-        }
+        if (deviceResponse.data.error) throw new Error(`No device info for ${nodeToConfirm.id}`);
+        
         const confirmedNodeData = deviceResponse.data;
-
         const neighborsResponse = await api.getDeviceNeighbors(nodeToConfirm.id);
         const allNeighborsOfNewNode = neighborsResponse.data.neighbors || [];
 
@@ -203,82 +267,57 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             const newNode = createNodeObject(confirmedNodeData, nodeToConfirm.position);
             newNode.selected = false; 
 
-            // Filter out all existing preview elements
-            const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview);
+            const nodesWithoutPreviews = prev.nodes.filter(n => !n.data.isPreview && n.id !== nodeToConfirm.id);
             const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
-            
-            // Remove the node that was just confirmed (it was a preview node in the previous state)
-            const nextNodes = nodesWithoutPreviews.filter(n => n.id !== nodeToConfirm.id);
-            nextNodes.push(newNode);
+            const nextNodes = [...nodesWithoutPreviews, newNode];
 
-            // Re-select the source node that was selected BEFORE the new one was added
-            const sourceNode = nextNodes.find(n => n.id === sourceNodeId);
-            if (sourceNode) {
-                // Ensure only the source node is selected
-                nextNodes.forEach(n => n.selected = n.id === sourceNodeId); 
+            if (sourceNodeId) {
+                nextNodes.forEach(n => n.selected = n.id === sourceNodeId);
             }
             
-            // Promote preview edges connected to the new node to permanent
             const edgesToPromote = prev.edges
                 .filter(e => e.data.isPreview && (e.target === nodeToConfirm.id || e.source === nodeToConfirm.id))
                 .map(e => ({ ...e, style: { stroke: '#6c757d' }, data: { ...e.data, isPreview: false }, animated: false }));
             
-            const nextEdges = [...edgesWithoutPreviews, ...edgesToPromote];
+            let nextEdges = [...edgesWithoutPreviews, ...edgesToPromote];
 
-            const permanentNodeIdsOnMap = new Set(nextNodes.filter(n => !n.data.isPreview).map(n => n.id));
-            const existingEdgeIds = new Set(nextEdges.map(e => e.id));
+            const permanentNodeIdsOnMap = new Set(nextNodes.map(n => n.id));
             const existingConnections = new Set(nextEdges.map(e => [e.source, e.target].sort().join('--')));
             
-            // Add any new connections for the added device to existing permanent nodes
-            const neighborsToConnect = allNeighborsOfNewNode.filter(n => permanentNodeIdsOnMap.has(n.ip));
+            const neighborsToConnect = allNeighborsOfNewNode.filter(n => n.ip && permanentNodeIdsOnMap.has(n.ip));
             neighborsToConnect.forEach(neighbor => {
-                const newEdgeId = `e-${newNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
                 const connectionKey = [newNode.id, neighbor.ip].sort().join('--');
-                if (!existingEdgeIds.has(newEdgeId) && !existingConnections.has(connectionKey)) {
-                    nextEdges.push(createEdgeObject(newNode.id, neighbor, false));
+                if (!existingConnections.has(connectionKey)) {
+                    nextEdges.push(createEdgeObject(newNode.id, neighbor.ip, neighbor, false));
                 }
             });
             
-            // --- Re-apply neighbor/preview logic for the source node ---
+            const sourceNode = nextNodes.find(n => n.id === sourceNodeId);
             if (sourceNode) {
-                // Find the original source node's full list of neighbors
-                const sourceNeighbors = currentNeighbors;
-
-                const remainingNeighbors = sourceNeighbors.filter(n => !permanentNodeIdsOnMap.has(n.ip));
-                setCurrentNeighbors(remainingNeighbors); // Update remaining neighbors in state
+                setSelectedElements([sourceNode]);
+                const remainingNeighbors = currentNeighbors.filter(n => !permanentNodeIdsOnMap.has(n.ip));
+                setCurrentNeighbors(remainingNeighbors);
                 
-                // If the source node has many remaining neighbors, open the popup
                 if (remainingNeighbors.length > 10) {
                     onShowNeighborPopup(remainingNeighbors, sourceNode);
-                    // No on-map previews needed
                     return { nodes: nextNodes, edges: nextEdges };
                 }
 
-                // Otherwise, generate previews for the remaining neighbors
-                const previewNodes = [];
-                const previewEdges = [];
+                const previewNodes = [], previewEdges = [];
                 const radius = 250;
-                const angleStep = (2 * Math.PI) / remainingNeighbors.length;
+                const angleStep = remainingNeighbors.length > 0 ? (2 * Math.PI) / remainingNeighbors.length : 0;
                 
                 remainingNeighbors.forEach((neighbor, index) => {
                     const angle = angleStep * index - (Math.PI / 2);
-                    const position = {
-                        x: sourceNode.position.x + radius * Math.cos(angle),
-                        y: sourceNode.position.y + radius * Math.sin(angle)
-                    };
+                    const position = { x: sourceNode.position.x + radius * Math.cos(angle), y: sourceNode.position.y + radius * Math.sin(angle) };
                     const previewNode = createNodeObject({ ip: neighbor.ip, hostname: neighbor.neighbor, type: 'Unknown' }, position);
                     previewNode.data.isPreview = true;
                     previewNodes.push(previewNode);
-                    previewEdges.push(createEdgeObject(sourceNode.id, neighbor, true));
+                    previewEdges.push(createEdgeObject(sourceNode.id, previewNode.id, neighbor, true));
                 });
-
-                setSelectedElements([sourceNode]);
                 return { nodes: [...nextNodes, ...previewNodes], edges: [...nextEdges, ...previewEdges] };
             }
 
-            // Fallback for unexpected selection state
-            setSelectedElements([]);
-            setCurrentNeighbors([]);
             return { nodes: nextNodes, edges: nextEdges };
         });
 
@@ -291,19 +330,16 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   }, [edges, currentNeighbors, setState, createNodeObject, clearPreviewElements, t, onShowNeighborPopup, setSelectedElements]);
 
   const confirmNeighbor = useCallback((neighbor, setLoading, setError) => {
-      // Find the preview node by IP (if it exists)
       const nodeToConfirm = nodes.find(n => n.id === neighbor.ip && n.data.isPreview);
       
       if (nodeToConfirm) {
-          // If a preview node exists, click it to confirm
           confirmPreviewNode(nodeToConfirm, setLoading, setError);
       } else {
-          // If no preview node exists (e.g., adding from a popup), create one manually
-          // The coordinates here are placeholders, but the core logic handles the confirmation.
+          const dummyId = neighbor.ip || `end-device-${neighbor.neighbor.replace(/\s/g, '-')}-${Date.now()}`;
           const dummyNodeToConfirm = {
-              id: neighbor.ip,
-              position: {x: 0, y: 0}, 
-              data: { isPreview: true, hostname: neighbor.neighbor },
+              id: dummyId,
+              position: {x: 0, y: 0},
+              data: { isPreview: true, hostname: neighbor.neighbor, ip: neighbor.ip },
           };
           confirmPreviewNode(dummyNodeToConfirm, setLoading, setError);
       }
@@ -316,10 +352,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     }
     
     const isNodeAlreadySelected = selectedElements.some(el => el.id === node.id);
-
-    if (isContextMenu && isNodeAlreadySelected) {
-        return;
-    }
+    if (isContextMenu && isNodeAlreadySelected) return;
 
     const isMultiSelect = event && (event.ctrlKey || event.metaKey);
     let newSelectedNodes;
@@ -340,9 +373,9 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         nodes: prev.nodes.map(n => ({...n, selected: newSelectedNodes.some(sn => sn.id === n.id)}))
     }), true);
 
-    if (newSelectedNodes.length === 1 && newSelectedNodes[0].type === 'custom') {
-        // Pass the App.js-scoped setters for error/loading notification
-        handleFetchNeighbors(newSelectedNodes[0], setLoading, setError); 
+    const selectedNode = newSelectedNodes[0];
+    if (newSelectedNodes.length === 1 && selectedNode.type === 'custom' && selectedNode.data.ip) {
+        handleFetchNeighbors(selectedNode, setLoading, setError); 
     } else {
         setCurrentNeighbors([]);
     }
@@ -375,7 +408,6 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     const isDrag = changes.some(c => c.type === 'position' && c.dragging);
     const isDragEnd = changes.some(c => c.type === 'position' && c.dragging === false);
     
-    // Crucially, we DO NOT check the `isLoading` state here. Dragging is always allowed.
     if (!isDrag && !isDragEnd) {
         setSnapLines([]);
     }

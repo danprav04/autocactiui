@@ -29,7 +29,7 @@ export default memo(({ data, selected }) => {
       
       <div className="node-label">
         <strong>{data.hostname}</strong>
-        <small>{data.ip}</small>
+        {data.ip && <small>{data.ip}</small>}
       </div>
     </div>
   );

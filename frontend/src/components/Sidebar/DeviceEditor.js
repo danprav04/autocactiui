@@ -43,6 +43,8 @@ const DeviceEditor = ({
 
   if (!selectedElement) return null;
 
+  const isEndDevice = !selectedElement.data.ip;
+
   return (
     <>
       <h3>{t('sidebar.editDevice')}</h3>
@@ -57,7 +59,12 @@ const DeviceEditor = ({
       </div>
       <div className="control-group">
         <label htmlFor="ip-display">{t('sidebar.ipAddress')}</label>
-        <input id="ip-display" type="text" value={selectedElement.data.ip} disabled={true} />
+        <input 
+          id="ip-display" 
+          type="text" 
+          value={isEndDevice ? t('sidebar.endDeviceIdentifier') : selectedElement.data.ip} 
+          disabled={true} 
+        />
       </div>
       <div className="control-group">
         <label htmlFor="type-selector">{t('sidebar.deviceType')}</label>
@@ -79,7 +86,7 @@ const DeviceEditor = ({
           {t('sidebar.deleteDevice')}
         </button>
       </div>
-      <NeighborsList neighbors={neighbors} onAddNeighbor={onAddNeighbor} />
+      {!isEndDevice && <NeighborsList neighbors={neighbors} onAddNeighbor={onAddNeighbor} />}
     </>
   );
 };

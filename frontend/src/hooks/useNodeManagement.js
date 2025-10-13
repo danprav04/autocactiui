@@ -14,8 +14,11 @@ export const useNodeManagement = (theme, setState) => {
       finalIconName = ICONS_BY_THEME[discoveredType] ? discoveredType : 'Unknown';
     }
     
+    // If IP is missing, create a unique ID to prevent collisions for end devices.
+    const nodeId = device.ip || `end-device-${device.hostname.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}`;
+
     return {
-      id: device.ip,
+      id: nodeId,
       type: 'custom',
       position: position || { x: (Math.random() * 400) + 100, y: (Math.random() * 400) + 50 },
       data: { 
