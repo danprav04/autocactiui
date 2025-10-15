@@ -87,58 +87,12 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         if (node.type !== 'custom') return node;
         const iconType = node.data.iconType;
         if (iconType && ICONS_BY_THEME[iconType]) {
-          return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
+          return { ...node, data: { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } } };
         }
         return node;
       })
     }), true);
   }, [theme, setState]);
-
-  // Background task to check for new interconnections
-  useEffect(() => {
-      const interconnectCheckInterval = setInterval(async () => {
-          const currentNodes = nodesRef.current;
-          const currentEdges = edgesRef.current;
-          
-          const deviceNodes = currentNodes.filter(n => n.data.ip && !n.data.isPreview);
-          if (deviceNodes.length < 2) return;
-
-          const nodesOnMap = new Set(deviceNodes.map(n => n.id));
-          const existingConnections = new Set(currentEdges.map(e => [e.source, e.target].sort().join('--')));
-          const newEdges = [];
-
-          for (const node of deviceNodes) {
-              try {
-                  const response = await api.getDeviceNeighbors(node.id);
-                  const neighbors = response.data.neighbors || [];
-                  
-                  for (const neighbor of neighbors) {
-                      if (neighbor.ip && nodesOnMap.has(neighbor.ip)) {
-                          const connectionKey = [node.id, neighbor.ip].sort().join('--');
-                          const edgeId = `e-${node.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
-
-                          // Check if a link for this specific interface already exists
-                          const interfaceExists = currentEdges.some(e => e.id === edgeId);
-
-                          if (existingConnections.has(connectionKey) && !interfaceExists) {
-                              // Connection exists, but maybe this specific link is new
-                               newEdges.push(createEdgeObject(node.id, neighbor.ip, neighbor, false));
-                          }
-                      }
-                  }
-              } catch (err) {
-                  // Fail silently to avoid spamming the user with notifications
-                  console.warn(`Background interconnect check failed for ${node.id}:`, err);
-              }
-          }
-
-          if (newEdges.length > 0) {
-              setState(prev => ({ ...prev, edges: [...prev.edges, ...newEdges] }));
-          }
-      }, 30000); // Run every 30 seconds
-
-      return () => clearInterval(interconnectCheckInterval);
-  }, [setState]); // Dependency on setState only, which is stable
   
   const clearPreviewElements = useCallback(() => {
       setState(prev => {
@@ -275,7 +229,11 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             const permanentNodeIdsOnMap = new Set(tempState.nodes.map(n => n.id));
             const existingEdgeIds = new Set(tempState.edges.map(e => e.id));
             
-            const neighborsToConnect = allNeighborsOfNewNode.filter(n => n.ip && permanentNodeIdsOnMap.has(n.ip));
+            const neighborsToConnect = allNeighborsOfNewNode.filter(n => 
+                n.ip && 
+                n.ip !== sourceNodeId && // Exclude the source node from this check
+                permanentNodeIdsOnMap.has(n.ip)
+            );
             
             neighborsToConnect.forEach(neighbor => {
                 const edgeId = `e-${confirmedNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
