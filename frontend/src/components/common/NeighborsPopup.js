@@ -30,6 +30,7 @@ const NeighborsPopup = ({
   neighbors,
   sourceHostname,
   onAddNeighbor,
+  onAddAllNeighbors,
   onClose,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -59,15 +60,40 @@ const NeighborsPopup = ({
     };
   }, [isOpen, onClose]);
 
+  const groupedNeighbors = React.useMemo(() => {
+    const neighborMap = new Map();
+    neighbors.forEach(neighbor => {
+      const key = neighbor.ip || neighbor.neighbor;
+      if (!neighborMap.has(key)) {
+        neighborMap.set(key, {
+          ...neighbor,
+          links: [neighbor]
+        });
+      } else {
+        neighborMap.get(key).links.push(neighbor);
+      }
+    });
+    return Array.from(neighborMap.values());
+  }, [neighbors]);
+
+  const filteredNeighbors = React.useMemo(() => 
+    groupedNeighbors.filter(
+      (n) =>
+        n.neighbor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (n.ip && n.ip.toLowerCase().includes(searchTerm.toLowerCase()))
+    ), 
+  [groupedNeighbors, searchTerm]);
+
+
   if (!isOpen) {
     return null;
   }
 
-  const filteredNeighbors = neighbors.filter(
-    (n) =>
-      n.neighbor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.ip.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleAddAllClick = () => {
+      if(filteredNeighbors.length > 0) {
+          onAddAllNeighbors(filteredNeighbors);
+      }
+  };
 
   return (
     <div className="neighbor-popup-overlay" onClick={onClose}>
@@ -102,18 +128,23 @@ const NeighborsPopup = ({
           <div className="neighbor-grid-panel">
             {filteredNeighbors.length > 0 ? (
               <ul className="neighbor-grid">
-                {filteredNeighbors.map((neighbor) => (
+                {filteredNeighbors.map((group) => (
                   <li
-                    key={neighbor.ip + neighbor.interface}
+                    key={group.ip + group.neighbor}
                     className="neighbor-item"
                   >
                     <div className="neighbor-info">
-                      <strong>{neighbor.neighbor}</strong>
-                      <small>{neighbor.ip}</small>
+                      <strong>{group.neighbor}</strong>
+                      <small>{group.ip || ' '}</small>
+                      {group.links.length > 1 && (
+                        <small style={{ fontWeight: 'bold' }}>
+                          {t('neighborsPopup.multipleLinks', { count: group.links.length })}
+                        </small>
+                      )}
                     </div>
                     <button
                       className="add-neighbor-button"
-                      onClick={() => onAddNeighbor(neighbor)}
+                      onClick={() => onAddNeighbor(group)}
                     >
                       {t("sidebar.add")}
                     </button>
@@ -128,6 +159,13 @@ const NeighborsPopup = ({
               </div>
             )}
           </div>
+            {filteredNeighbors.length > 1 && (
+                <div style={{ flexShrink: 0, paddingTop: '16px', borderTop: '1px solid var(--border-color)', marginTop: '16px' }}>
+                    <button className="add-neighbor-button" onClick={handleAddAllClick}>
+                       {t('neighborsPopup.addAll', { count: filteredNeighbors.length })}
+                    </button>
+                </div>
+            )}
         </div>
       </div>
     </div>

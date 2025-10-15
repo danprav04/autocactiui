@@ -115,6 +115,8 @@
     "title": "Neighbors of {{hostname}}",
     "subtitle": "{{count}} available neighbors found.",
     "searchPlaceholder": "Search by name or IP...",
-    "noResults": "No neighbors match your search."
+    "noResults": "No neighbors match your search.",
+    "multipleLinks": "{{count}} links",
+    "addAll": "Add All ({{count}})"
   }
 }

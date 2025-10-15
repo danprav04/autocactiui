@@ -209,19 +209,31 @@ function App() {
     }
   };
 
-  const handleAddNeighborFromPopup = useCallback((neighbor) => {
+  const handleAddNeighborFromPopup = useCallback((neighborGroup) => {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
     
-    confirmNeighbor(neighbor, sourceNode.id, setIsLoading, setAppError);
+    confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
 
-    // Correctly filter out only the added neighbor, handling end devices safely.
-    setNeighborPopup(prev => ({
-        ...prev,
-        neighbors: prev.neighbors.filter(n => !(n.neighbor === neighbor.neighbor && n.interface === neighbor.interface))
-    }));
+    // After adding, close the popup. The hook will manage updating neighbor availability.
+    handleCloseNeighborPopup();
+  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError, handleCloseNeighborPopup]);
 
-  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError]);
+  const handleAddAllNeighborsFromPopup = useCallback(async (neighborGroups) => {
+    const { sourceNode } = neighborPopup;
+    if (!sourceNode) return;
+
+    handleCloseNeighborPopup();
+    setIsLoading(true);
+
+    // Process each neighbor sequentially to avoid race conditions
+    for (const neighborGroup of neighborGroups) {
+      await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+    }
+    
+    setIsLoading(false);
+  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError, handleCloseNeighborPopup]);
+
 
   const handleCreateMap = async () => {
     if (!reactFlowWrapper.current || nodes.length === 0) { setAppError(t('app.errorEmptyMap')); return; }
@@ -242,6 +254,7 @@ function App() {
         setEdges
       });
       setUploadSuccessData(taskResponse);
+      setMapName('My-Network-Map'); // Reset map name for the next creation
     } catch (err) {
       setAppError(t('app.errorUpload'));
       console.error(err);
@@ -361,12 +374,17 @@ function App() {
                 {isUploading ? t('app.processingMap') : t('app.loading')}
               </p>
             )}
-            <UploadSuccessPopup data={uploadSuccessData} onClose={() => setUploadSuccessData(null)} />
+            <UploadSuccessPopup 
+              key={uploadSuccessData ? JSON.stringify(uploadSuccessData.tasks) : 'popup-closed'}
+              data={uploadSuccessData} 
+              onClose={() => setUploadSuccessData(null)} 
+            />
             <NeighborsPopup
               isOpen={neighborPopup.isOpen}
               neighbors={neighborPopup.neighbors}
               sourceHostname={neighborPopup.sourceNode?.data?.hostname}
               onAddNeighbor={handleAddNeighborFromPopup}
+              onAddAllNeighbors={handleAddAllNeighborsFromPopup}
               onClose={handleCloseNeighborPopup}
             />
           </div>

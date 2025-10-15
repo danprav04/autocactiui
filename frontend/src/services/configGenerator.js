@@ -18,7 +18,7 @@ const CONFIG_Y_OFFSET = 0;
  * 1 = no scaling, 2 = double size, 0.5 = half size.
  * This is applied before the fixed offset.
  */
-const CONFIG_SCALE_FACTOR = 1;
+const CONFIG_SCALE_FACTOR = .9;
 
 
 // Template for a Weathermap NODE used as an invisible anchor for a LINK.

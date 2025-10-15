@@ -6,6 +6,7 @@ from werkzeug.security import check_password_hash
 import time
 from datetime import datetime
 import map_renderer
+import random
 
 # --- Mock Authentication Data ---
 # In a real application, this would be replaced with a proper database
@@ -338,6 +339,7 @@ def get_installations_by_group_id(group_id):
 
 def get_device_info(ip_address):
     """Fetches device type, model, and hostname by IP address."""
+    time.sleep(random.uniform(0.3, 1.2)) # Simulate network latency
     if ip_address in MOCK_NETWORK:
         device_data = MOCK_NETWORK[ip_address]
         return {
@@ -350,6 +352,7 @@ def get_device_info(ip_address):
 
 def get_device_neighbors(ip_address):
     """Gets CDP neighbors of a device by IP address using SNMP (mocked)."""
+    time.sleep(random.uniform(0.5, 1.5)) # Simulate network latency
     if ip_address in MOCK_NEIGHBORS:
         return {"neighbors": MOCK_NEIGHBORS[ip_address]}
     return None
