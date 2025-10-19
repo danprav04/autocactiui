@@ -127,13 +127,12 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         const nodeIdsOnMap = new Set(nodesWithoutPreviews.map(n => n.id));
 
         const neighborsToConnect = allNeighbors.filter(n => n.ip && nodeIdsOnMap.has(n.ip));
-        const neighborsToAddAsPreview = allNeighbors.filter(n => n.ip ? !nodeIdsOnMap.has(n.ip) : true);
+        const neighborsForConsideration = allNeighbors.filter(n => n.ip ? !nodeIdsOnMap.has(n.ip) : true);
         
         const edgesToCreate = [];
         
         neighborsToConnect.forEach(neighbor => {
             const edgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
-            // Add edge only if this specific interface connection doesn't exist
             if (!edgesWithoutPreviews.some(e => e.id === edgeId)) {
                 edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor.ip, neighbor, false));
             }
@@ -141,18 +140,66 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
 
         const edgesWithNewConnections = [...edgesWithoutPreviews, ...edgesToCreate];
 
-        onShowNeighborPopup(neighborsToAddAsPreview, sourceNode);
-        setCurrentNeighbors(neighborsToAddAsPreview);
-        setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id)); 
-        return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
+        const neighborGroups = new Map();
+        neighborsForConsideration.forEach(neighbor => {
+            const key = neighbor.ip || neighbor.hostname;
+            if (!neighborGroups.has(key)) {
+                neighborGroups.set(key, { ...neighbor, links: [neighbor] });
+            } else {
+                neighborGroups.get(key).links.push(neighbor);
+            }
+        });
+        const groupedNeighbors = Array.from(neighborGroups.values());
+        
+        if (groupedNeighbors.length > 0 && groupedNeighbors.length < 6) {
+            const previewNodes = [];
+            const previewEdges = [];
+            const angleStep = (2 * Math.PI) / groupedNeighbors.length;
+            const radius = 250; 
 
+            groupedNeighbors.forEach((neighborGroup, index) => {
+                const angle = angleStep * index;
+                const position = {
+                    x: sourceNode.position.x + radius * Math.cos(angle) - (NODE_WIDTH / 2),
+                    y: sourceNode.position.y + radius * Math.sin(angle) - (NODE_HEIGHT / 2),
+                };
+                
+                const isEndDevice = !neighborGroup.ip;
+                const deviceData = {
+                    ip: neighborGroup.ip,
+                    hostname: neighborGroup.hostname,
+                    type: isEndDevice ? 'Switch' : 'Unknown'
+                };
+                
+                const newNode = createNodeObject(deviceData, position);
+                newNode.data.isPreview = true;
+                newNode.data.neighborGroup = neighborGroup;
+                
+                previewNodes.push(newNode);
+                previewEdges.push(createEdgeObject(sourceNode.id, newNode.id, neighborGroup.links[0], true));
+            });
+
+            const finalNodes = [...nodesWithoutPreviews, ...previewNodes];
+            const finalEdges = [...edgesWithNewConnections, ...previewEdges];
+
+            setCurrentNeighbors([]);
+            setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id)); 
+            return { nodes: finalNodes, edges: finalEdges };
+        } else {
+            if (groupedNeighbors.length > 0) {
+                onShowNeighborPopup(allNeighbors, sourceNode);
+            }
+            setCurrentNeighbors(allNeighbors);
+            setSelectedElements(nodesWithoutPreviews.filter(n => n.id === sourceNode.id)); 
+            return { nodes: nodesWithoutPreviews, edges: edgesWithNewConnections };
+        }
       });
     } catch (err) {
       setError(t('app.errorFetchNeighbors', { ip: sourceNode.id }));
     } finally {
       setLoading(false);
     }
-  }, [setState, t, onShowNeighborPopup, setSelectedElements]);
+  }, [setState, t, onShowNeighborPopup, setSelectedElements, createNodeObject]);
 
   const confirmNeighbor = useCallback(async (neighborGroup, sourceNodeId, setLoading, setError, isBatchOperation = false) => {
     setLoading(true);
@@ -276,10 +323,11 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
       return;
     }
     
-    const neighborGroup = {
-      ...nodeToConfirm.data,
-      links: [{ ...nodeToConfirm.data, interface: edge.data.interface }]
-    };
+    const neighborGroup = nodeToConfirm.data.neighborGroup;
+    if (!neighborGroup) {
+      setError(t('app.errorAddNeighborGeneric'));
+      return;
+    }
 
     await confirmNeighbor(neighborGroup, edge.source, setLoading, setError);
   }, [confirmNeighbor, t, setError]);
