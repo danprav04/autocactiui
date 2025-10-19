@@ -22,6 +22,7 @@ import NeighborsPopup from './components/common/NeighborsPopup';
 
 import * as api from './services/apiService';
 import { handleUploadProcess } from './services/mapExportService';
+import * as mapImportExport from './services/mapImportExportService';
 import { ICONS_BY_THEME } from './config/constants';
 import './App.css';
 import './components/TopToolbar/TopToolbar.css';
@@ -89,6 +90,7 @@ function App() {
     confirmNeighbor,
     setLoading: setMapHookLoading, // Use setter from map hook
     setError: setMapHookError, // Use setter from map hook
+    setState: setMapState,
   } = useMapInteraction(theme, handleShowNeighborPopup);
 
   // --- Memos and Derived State (Called Unconditionally) ---
@@ -197,8 +199,7 @@ function App() {
     try {
       const response = await api.getInitialDevice(ip);
       const newNode = createNodeObject(response.data, { x: 400, y: 150 }, initialIconName);
-      setNodes([newNode]);
-      setEdges([]);
+      setMapState({ nodes: [newNode], edges: [] });
       // Simulate click to select the first node and fetch its neighbors
       // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
       onNodeClick(null, newNode, setIsLoading, setAppError); 
@@ -263,6 +264,25 @@ function App() {
     }
   };
 
+  const handleDownloadConfig = useCallback(() => {
+    mapImportExport.downloadMapConfig(nodes, edges, mapName);
+  }, [nodes, edges, mapName]);
+
+  const handleImportConfig = useCallback(async (file) => {
+    setIsLoading(true);
+    setAppError('');
+    try {
+      const { nodes: importedNodes, edges: importedEdges, mapName: importedMapName } = await mapImportExport.importMapConfig(file);
+      setMapState({ nodes: importedNodes, edges: importedEdges });
+      setMapName(importedMapName);
+    } catch (err) {
+      setAppError(t('app.errorImportMap'));
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setMapState, t]);
+
   const onNodeClickHandler = useCallback((event, node) => {
       setContextMenu(null); // Close context menu on any node click
       // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
@@ -312,6 +332,8 @@ function App() {
           sendBackward={sendBackward}
           bringToFront={bringToFront}
           sendToBack={sendToBack}
+          onDownloadConfig={handleDownloadConfig}
+          onImportConfig={handleImportConfig}
           neighbors={availableNeighbors}
           onAddNeighbor={(neighbor) => {
             if (selectedCustomNode) {

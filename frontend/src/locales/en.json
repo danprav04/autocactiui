@@ -19,7 +19,8 @@
     "uploadFailed": "Map creation failed. Please check the logs and try again.",
     "statusProcessing": "Processing...",
     "statusFailed": "Failed",
-    "errorTaskStatus": "Could not retrieve task status."
+    "errorTaskStatus": "Could not retrieve task status.",
+    "errorImportMap": "Import failed. The file is not a valid map configuration."
   },
   "sidebar": {
     "controls": "Controls",
@@ -92,7 +93,9 @@
     "mapActions": "Map Actions",
     "quickSelect": "Quick Select",
     "selectByType": "Select by type...",
-    "endDeviceIdentifier": "End Device (No IP)"
+    "endDeviceIdentifier": "End Device (No IP)",
+    "downloadMap": "Download Map",
+    "importMap": "Import Map"
   },
   "startup": {
     "title": "Interactive Network Map Creator",

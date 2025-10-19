@@ -19,7 +19,8 @@
     "uploadFailed": "יצירת המפה נכשלה. אנא בדוק את הלוגים ונסה שוב.",
     "statusProcessing": "מעבד...",
     "statusFailed": "נכשל",
-    "errorTaskStatus": "לא ניתן היה לקבל סטטוס משימה."
+    "errorTaskStatus": "לא ניתן היה לקבל סטטוס משימה.",
+    "errorImportMap": "הייבוא נכשל. הקובץ אינו קובץ תצורת מפה תקין."
   },
   "sidebar": {
     "controls": "הגדרות",
@@ -92,7 +93,9 @@
     "mapActions": "פעולות מפה",
     "quickSelect": "בחירה מהירה",
     "selectByType": "בחר לפי סוג...",
-    "endDeviceIdentifier": "התקן קצה (ללא IP)"
+    "endDeviceIdentifier": "התקן קצה (ללא IP)",
+    "downloadMap": "הורד מפה",
+    "importMap": "ייבא מפה"
   },
   "startup": {
     "title": "יוצר מפות רשת אינטראקטיבי",

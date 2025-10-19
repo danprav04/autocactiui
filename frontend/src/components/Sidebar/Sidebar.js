@@ -1,5 +1,5 @@
 // frontend/src/components/Sidebar/Sidebar.js
-import React, { useContext } from 'react';
+import React, { useContext, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeContext } from '../../App';
 import MapExportControls from './MapExportControls';
@@ -34,14 +34,30 @@ const Sidebar = ({
   sendToBack,
   neighbors,
   onAddNeighbor,
+  onDownloadConfig,
+  onImportConfig,
 }) => {
   const { t } = useTranslation();
   const { onUpdateNodeData } = useContext(NodeContext);
+  const importInputRef = useRef(null);
 
   const handleResetClick = () => {
     if (window.confirm(t('sidebar.confirmReset'))) {
       onResetMap();
     }
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current.click();
+  };
+
+  const handleFileImport = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      onImportConfig(file);
+    }
+    // Reset the input value to allow importing the same file again
+    event.target.value = null;
   };
 
   const renderContextualContent = () => {
@@ -142,6 +158,21 @@ const Sidebar = ({
            </div>
           <div className="control-group">
             <label>{t('sidebar.mapActions')}</label>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <button onClick={onDownloadConfig} className="secondary" disabled={!isMapStarted}>
+                    {t('sidebar.downloadMap')}
+                </button>
+                <input
+                    type="file"
+                    ref={importInputRef}
+                    onChange={handleFileImport}
+                    style={{ display: 'none' }}
+                    accept=".json"
+                />
+                <button onClick={handleImportClick} className="secondary">
+                    {t('sidebar.importMap')}
+                </button>
+            </div>
             <button onClick={handleResetClick} className="danger" disabled={!isMapStarted}>
               {t('sidebar.clearMap')}
             </button>

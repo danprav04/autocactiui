@@ -55,10 +55,14 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   
   // Refs to hold the latest state for use in callbacks to avoid stale closures
   const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
   const currentNeighborsRef = useRef(currentNeighbors);
   useEffect(() => {
       nodesRef.current = nodes;
   }, [nodes]);
+   useEffect(() => {
+      edgesRef.current = edges;
+  }, [edges]);
   useEffect(() => {
     currentNeighborsRef.current = currentNeighbors;
   }, [currentNeighbors]);
@@ -465,5 +469,6 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     confirmPreviewNode,
     setLoading: setIsLoading,
     setError: setError,
+    setState,
   };
 };
