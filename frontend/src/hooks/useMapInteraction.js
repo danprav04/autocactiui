@@ -53,13 +53,15 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
   const { t } = useTranslation();
   const dragContext = useRef(null);
   
-  // Refs to hold the latest state for use in setInterval to avoid stale closures
+  // Refs to hold the latest state for use in callbacks to avoid stale closures
   const nodesRef = useRef(nodes);
-  const edgesRef = useRef(edges);
+  const currentNeighborsRef = useRef(currentNeighbors);
   useEffect(() => {
       nodesRef.current = nodes;
-      edgesRef.current = edges;
-  }, [nodes, edges]);
+  }, [nodes]);
+  useEffect(() => {
+    currentNeighborsRef.current = currentNeighbors;
+  }, [currentNeighbors]);
 
 
   const {
@@ -148,7 +150,6 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     }
   }, [setState, t, onShowNeighborPopup, setSelectedElements]);
 
-  // ******** FIX: DEFINED `confirmNeighbor` BEFORE `confirmPreviewNode` ********
   const confirmNeighbor = useCallback(async (neighborGroup, sourceNodeId, setLoading, setError) => {
     setLoading(true);
     setError('');
@@ -161,7 +162,6 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
         if (!sourceNode) return prev;
         
-        // Remove any previous versions of this node (e.g., preview nodes)
         const nodesWithoutOld = prev.nodes.filter(n => !n.data.isPreview && n.id !== newNode.id);
         const edgesWithoutPreviews = prev.edges.filter(e => !e.data.isPreview);
         
@@ -171,9 +171,8 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         const nextEdges = [...edgesWithoutPreviews, ...newEdges];
         setSelectedElements([sourceNode]);
 
-        // Update the list of available neighbors for the popup
         const permanentNodeIpsOnMap = new Set(nextNodes.filter(n => n.data.ip).map(n => n.data.ip));
-        const remainingNeighbors = currentNeighbors.filter(n => {
+        const remainingNeighbors = currentNeighborsRef.current.filter(n => {
             if (n.ip) return !permanentNodeIpsOnMap.has(n.ip);
             const key = `${n.neighbor}-${n.interface}`;
             const addedLinks = new Set(neighborGroup.links.map(l => `${l.neighbor}-${l.interface}`));
@@ -189,7 +188,6 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         setState(prev => {
             const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
             if (!sourceNode) return prev;
-            // End devices are added one by one, so we take the first link's info
             const linkInfo = neighborGroup.links[0]; 
             const position = { x: sourceNode.position.x + (Math.random() * 300 - 150), y: sourceNode.position.y + 200 };
             const newNode = createNodeObject({ ip: '', hostname: hostname, type: 'Switch' }, position);
@@ -200,24 +198,35 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         return;
     }
     
-    // Logic for devices with IPs
     try {
         let confirmedNode;
-        const existingNode = nodes.find(n => n.id === neighborIp);
+        const existingNode = nodesRef.current.find(n => n.id === neighborIp);
 
         if (existingNode) {
             confirmedNode = existingNode;
         } else {
-            const deviceResponse = await api.getDeviceInfo(neighborIp);
-            if (deviceResponse.data.error) throw new Error(`No device info for ${neighborIp}`);
-            
-            const sourceNode = nodes.find(n => n.id === sourceNodeId);
+            const sourceNode = nodesRef.current.find(n => n.id === sourceNodeId);
             const position = { x: sourceNode.position.x + (Math.random() * 300 - 150), y: sourceNode.position.y + 200 };
-            confirmedNode = createNodeObject(deviceResponse.data, position);
+            
+            try {
+                const deviceResponse = await api.getDeviceInfo(neighborIp);
+                confirmedNode = createNodeObject(deviceResponse.data, position);
+            } catch (infoError) {
+                console.warn(`Could not get device info for ${neighborIp}. Creating a fallback node.`, infoError);
+                const fallbackDeviceData = { ip: neighborIp, hostname: hostname, type: 'Unknown' };
+                confirmedNode = createNodeObject(fallbackDeviceData, position, 'Unknown');
+            }
         }
 
-        const neighborsResponse = await api.getDeviceNeighbors(neighborIp);
-        const allNeighborsOfNewNode = neighborsResponse.data.neighbors || [];
+        let allNeighborsOfNewNode = [];
+        try {
+            const neighborsResponse = await api.getDeviceNeighbors(neighborIp);
+            if (neighborsResponse.data.neighbors) {
+                allNeighborsOfNewNode = neighborsResponse.data.neighbors;
+            }
+        } catch (neighborError) {
+            console.warn(`Could not get neighbors for ${neighborIp}. Proceeding without them.`, neighborError);
+        }
 
         setState(prev => {
             const newEdgesFromSource = neighborGroup.links.map(link => 
@@ -230,9 +239,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             const existingEdgeIds = new Set(tempState.edges.map(e => e.id));
             
             const neighborsToConnect = allNeighborsOfNewNode.filter(n => 
-                n.ip && 
-                n.ip !== sourceNodeId && // Exclude the source node from this check
-                permanentNodeIdsOnMap.has(n.ip)
+                n.ip && n.ip !== sourceNodeId && permanentNodeIdsOnMap.has(n.ip)
             );
             
             neighborsToConnect.forEach(neighbor => {
@@ -246,24 +253,28 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         });
 
     } catch (err) {
+        console.error("A critical error occurred while adding a neighbor:", err);
         setError(t('app.errorAddNeighbor', { ip: neighborIp }));
         clearPreviewElements();
     } finally {
         setLoading(false);
     }
-  }, [nodes, currentNeighbors, createNodeObject, t, onShowNeighborPopup, setState]);
+  }, [createNodeObject, t, onShowNeighborPopup, setState, clearPreviewElements]);
 
   const confirmPreviewNode = useCallback(async (nodeToConfirm, setLoading, setError) => {
-    // This function is now a legacy entry point, the main logic is in `confirmNeighbor`
-    const edge = edges.find(e => e.target === nodeToConfirm.id && e.data.isPreview);
+    const edge = edgesRef.current.find(e => e.target === nodeToConfirm.id && e.data.isPreview);
+    if (!edge) {
+      setError(t('app.errorAddNeighborGeneric'));
+      return;
+    }
     
     const neighborGroup = {
       ...nodeToConfirm.data,
-      links: [{ ...nodeToConfirm.data, interface: edge?.data.interface }]
+      links: [{ ...nodeToConfirm.data, interface: edge.data.interface }]
     };
 
     await confirmNeighbor(neighborGroup, edge.source, setLoading, setError);
-  }, [edges, confirmNeighbor]);
+  }, [confirmNeighbor, t, setError]);
 
   const onNodeClick = useCallback((event, node, setLoading, setError, isContextMenu = false) => {
     if (node.data.isPreview) {

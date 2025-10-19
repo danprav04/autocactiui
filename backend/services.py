@@ -173,6 +173,8 @@ MOCK_NEIGHBORS = {
         {"interface": "TenGigabitEthernet2/14", "neighbor": "Branch-Router-14", "ip": "10.100.14.1", "description": "Link to Branch 14"},
         {"interface": "GigabitEthernet1/15", "neighbor": "Extra-Access-SW-15", "ip": "192.168.10.15", "description": "Link to SW 15"},
         {"interface": "TenGigabitEthernet2/15", "neighbor": "Branch-Router-15", "ip": "10.100.15.1", "description": "Link to Branch 15"},
+        {"interface": "GigabitEthernet9/1", "neighbor": "Failing-Device-1", "ip": "10.50.1.1", "description": "Link to failing device 1"},
+        {"interface": "GigabitEthernet9/2", "neighbor": "Failing-Device-2", "ip": "10.50.1.2", "description": "Link to failing device 2"},
     ],
     "10.10.1.2": [
         {"interface": "TenGigabitEthernet1/1/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink to Core"},
@@ -278,6 +280,9 @@ MOCK_NEIGHBORS = {
     "10.100.14.1": [{"interface": "GigabitEthernet0/0/0", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "WAN Link"}],
     "192.168.10.15": [{"interface": "GigabitEthernet0/1", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink"}],
     "10.100.15.1": [{"interface": "GigabitEthernet0/0/0", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "WAN Link"}],
+    # --- Reverse connections for failing devices (they have neighbors but no entry in MOCK_NETWORK) ---
+    "10.50.1.1": [{"interface": "eth0", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink"}],
+    "10.50.1.2": [{"interface": "eth0", "neighbor": "Core-Router-1", "ip": "10.10.1.3", "description": "Uplink"}],
 }
 
 # --- NEW MOCK Cacti Data Structure ---
