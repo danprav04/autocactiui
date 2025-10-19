@@ -102,13 +102,29 @@ export function generateCactiConfig({ nodes, edges, mapName, mapWidth, mapHeight
 
   // Iterate through each group of edges (i.e., connections between two specific devices)
   for (const [key, edgeGroup] of edgeGroups.entries()) {
-    const totalEdgesInGroup = edgeGroup.length;
+    
+    // --- FIX FOR REDUNDANT LINKS ---
+    // De-duplicate edges representing the same physical link from opposite ends.
+    // A canonical direction is chosen by picking the node with the lexicographically
+    // smaller ID as the source. To avoid losing data from asymmetric discovery,
+    // we use the edge set (forward or reverse) that has more entries.
+    const [nodeA_id, nodeB_id] = key.split('-'); // The key is sorted, so nodeA_id < nodeB_id
+
+    const forwardEdges = edgeGroup.filter(e => e.source === nodeA_id);
+    const reverseEdges = edgeGroup.filter(e => e.source === nodeB_id);
+    
+    // Use the direction that reported more links to avoid data loss.
+    // If equal, prefer the canonical direction (forward).
+    const edgesToProcess = forwardEdges.length >= reverseEdges.length ? forwardEdges : reverseEdges;
+    // --- END OF FIX ---
+
+    const totalEdgesInGroup = edgesToProcess.length;
     
     // Starting offset calculation ensures the links are centered around the true center line.
     let initialOffset = -PARALLEL_LINK_OFFSET * (totalEdgesInGroup - 1) / 2;
 
     for (let i = 0; i < totalEdgesInGroup; i++) {
-      const edge = edgeGroup[i];
+      const edge = edgesToProcess[i];
       const sourceNodeInfo = nodeInfoMap.get(edge.source);
       const targetNodeInfo = nodeInfoMap.get(edge.target);
 
