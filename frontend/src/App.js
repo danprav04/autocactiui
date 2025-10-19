@@ -333,7 +333,6 @@ function App() {
           bringToFront={bringToFront}
           sendToBack={sendToBack}
           onDownloadConfig={handleDownloadConfig}
-          onImportConfig={handleImportConfig}
           neighbors={availableNeighbors}
           onAddNeighbor={(neighbor) => {
             if (selectedCustomNode) {
@@ -356,6 +355,7 @@ function App() {
               <div className="startup-wrapper">
                 <StartupScreen 
                   onStart={handleStart} 
+                  onImportConfig={handleImportConfig}
                   isLoading={isAuthLoading || mapInteractionLoading}
                   availableIcons={availableIcons}
                 />

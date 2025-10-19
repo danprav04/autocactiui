@@ -3,8 +3,9 @@ import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { INITIAL_ICON_NAME } from '../../config/constants';
 
-const StartupScreen = ({ onStart, isLoading, availableIcons }) => {
+const StartupScreen = ({ onStart, isLoading, availableIcons, onImportConfig }) => {
     const initialIpRef = useRef(null);
+    const importInputRef = useRef(null);
     const [initialIconName, setInitialIconName] = useState(INITIAL_ICON_NAME);
     const { t } = useTranslation();
 
@@ -13,6 +14,19 @@ const StartupScreen = ({ onStart, isLoading, availableIcons }) => {
         if (initialIpRef.current) {
             onStart(initialIpRef.current.value, initialIconName);
         }
+    };
+
+    const handleImportClick = () => {
+        importInputRef.current.click();
+    };
+
+    const handleFileImport = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            onImportConfig(file);
+        }
+        // Reset the input value to allow importing the same file again
+        event.target.value = null;
     };
 
     return (
@@ -42,6 +56,19 @@ const StartupScreen = ({ onStart, isLoading, availableIcons }) => {
                     {isLoading ? t('startup.loading') : t('startup.startMapping')}
                 </button>
             </form>
+
+            <div className="import-section">
+                 <input
+                    type="file"
+                    ref={importInputRef}
+                    onChange={handleFileImport}
+                    style={{ display: 'none' }}
+                    accept=".json"
+                />
+                <button onClick={handleImportClick} className="link-button" disabled={isLoading}>
+                    {t('startup.importPrompt')}
+                </button>
+            </div>
         </div>
     );
 };
