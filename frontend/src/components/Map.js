@@ -1,4 +1,4 @@
-
+// frontend/src/components/Map.js
 import React, { useState, useRef, useCallback } from 'react';
 import ReactFlow, {
   Background,
@@ -138,6 +138,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
           return;
       }
 
+      let wasMarqueeSelection = false;
       if (marqueeStart && marqueeEnd) {
           const selectionRect = {
               x: Math.min(marqueeStart.x, marqueeEnd.x),
@@ -146,10 +147,8 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
               height: Math.abs(marqueeStart.y - marqueeEnd.y),
           };
 
-          // A small marquee is likely a click, so trigger pane click instead
-          if (selectionRect.width < 5 && selectionRect.height < 5) {
-              onPaneClick(event);
-          } else {
+          // Only consider it a marquee selection if the box is larger than a click threshold
+          if (selectionRect.width >= 5 || selectionRect.height >= 5) {
               const selectedNodes = reactFlowInstance.getNodes().filter(node => {
                   const nodePosition = reactFlowInstance.project({ x: node.position.x, y: node.position.y });
                   const nodeWidth = node.width || 100;
@@ -163,10 +162,17 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
                   );
               });
               onSelectionChange({ nodes: selectedNodes, edges: [] });
+              wasMarqueeSelection = true;
           }
-      } else if (event.button === 0) {
+      }
+
+      // If a marquee selection wasn't performed, treat it as a standard pane click.
+      // This correctly handles simple clicks that might have a tiny bit of mouse movement.
+      // We only fire this for left-clicks, as right-clicks are handled by onPaneContextMenu.
+      if (!wasMarqueeSelection && event.button === 0) {
         onPaneClick(event);
       }
+      
       setMarqueeStart(null);
       setMarqueeEnd(null);
   }, [marqueeStart, marqueeEnd, reactFlowInstance, onSelectionChange, onPaneClick]);

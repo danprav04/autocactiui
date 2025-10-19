@@ -146,6 +146,34 @@ function App() {
       }
   }, [setMapHookError]);
 
+  // --- Effect to close context menu when selection changes ---
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const isNodeStillSelected = selectedElements.some(el => el.id === contextMenu.node.id);
+
+    if (!isNodeStillSelected) {
+      setContextMenu(null);
+    }
+  }, [selectedElements, contextMenu]);
+
+  // --- Effect to close neighbor popup when selection changes ---
+  useEffect(() => {
+    if (!neighborPopup.isOpen) {
+      return; // Do nothing if the popup is already closed.
+    }
+
+    const shouldPopupBeOpen = 
+      selectedElements.length === 1 && // Exactly one element must be selected
+      selectedElements[0].type === 'custom' && // It must be a device
+      neighborPopup.sourceNode?.id === selectedElements[0].id; // Its ID must match the source node that opened the popup
+
+    if (!shouldPopupBeOpen) {
+      handleCloseNeighborPopup();
+    }
+  }, [selectedElements, neighborPopup.isOpen, neighborPopup.sourceNode, handleCloseNeighborPopup]);
+
+
   // --- Keyboard Shortcuts for Undo/Redo ---
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -299,12 +327,14 @@ function App() {
   const onPaneClickHandler = useCallback(() => {
     onPaneClick();
     setContextMenu(null);
-  }, [onPaneClick]);
+    handleCloseNeighborPopup();
+  }, [onPaneClick, handleCloseNeighborPopup]);
 
   const onPaneContextMenu = useCallback((event) => {
     event.preventDefault();
     setContextMenu(null);
-  }, []);
+    handleCloseNeighborPopup();
+  }, [handleCloseNeighborPopup]);
 
   const handleNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
