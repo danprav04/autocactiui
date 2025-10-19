@@ -301,6 +301,11 @@ function App() {
     setContextMenu(null);
   }, [onPaneClick]);
 
+  const onPaneContextMenu = useCallback((event) => {
+    event.preventDefault();
+    setContextMenu(null);
+  }, []);
+
   const handleNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
     // Trigger selection logic before opening the menu
@@ -378,6 +383,7 @@ function App() {
                   onPaneClick={onPaneClickHandler}
                   onSelectionChange={onSelectionChange}
                   onNodeContextMenu={handleNodeContextMenu}
+                  onPaneContextMenu={onPaneContextMenu}
                   nodeTypes={nodeTypes} 
                   theme={theme}
                   setReactFlowInstance={(instance) => (reactFlowInstance.current = instance)}

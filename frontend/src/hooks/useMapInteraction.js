@@ -314,7 +314,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     }), true);
 
     const selectedNode = newSelectedNodes[0];
-    if (newSelectedNodes.length === 1 && selectedNode.type === 'custom' && selectedNode.data.ip) {
+    if (newSelectedNodes.length === 1 && selectedNode.type === 'custom' && selectedNode.data.ip && !isContextMenu) {
         handleFetchNeighbors(selectedNode, setLoading, setError); 
     } else {
         setCurrentNeighbors([]);

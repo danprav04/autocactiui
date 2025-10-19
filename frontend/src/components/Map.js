@@ -1,4 +1,4 @@
-// frontend/src/components/Map.js
+
 import React, { useState, useRef, useCallback } from 'react';
 import ReactFlow, {
   Background,
@@ -78,7 +78,7 @@ const SnapLines = ({ lines }) => {
     );
 };
 
-const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu, snapLines }) => {
+const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu, snapLines, onPaneContextMenu }) => {
   
   const [marqueeStart, setMarqueeStart] = useState(null);
   const [marqueeEnd, setMarqueeEnd] = useState(null);
@@ -195,6 +195,7 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
         onNodeMouseUp={handleNodeMouseUp}
         onNodesChange={onNodesChange}
         onNodeContextMenu={onNodeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
         // Use custom pane interaction handlers instead of onPaneClick
         onPaneClick={undefined} 
         onSelectionChange={onSelectionChange}
