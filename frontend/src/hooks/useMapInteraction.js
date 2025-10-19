@@ -93,7 +93,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         if (node.type !== 'custom') return node;
         const iconType = node.data.iconType;
         if (iconType && ICONS_BY_THEME[iconType]) {
-          return { ...node, data: { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } } };
+          return { ...node, data: { ...node.data, icon: ICONS_BY_THEME[iconType][theme] } };
         }
         return node;
       })

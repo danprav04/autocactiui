@@ -48,7 +48,14 @@
   --snap-line-color: #00e5ff; /* Cyan for high visibility on dark theme */
 }
 
-body, html, #root {
+/* Base layout rules to enable fixed scaling */
+html {
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Prevents scrollbars from the scaled body */
+}
+
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -62,6 +69,15 @@ body, html, #root {
   -webkit-user-select: none; /* Safari */
   -moz-user-select: none;    /* Firefox */
   -ms-user-select: none;     /* IE/Edge */
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  width: 111.111%; /* 100 / 0.9 */
+  height: 111.111%;
+  transform: scale(0.9);
+  transform-origin: top left;
 }
 
 /* Allow text selection on elements where it's expected, like form inputs */
@@ -79,7 +95,7 @@ textarea,
 /* --- MAIN LAYOUT --- */
 .app-container {
   display: flex;
-  height: 100vh;
+  height: 100%; /* Changed from 100vh to correctly size within the transformed #root */
 }
 .rtl .app-container {
   flex-direction: row-reverse;
