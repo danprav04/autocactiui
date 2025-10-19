@@ -19,7 +19,7 @@ import { calculateSnaps } from './useSnapping';
  * @returns {object} A complete React Flow edge object.
  */
 const createEdgeObject = (sourceId, targetId, neighborInfo, isPreview = false) => {
-    const { interface: iface } = neighborInfo;
+    const { interface: iface, bandwidth } = neighborInfo;
     const safeInterface = iface ? iface.replace(/[/]/g, '-') : `unknown-${Math.random()}`;
     const edgeId = `e-${sourceId}-${targetId}-${safeInterface}`;
 
@@ -35,7 +35,8 @@ const createEdgeObject = (sourceId, targetId, neighborInfo, isPreview = false) =
         style,
         data: {
             isPreview,
-            interface: iface
+            interface: iface,
+            bandwidth: bandwidth
         }
     };
 };

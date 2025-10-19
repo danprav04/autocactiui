@@ -146,6 +146,15 @@ export const getInitialDevice = (ip) => {
 };
 
 /**
+ * Fetches the Cacti Weathermap configuration template from the backend.
+ * @returns {Promise<object>} A promise that resolves with the template content.
+ */
+export const getConfigTemplate = () => {
+    // Templates are not cached as they might be updated on the server.
+    return apiClient.get('/config-template');
+};
+
+/**
  * Uploads the generated map image and configuration file to the backend to start a task.
  * @param {FormData} formData - The form data containing the image, config, map name, and Cacti group ID.
  * @returns {Promise<object>} A promise that resolves with the task creation response.

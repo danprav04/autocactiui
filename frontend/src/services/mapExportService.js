@@ -1,7 +1,7 @@
 // frontend/src/services/mapExportService.js
 import { toBlob } from 'html-to-image';
 import { generateCactiConfig } from './configGenerator';
-import { createMap } from './apiService';
+import { createMap, getConfigTemplate } from './apiService';
 import { ICONS_BY_THEME, NODE_WIDTH, NODE_HEIGHT } from '../config/constants';
 
 /**
@@ -121,12 +121,15 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
             throw new Error('Failed to create image blob.');
         }
         
+        // Fetch the configuration template from the backend.
+        const templateResponse = await getConfigTemplate();
+        const configTemplate = templateResponse.data;
+
         // Calculate the offsets needed to center the content in the final image.
         const contentWidth = (nodes.reduce((max, n) => Math.max(max, n.position.x + (n.type === 'group' ? n.data.width : NODE_WIDTH)), 0) - minX);
         const contentHeight = (nodes.reduce((max, n) => Math.max(max, n.position.y + (n.type === 'group' ? n.data.height : NODE_HEIGHT)), 0) - minY);
         const offsetX = (width - contentWidth) / 2;
         const offsetY = (height - contentHeight) / 2;
-
 
         // Create a new set of nodes with their positions transformed into the coordinate
         // system of the final PNG image, including the centering offset.
@@ -145,6 +148,7 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
             mapWidth: width, 
             mapHeight: height,
             scaleFactor,
+            configTemplate, // Pass the fetched template
         });
         
         const formData = new FormData();
