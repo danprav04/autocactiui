@@ -122,6 +122,6 @@
     "searchPlaceholder": "חפש לפי שם או IP...",
     "noResults": "לא נמצאו שכנים התואמים לחיפוש.",
     "multipleLinks": "{{count}} קישורים",
-    "addAll": "הוסף הכל ({{count}})"
+    "addSelected": "הוסף נבחרים ({{count}})"
   }
 }

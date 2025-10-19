@@ -203,6 +203,7 @@
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     cursor: pointer;
+    position: relative;
 }
 
 .neighbor-item:hover {
@@ -211,6 +212,47 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     background: var(--bg-primary);
 }
+
+.neighbor-item.selected {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-primary), 0 8px 24px rgba(0, 0, 0, 0.12);
+    background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-primary));
+}
+
+
+.selection-checkbox {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid var(--border-color);
+    background-color: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    pointer-events: none; /* The parent li handles the click */
+}
+
+.rtl .selection-checkbox {
+    left: auto;
+    right: 10px;
+}
+
+.neighbor-item.selected .selection-checkbox {
+    background-color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.selection-checkbox svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 3;
+}
+
 
 .neighbor-info {
     display: flex;
@@ -266,6 +308,15 @@
 .add-neighbor-button:active {
     transform: scale(0.98);
 }
+
+.add-neighbor-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    filter: grayscale(40%);
+    transform: none;
+    box-shadow: none;
+}
+
 
 .no-results {
     width: 100%;

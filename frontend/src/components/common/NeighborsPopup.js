@@ -25,20 +25,30 @@ const CloseIcon = () => (
   </svg>
 );
 
+const CheckIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 12.6111L8.92308 17.5L20 6.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+
 const NeighborsPopup = ({
   isOpen,
   neighbors,
   sourceHostname,
   onAddNeighbor,
-  onAddAllNeighbors,
+  onAddSelectedNeighbors,
   onClose,
+  isLoading,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [selectedNeighbors, setSelectedNeighbors] = React.useState(new Set());
   const { t } = useTranslation();
 
   React.useEffect(() => {
     if (isOpen) {
       setSearchTerm("");
+      setSelectedNeighbors(new Set());
     }
   }, [isOpen]);
 
@@ -75,6 +85,16 @@ const NeighborsPopup = ({
     });
     return Array.from(neighborMap.values());
   }, [neighbors]);
+  
+  const groupedNeighborsMap = React.useMemo(() => {
+    const map = new Map();
+    groupedNeighbors.forEach(group => {
+        const key = group.ip || group.hostname;
+        map.set(key, group);
+    });
+    return map;
+  }, [groupedNeighbors]);
+
 
   const filteredNeighbors = React.useMemo(() => 
     groupedNeighbors.filter(
@@ -84,16 +104,37 @@ const NeighborsPopup = ({
     ), 
   [groupedNeighbors, searchTerm]);
 
+  const handleToggleSelection = (key) => {
+    setSelectedNeighbors(prev => {
+        const newSelection = new Set(prev);
+        if (newSelection.has(key)) {
+            newSelection.delete(key);
+        } else {
+            newSelection.add(key);
+        }
+        return newSelection;
+    });
+  };
+
+  const handleAddSelectedClick = () => {
+    if (isLoading || selectedNeighbors.size === 0) return;
+
+    const selectedGroups = [];
+    selectedNeighbors.forEach(key => {
+        if (groupedNeighborsMap.has(key)) {
+            selectedGroups.push(groupedNeighborsMap.get(key));
+        }
+    });
+
+    if (selectedGroups.length > 0) {
+        onAddSelectedNeighbors(selectedGroups);
+    }
+  };
+
 
   if (!isOpen) {
     return null;
   }
-
-  const handleAddAllClick = () => {
-      if(filteredNeighbors.length > 0) {
-          onAddAllNeighbors(filteredNeighbors);
-      }
-  };
 
   return (
     <div className="neighbor-popup-overlay" onClick={onClose}>
@@ -128,28 +169,40 @@ const NeighborsPopup = ({
           <div className="neighbor-grid-panel">
             {filteredNeighbors.length > 0 ? (
               <ul className="neighbor-grid">
-                {filteredNeighbors.map((group) => (
-                  <li
-                    key={group.ip + group.hostname}
-                    className="neighbor-item"
-                  >
-                    <div className="neighbor-info">
-                      <strong>{group.hostname}</strong>
-                      <small>{group.ip || ' '}</small>
-                      {group.links.length > 1 && (
-                        <small style={{ fontWeight: 'bold' }}>
-                          {t('neighborsPopup.multipleLinks', { count: group.links.length })}
-                        </small>
-                      )}
-                    </div>
-                    <button
-                      className="add-neighbor-button"
-                      onClick={() => onAddNeighbor(group)}
+                {filteredNeighbors.map((group) => {
+                  const key = group.ip || group.hostname;
+                  const isSelected = selectedNeighbors.has(key);
+                  return (
+                    <li
+                      key={key}
+                      className={`neighbor-item ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleToggleSelection(key)}
                     >
-                      {t("sidebar.add")}
-                    </button>
-                  </li>
-                ))}
+                      <div className="selection-checkbox">
+                        {isSelected && <CheckIcon />}
+                      </div>
+                      <div className="neighbor-info">
+                        <strong>{group.hostname}</strong>
+                        <small>{group.ip || ' '}</small>
+                        {group.links.length > 1 && (
+                          <small style={{ fontWeight: 'bold' }}>
+                            {t('neighborsPopup.multipleLinks', { count: group.links.length })}
+                          </small>
+                        )}
+                      </div>
+                      <button
+                        className="add-neighbor-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddNeighbor(group);
+                        }}
+                        disabled={isLoading}
+                      >
+                        {t("sidebar.add")}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="no-results">
@@ -159,10 +212,14 @@ const NeighborsPopup = ({
               </div>
             )}
           </div>
-            {filteredNeighbors.length > 1 && (
+            {filteredNeighbors.length > 0 && (
                 <div style={{ flexShrink: 0, paddingTop: '16px', borderTop: '1px solid var(--border-color)', marginTop: '16px' }}>
-                    <button className="add-neighbor-button" onClick={handleAddAllClick}>
-                       {t('neighborsPopup.addAll', { count: filteredNeighbors.length })}
+                    <button 
+                      className="add-neighbor-button" 
+                      onClick={handleAddSelectedClick}
+                      disabled={isLoading || selectedNeighbors.size === 0}
+                    >
+                       {t('neighborsPopup.addSelected', { count: selectedNeighbors.size })}
                     </button>
                 </div>
             )}

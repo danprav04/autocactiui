@@ -210,30 +210,35 @@ function App() {
     }
   };
 
-  const handleAddNeighborFromPopup = useCallback((neighborGroup) => {
+  const handleAddNeighborFromPopup = useCallback(async (neighborGroup) => {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
     
-    confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+    // The confirmNeighbor function manages the loading state for this single request.
+    await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError]);
 
-    // After adding, close the popup. The hook will manage updating neighbor availability.
-    handleCloseNeighborPopup();
-  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError, handleCloseNeighborPopup]);
-
-  const handleAddAllNeighborsFromPopup = useCallback(async (neighborGroups) => {
+  const handleAddSelectedNeighbors = useCallback(async (selectedNeighborGroups) => {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
 
     handleCloseNeighborPopup();
     setIsLoading(true);
 
-    // Process each neighbor sequentially to avoid race conditions
-    for (const neighborGroup of neighborGroups) {
-      await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+    try {
+      // Process each neighbor sequentially to avoid race conditions and API spam.
+      for (const neighborGroup of selectedNeighborGroups) {
+        // Each call to confirmNeighbor will handle its own API logic, while the
+        // overarching loading state keeps the main UI locked.
+        await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+      }
+    } catch (err) {
+      console.error("An error occurred during batch neighbor addition:", err);
+      setAppError(t('app.errorAddNeighborGeneric'));
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
-  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError, handleCloseNeighborPopup]);
+  }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError, handleCloseNeighborPopup, t]);
 
 
   const handleCreateMap = async () => {
@@ -406,8 +411,9 @@ function App() {
               neighbors={neighborPopup.neighbors}
               sourceHostname={neighborPopup.sourceNode?.data?.hostname}
               onAddNeighbor={handleAddNeighborFromPopup}
-              onAddAllNeighbors={handleAddAllNeighborsFromPopup}
+              onAddSelectedNeighbors={handleAddSelectedNeighbors}
               onClose={handleCloseNeighborPopup}
+              isLoading={mapInteractionLoading}
             />
           </div>
         </div>

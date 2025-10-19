@@ -122,6 +122,6 @@
     "searchPlaceholder": "Search by name or IP...",
     "noResults": "No neighbors match your search.",
     "multipleLinks": "{{count}} links",
-    "addAll": "Add All ({{count}})"
+    "addSelected": "Add Selected ({{count}})"
   }
 }
