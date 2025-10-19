@@ -32,41 +32,43 @@ const StartupScreen = ({ onStart, isLoading, availableIcons, onImportConfig }) =
     return (
         <div className="start-container">
             <h1>{t('startup.title')}</h1>
-            <form className="start-form" onSubmit={handleSubmit}>
+            <div className="start-form">
+                <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+                    <input
+                        type="text"
+                        ref={initialIpRef}
+                        placeholder={t('startup.placeholderIp')}
+                        defaultValue="10.10.1.3"
+                    />
+                    <select 
+                        className="icon-selector"
+                        value={initialIconName} 
+                        onChange={(e) => setInitialIconName(e.target.value)}
+                        style={{width: '100%', marginBottom: '20px', textAlign: 'center'}}
+                    >
+                        {availableIcons.map(iconName => (
+                            <option key={iconName} value={iconName}>
+                                {t('startup.iconSelector', { iconName })}
+                            </option>
+                        ))}
+                    </select>
+
+                    <button type="submit" disabled={isLoading}>
+                        {isLoading ? t('startup.loading') : t('startup.startMapping')}
+                    </button>
+                </form>
+
+                <div className="startup-separator">{t('startup.or')}</div>
+
                 <input
-                    type="text"
-                    ref={initialIpRef}
-                    placeholder={t('startup.placeholderIp')}
-                    defaultValue="10.10.1.3"
-                />
-                <select 
-                    className="icon-selector"
-                    value={initialIconName} 
-                    onChange={(e) => setInitialIconName(e.target.value)}
-                    style={{width: '320px', marginBottom: '20px', textAlign: 'center'}}
-                >
-                    {availableIcons.map(iconName => (
-                        <option key={iconName} value={iconName}>
-                            {t('startup.iconSelector', { iconName })}
-                        </option>
-                    ))}
-                </select>
-
-                <button type="submit" disabled={isLoading}>
-                    {isLoading ? t('startup.loading') : t('startup.startMapping')}
-                </button>
-            </form>
-
-            <div className="import-section">
-                 <input
                     type="file"
                     ref={importInputRef}
                     onChange={handleFileImport}
                     style={{ display: 'none' }}
                     accept=".json"
                 />
-                <button onClick={handleImportClick} className="link-button" disabled={isLoading}>
-                    {t('startup.importPrompt')}
+                <button type="button" onClick={handleImportClick} className="secondary" disabled={isLoading}>
+                    {t('startup.importAction')}
                 </button>
             </div>
         </div>

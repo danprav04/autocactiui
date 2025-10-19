@@ -103,7 +103,8 @@
     "iconSelector": "השתמש בסמל: {{iconName}}",
     "loading": "טוען...",
     "startMapping": "התחל מיפוי",
-    "importPrompt": "או ייבא מפה מקובץ"
+    "or": "או",
+    "importAction": "ייבא מפה מקובץ"
   },
   "themeToggle": {
     "title": "החלף ערכת נושא"

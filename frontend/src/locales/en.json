@@ -103,7 +103,8 @@
     "iconSelector": "Use icon: {{iconName}}",
     "loading": "Loading...",
     "startMapping": "Start Mapping",
-    "importPrompt": "Or import a map from a file"
+    "or": "OR",
+    "importAction": "Import Map From File"
   },
   "themeToggle": {
     "title": "Toggle Theme"

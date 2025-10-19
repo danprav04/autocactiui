@@ -259,47 +259,51 @@ button:disabled { background-color: var(--accent-secondary); cursor: not-allowed
   border-radius: 8px;
   box-shadow: 0 4px 12px var(--shadow-color);
   border: 1px solid var(--border-color);
+  width: 100%;
+  max-width: 400px;
 }
 .start-form input {
   padding: 14px;
-  width: 320px;
+  width: 100%;
   margin-bottom: 20px;
   border-radius: 6px;
   font-size: 16px;
   text-align: center;
+  box-sizing: border-box;
 }
 .start-form button {
   background-color: var(--accent-success);
   width: auto;
   padding: 12px 30px;
 }
-
-.import-section {
-  margin-top: 24px;
+.start-form button.secondary {
+  width: 100%;
+  background-color: var(--accent-secondary);
 }
 
-.link-button {
-  background: none;
-  border: none;
-  color: var(--accent-primary);
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 500;
-  padding: 0;
-  text-decoration: underline;
-  width: auto;
-  margin: 0;
-}
-
-.link-button:hover {
-  opacity: 0.8;
-}
-
-.link-button:disabled {
+.startup-separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
   color: var(--text-secondary);
-  cursor: not-allowed;
-  text-decoration: none;
-  opacity: 0.7;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 24px 0;
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.startup-separator::before,
+.startup-separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-color);
+}
+.startup-separator:not(:empty)::before {
+  margin-right: 1em;
+}
+.startup-separator:not(:empty)::after {
+  margin-left: 1em;
 }
 
 
