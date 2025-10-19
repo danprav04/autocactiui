@@ -97,7 +97,7 @@ const calculateBoundsAndTransform = (nodes) => {
  * @param {object} params - The export parameters.
  * @returns {Promise<object>} The API response from starting the task.
  */
-export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiGroupId, theme }) => {
+export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, cactiGroupId, theme, scaleFactor }) => {
     const viewport = mapElement.querySelector('.react-flow__viewport');
     if (!viewport) {
         throw new Error('Could not find map viewport for export.');
@@ -143,7 +143,8 @@ export const exportAndUploadMap = async ({ mapElement, nodes, edges, mapName, ca
             edges, 
             mapName, 
             mapWidth: width, 
-            mapHeight: height, 
+            mapHeight: height,
+            scaleFactor,
         });
         
         const formData = new FormData();
@@ -181,12 +182,15 @@ export const handleUploadProcess = async ({ mapElement, nodes, edges, mapName, c
     
     mapElement.classList.add('exporting');
 
+    // Get the device pixel ratio, which accounts for browser zoom and OS scaling.
+    const scaleFactor = window.devicePixelRatio;
+
     // Wait for React to re-render the component.
     await new Promise(resolve => setTimeout(resolve, 200));
     
     try {
         // Perform the export and get the initial task response.
-        const response = await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: finalEdges, mapName, cactiGroupId, theme });
+        const response = await exportAndUploadMap({ mapElement, nodes: exportNodes, edges: finalEdges, mapName, cactiGroupId, theme, scaleFactor });
         return response.data;
     } finally {
         // Restore the UI to its original state.
