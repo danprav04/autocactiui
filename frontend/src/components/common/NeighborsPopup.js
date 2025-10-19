@@ -63,7 +63,7 @@ const NeighborsPopup = ({
   const groupedNeighbors = React.useMemo(() => {
     const neighborMap = new Map();
     neighbors.forEach(neighbor => {
-      const key = neighbor.ip || neighbor.neighbor;
+      const key = neighbor.ip || neighbor.hostname;
       if (!neighborMap.has(key)) {
         neighborMap.set(key, {
           ...neighbor,
@@ -79,7 +79,7 @@ const NeighborsPopup = ({
   const filteredNeighbors = React.useMemo(() => 
     groupedNeighbors.filter(
       (n) =>
-        n.neighbor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        n.hostname.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (n.ip && n.ip.toLowerCase().includes(searchTerm.toLowerCase()))
     ), 
   [groupedNeighbors, searchTerm]);
@@ -130,11 +130,11 @@ const NeighborsPopup = ({
               <ul className="neighbor-grid">
                 {filteredNeighbors.map((group) => (
                   <li
-                    key={group.ip + group.neighbor}
+                    key={group.ip + group.hostname}
                     className="neighbor-item"
                   >
                     <div className="neighbor-info">
-                      <strong>{group.neighbor}</strong>
+                      <strong>{group.hostname}</strong>
                       <small>{group.ip || ' '}</small>
                       {group.links.length > 1 && (
                         <small style={{ fontWeight: 'bold' }}>

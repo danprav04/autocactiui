@@ -160,7 +160,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
 
     const isEndDevice = !neighborGroup.ip;
     const neighborIp = neighborGroup.ip;
-    const hostname = neighborGroup.neighbor || neighborGroup.hostname;
+    const hostname = neighborGroup.hostname;
 
     const handleStateUpdate = (prev, newNode, newEdges = []) => {
         const sourceNode = prev.nodes.find(n => n.id === sourceNodeId);
@@ -178,8 +178,8 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
         const permanentNodeIpsOnMap = new Set(nextNodes.filter(n => n.data.ip).map(n => n.data.ip));
         const remainingNeighbors = currentNeighborsRef.current.filter(n => {
             if (n.ip) return !permanentNodeIpsOnMap.has(n.ip);
-            const key = `${n.neighbor}-${n.interface}`;
-            const addedLinks = new Set(neighborGroup.links.map(l => `${l.neighbor}-${l.interface}`));
+            const key = `${n.hostname}-${n.interface}`;
+            const addedLinks = new Set(neighborGroup.links.map(l => `${l.hostname}-${l.interface}`));
             return !addedLinks.has(key);
         });
         setCurrentNeighbors(remainingNeighbors);

@@ -22,9 +22,9 @@ const NeighborsList = ({ neighbors, onAddNeighbor }) => {
       {neighbors.length > 0 ? (
         <ul>
           {neighbors.map((neighbor) => (
-            <li key={neighbor.neighbor + neighbor.interface}>
+            <li key={neighbor.hostname + neighbor.interface}>
               <span>
-                {neighbor.neighbor}
+                {neighbor.hostname}
                 <br />
                 <small>{neighbor.ip || t('sidebar.endDeviceIdentifier')}</small>
               </span>

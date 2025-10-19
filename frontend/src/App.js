@@ -125,7 +125,7 @@ function App() {
               return !nodes.some(node => node.id === n.ip);
           }
           // For end devices, check if a connection with the same signature already exists.
-          const connectionKey = `${selectedCustomNode.id}-${n.neighbor}-${n.interface}`;
+          const connectionKey = `${selectedCustomNode.id}-${n.hostname}-${n.interface}`;
           return !existingConnections.has(connectionKey);
       });
   }, [selectedCustomNode, currentNeighbors, nodes, edges]);
