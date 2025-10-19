@@ -30,7 +30,8 @@ const UploadSuccessPopup = ({ data, onClose }) => {
     const [tasks, setTasks] = useState([]);
     const pollingRef = useRef(null);
 
-    // Initialize or reset state when the popup is opened with new data
+    // This effect is solely responsible for initializing the component's state
+    // when the `data` prop changes (i.e., when the popup is opened).
     useEffect(() => {
         if (data && data.tasks) {
             const initialTasks = data.tasks.map(task => ({
@@ -41,66 +42,83 @@ const UploadSuccessPopup = ({ data, onClose }) => {
             }));
             setTasks(initialTasks);
         } else {
-            setTasks([]); // Clear tasks if popup is closed/data is removed
+            setTasks([]);
         }
     }, [data]);
 
-    // Effect to handle the polling logic
+    // This effect manages the polling lifecycle. It runs only when the component
+    // mounts or when the number of tasks changes, but crucially, NOT when the
+    // status of individual tasks is updated.
     useEffect(() => {
         const pollTasks = async () => {
-            let allTasksAreDone = true;
+            // Use the functional form of setTasks to get the most recent state
+            // without needing `tasks` in the dependency array.
+            setTasks(currentTasks => {
+                // If there are no tasks, do nothing.
+                if (currentTasks.length === 0) {
+                    return currentTasks;
+                }
 
-            const updatedTasks = await Promise.all(
-                tasks.map(async (task) => {
-                    // Don't poll tasks that have already finished
-                    if (task.status === 'SUCCESS' || task.status === 'FAILURE') {
-                        return task;
+                // Check if all tasks have reached a terminal state.
+                const allTasksFinished = currentTasks.every(
+                    t => t.status === 'SUCCESS' || t.status === 'FAILURE'
+                );
+
+                if (allTasksFinished) {
+                    // If all tasks are done, clear the interval and return the state as-is.
+                    if (pollingRef.current) {
+                        clearInterval(pollingRef.current);
+                        pollingRef.current = null;
                     }
-
-                    allTasksAreDone = false; // Mark that at least one task is still running
-
-                    try {
-                        const response = await api.getTaskStatus(task.task_id);
-                        const { status, message } = response.data;
-
-                        if (status === 'SUCCESS') {
-                            return { ...task, status: 'SUCCESS', url: message };
+                    return currentTasks;
+                }
+                
+                // Asynchronously update all tasks that are still pending/processing.
+                Promise.all(
+                    currentTasks.map(async (task) => {
+                        if (task.status === 'SUCCESS' || task.status === 'FAILURE') {
+                            return task; // Return completed tasks unchanged.
                         }
-                        if (status === 'FAILURE') {
-                            return { ...task, status: 'FAILURE', error: message };
+                        try {
+                            const response = await api.getTaskStatus(task.task_id);
+                            const { status, message } = response.data;
+                            if (status === 'SUCCESS') {
+                                return { ...task, status: 'SUCCESS', url: message };
+                            }
+                            if (status === 'FAILURE') {
+                                return { ...task, status: 'FAILURE', error: message };
+                            }
+                            return { ...task, status };
+                        } catch (err) {
+                            console.error(`Failed to get status for task ${task.task_id}:`, err);
+                            return { ...task, status: 'FAILURE', error: t('app.errorTaskStatus') };
                         }
-                        // Keep its current status (e.g., PENDING or PROCESSING)
-                        return { ...task, status };
-                    } catch (err) {
-                        console.error(`Failed to get status for task ${task.task_id}:`, err);
-                        return { ...task, status: 'FAILURE', error: t('app.errorTaskStatus') };
-                    }
-                })
-            );
-
-            setTasks(updatedTasks);
-
-            // If all tasks have finished, stop polling
-            if (allTasksAreDone && pollingRef.current) {
-                clearInterval(pollingRef.current);
-                pollingRef.current = null;
-            }
+                    })
+                ).then(updatedTasks => {
+                    setTasks(updatedTasks);
+                });
+                
+                // Return the original state for this render cycle; the updated
+                // state will be applied in the next render after the promises resolve.
+                return currentTasks;
+            });
         };
 
-        // Start polling only if there are tasks and no interval is already running
+        // Start polling only if there are tasks and no interval is already running.
         if (tasks.length > 0 && !pollingRef.current) {
-            pollTasks(); // Poll immediately on start
-            pollingRef.current = setInterval(pollTasks, 3000); // Then poll every 3 seconds
+            pollTasks(); // Initial poll
+            pollingRef.current = setInterval(pollTasks, 3000); // Subsequent polls
         }
 
-        // Cleanup: stop polling when the component unmounts (popup is closed)
+        // Cleanup function: This is crucial. It runs when the component unmounts
+        // (e.g., when the popup is closed), stopping any ongoing polling.
         return () => {
             if (pollingRef.current) {
                 clearInterval(pollingRef.current);
                 pollingRef.current = null;
             }
         };
-    }, [tasks, t]);
+    }, [tasks.length, t]); // The effect now only depends on the *number* of tasks and the translation function.
 
     if (!data || !data.tasks || data.tasks.length === 0) {
         return null;
