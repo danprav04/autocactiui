@@ -214,29 +214,31 @@ function App() {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
     
-    // The confirmNeighbor function manages the loading state for this single request.
-    await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+    // Process a single neighbor; the popup should remain open and refresh.
+    // isBatchOperation is false by default.
+    await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError, false);
   }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError]);
 
   const handleAddSelectedNeighbors = useCallback(async (selectedNeighborGroups) => {
     const { sourceNode } = neighborPopup;
-    if (!sourceNode) return;
-
+    if (!sourceNode || selectedNeighborGroups.length === 0) return;
+  
     handleCloseNeighborPopup();
     setIsLoading(true);
-
+  
     try {
-      // Process each neighbor sequentially to avoid race conditions and API spam.
+      // Process each selected neighbor sequentially. The `isBatchOperation` flag
+      // prevents the popup from reopening after each addition.
       for (const neighborGroup of selectedNeighborGroups) {
-        // Each call to confirmNeighbor will handle its own API logic, while the
-        // overarching loading state keeps the main UI locked.
-        await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError);
+        await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError, true);
       }
     } catch (err) {
       console.error("An error occurred during batch neighbor addition:", err);
       setAppError(t('app.errorAddNeighborGeneric'));
     } finally {
       setIsLoading(false);
+      // The popup remains closed. The user can click the source node again to see
+      // the updated list of remaining neighbors.
     }
   }, [neighborPopup, confirmNeighbor, setIsLoading, setAppError, handleCloseNeighborPopup, t]);
 

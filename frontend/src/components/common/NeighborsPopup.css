@@ -84,7 +84,7 @@
     flex-shrink: 0;
     padding-bottom: 20px;
     border-bottom: 2px solid var(--border-color-light);
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .neighbor-popup-header h2 {
@@ -251,6 +251,29 @@
     width: 16px;
     height: 16px;
     stroke-width: 3;
+}
+
+.neighbor-popup-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.select-all-button {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.select-all-button:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
 }
 
 

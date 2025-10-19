@@ -154,7 +154,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     }
   }, [setState, t, onShowNeighborPopup, setSelectedElements]);
 
-  const confirmNeighbor = useCallback(async (neighborGroup, sourceNodeId, setLoading, setError) => {
+  const confirmNeighbor = useCallback(async (neighborGroup, sourceNodeId, setLoading, setError, isBatchOperation = false) => {
     setLoading(true);
     setError('');
 
@@ -183,7 +183,11 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             return !addedLinks.has(key);
         });
         setCurrentNeighbors(remainingNeighbors);
-        onShowNeighborPopup(remainingNeighbors, sourceNode);
+
+        // Only reopen/refresh the popup if this is not part of a batch operation.
+        if (!isBatchOperation) {
+          onShowNeighborPopup(remainingNeighbors, sourceNode);
+        }
         
         return { nodes: nextNodes, edges: nextEdges };
     };

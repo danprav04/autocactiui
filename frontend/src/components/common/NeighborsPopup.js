@@ -104,6 +104,30 @@ const NeighborsPopup = ({
     ), 
   [groupedNeighbors, searchTerm]);
 
+  const filteredKeys = React.useMemo(() => new Set(filteredNeighbors.map(n => n.ip || n.hostname)), [filteredNeighbors]);
+  const areAllFilteredSelected = React.useMemo(() => {
+      if (filteredKeys.size === 0) return false;
+      return Array.from(filteredKeys).every(key => selectedNeighbors.has(key));
+  }, [selectedNeighbors, filteredKeys]);
+
+  const handleSelectAllClick = () => {
+      if (areAllFilteredSelected) {
+          // Deselect all filtered
+          setSelectedNeighbors(prev => {
+              const newSelection = new Set(prev);
+              filteredKeys.forEach(key => newSelection.delete(key));
+              return newSelection;
+          });
+      } else {
+          // Select all filtered
+          setSelectedNeighbors(prev => {
+              const newSelection = new Set(prev);
+              filteredKeys.forEach(key => newSelection.add(key));
+              return newSelection;
+          });
+      }
+  };
+
   const handleToggleSelection = (key) => {
     setSelectedNeighbors(prev => {
         const newSelection = new Set(prev);
@@ -166,6 +190,13 @@ const NeighborsPopup = ({
         </div>
 
         <div className="neighbor-popup-body">
+            <div className="neighbor-popup-actions">
+                {filteredNeighbors.length > 0 && (
+                    <button className="select-all-button" onClick={handleSelectAllClick}>
+                        {areAllFilteredSelected ? t('neighborsPopup.deselectAll') : t('neighborsPopup.selectAll')}
+                    </button>
+                )}
+            </div>
           <div className="neighbor-grid-panel">
             {filteredNeighbors.length > 0 ? (
               <ul className="neighbor-grid">
