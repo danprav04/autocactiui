@@ -11,24 +11,23 @@ const SpinnerIcon = () => (
         <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5"></circle>
     </svg>
 );
-
 const SuccessIcon = () => (
     <svg className="status-icon" viewBox="0 0 24 24">
         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
     </svg>
 );
-
 const ErrorIcon = () => (
     <svg className="status-icon error" viewBox="0 0 24 24">
         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
     </svg>
 );
 
-
 const UploadSuccessPopup = ({ data, onClose }) => {
     const { t } = useTranslation();
     const [tasks, setTasks] = useState([]);
-    const pollingRef = useRef(null);
+    // Ref to track if the component is mounted.
+    // This prevents state updates or new polls after the popup is closed.
+    const isMountedRef = useRef(false);
 
     // This effect is solely responsible for initializing the component's state
     // when the `data` prop changes (i.e., when the popup is opened).
@@ -46,79 +45,92 @@ const UploadSuccessPopup = ({ data, onClose }) => {
         }
     }, [data]);
 
-    // This effect manages the polling lifecycle. It runs only when the component
-    // mounts or when the number of tasks changes, but crucially, NOT when the
-    // status of individual tasks is updated.
+    // This effect manages the entire polling lifecycle.
     useEffect(() => {
-        const pollTasks = async () => {
-            // Use the functional form of setTasks to get the most recent state
-            // without needing `tasks` in the dependency array.
-            setTasks(currentTasks => {
-                // If there are no tasks, do nothing.
-                if (currentTasks.length === 0) {
-                    return currentTasks;
-                }
+        isMountedRef.current = true; // Mark as mounted
 
-                // Check if all tasks have reached a terminal state.
-                const allTasksFinished = currentTasks.every(
-                    t => t.status === 'SUCCESS' || t.status === 'FAILURE'
-                );
+        // Define a recursive async function to poll task statuses
+        const checkStatus = async () => {
+            // Stop polling if the component has unmounted
+            if (!isMountedRef.current) return;
 
-                if (allTasksFinished) {
-                    // If all tasks are done, clear the interval and return the state as-is.
-                    if (pollingRef.current) {
-                        clearInterval(pollingRef.current);
-                        pollingRef.current = null;
-                    }
-                    return currentTasks;
-                }
-                
-                // Asynchronously update all tasks that are still pending/processing.
-                Promise.all(
-                    currentTasks.map(async (task) => {
+            let allTasksFinished = true;
+            let shouldPollAgain = false; // Flag to see if recursion is needed
+
+            // We must use a functional update to get the *latest* task state
+            // and then return an array of promises for the updates.
+            const updatedTasks = await new Promise((resolve) => {
+                setTasks(currentTasks => {
+                    // Map over tasks to create an array of API call promises
+                    const promises = currentTasks.map(async (task) => {
+                        // If task is already done, just return it
                         if (task.status === 'SUCCESS' || task.status === 'FAILURE') {
-                            return task; // Return completed tasks unchanged.
+                            return task;
                         }
+                        
+                        allTasksFinished = false; // Found at least one unfinished task
+
                         try {
                             const response = await api.getTaskStatus(task.task_id);
                             const { status, message } = response.data;
+                            
                             if (status === 'SUCCESS') {
                                 return { ...task, status: 'SUCCESS', url: message };
                             }
-                            if (status === 'FAILURE') {
+                            if (status === 'FAILURE' || status === 'REVOKED') {
                                 return { ...task, status: 'FAILURE', error: message };
                             }
-                            return { ...task, status };
+
+                            // Task is PENDING, STARTED, RETRY, etc.
+                            shouldPollAgain = true; // Mark that we need to poll again
+                            return { ...task, status }; // Return updated pending status
+
                         } catch (err) {
                             console.error(`Failed to get status for task ${task.task_id}:`, err);
                             return { ...task, status: 'FAILURE', error: t('app.errorTaskStatus') };
                         }
-                    })
-                ).then(updatedTasks => {
-                    setTasks(updatedTasks);
+                    });
+
+                    // When all API calls are done, resolve the outer promise
+                    // with the new array of task objects.
+                    Promise.all(promises).then(resolve);
+                    
+                    // Return currentTasks *for this render cycle*.
+                    // The .then(resolve) ensures `updatedTasks` gets the *new* array
+                    return currentTasks;
                 });
-                
-                // Return the original state for this render cycle; the updated
-                // state will be applied in the next render after the promises resolve.
-                return currentTasks;
             });
-        };
 
-        // Start polling only if there are tasks and no interval is already running.
-        if (tasks.length > 0 && !pollingRef.current) {
-            pollTasks(); // Initial poll
-            pollingRef.current = setInterval(pollTasks, 3000); // Subsequent polls
-        }
+            // Now that all promises are resolved and `updatedTasks` has the new array,
+            // update the state *if* we are still mounted.
+            if (isMountedRef.current) {
+                setTasks(updatedTasks);
 
-        // Cleanup function: This is crucial. It runs when the component unmounts
-        // (e.g., when the popup is closed), stopping any ongoing polling.
-        return () => {
-            if (pollingRef.current) {
-                clearInterval(pollingRef.current);
-                pollingRef.current = null;
+                // *** LONG POLLING FIX ***
+                // If we're not done and at least one task was still pending,
+                // call checkStatus() again immediately to start the next long poll.
+                if (!allTasksFinished && shouldPollAgain) {
+                    checkStatus();
+                }
             }
         };
-    }, [tasks.length, t]); // The effect now only depends on the *number* of tasks and the translation function.
+
+        // Start polling only if there are tasks.
+        if (tasks.length > 0) {
+            checkStatus();
+        }
+
+        // Cleanup function: This runs when the component unmounts
+        // (popup closes) or when `tasks.length` changes (new upload).
+        // This stops any in-flight polls from updating state.
+        return () => {
+            isMountedRef.current = false;
+        };
+        // This effect's dependency MUST be tasks.length.
+        // When `data` changes, the first effect runs, `setTasks` runs,
+        // `tasks.length` changes, which triggers this effect's cleanup
+        // (stopping old polls) and then runs it again (starting new polls).
+    }, [tasks.length, t]);
 
     if (!data || !data.tasks || data.tasks.length === 0) {
         return null;
@@ -139,7 +151,7 @@ const UploadSuccessPopup = ({ data, onClose }) => {
                         <span>{t('app.statusFailed')}</span>
                     </div>
                 );
-            default: // PENDING or PROCESSING
+            default: // PENDING, PROCESSING, STARTED, RETRY
                 return (
                     <div className="task-status-indicator pending">
                         <SpinnerIcon />
