@@ -25,12 +25,12 @@ const ErrorIcon = () => (
 const UploadSuccessPopup = ({ data, onClose }) => {
     const { t } = useTranslation();
     const [tasks, setTasks] = useState([]);
-    // Ref to track if the component is mounted.
-    // This prevents state updates or new polls after the popup is closed.
+    // Ref to track if the component is mounted to prevent state updates after unmounting.
     const isMountedRef = useRef(false);
+    // Ref to hold the timeout ID for cleanup.
+    const pollTimeoutRef = useRef(null);
 
-    // This effect is solely responsible for initializing the component's state
-    // when the `data` prop changes (i.e., when the popup is opened).
+    // Effect to initialize state when the popup is opened (when `data` prop changes).
     useEffect(() => {
         if (data && data.tasks) {
             const initialTasks = data.tasks.map(task => ({
@@ -45,30 +45,27 @@ const UploadSuccessPopup = ({ data, onClose }) => {
         }
     }, [data]);
 
-    // This effect manages the entire polling lifecycle.
+    // Effect to manage the polling lifecycle. It starts when `tasks` state is initialized.
     useEffect(() => {
-        isMountedRef.current = true; // Mark as mounted
+        isMountedRef.current = true;
+        // Clear any lingering timeout from a previous render/data change.
+        clearTimeout(pollTimeoutRef.current);
 
-        // Define a recursive async function to poll task statuses
         const checkStatus = async () => {
-            // Stop polling if the component has unmounted
+            // Stop if the component has unmounted since the poll was scheduled.
             if (!isMountedRef.current) return;
 
             let allTasksFinished = true;
-            let shouldPollAgain = false; // Flag to see if recursion is needed
 
-            // We must use a functional update to get the *latest* task state
-            // and then return an array of promises for the updates.
-            const updatedTasks = await new Promise((resolve) => {
+            // Use a functional update to get the latest task state for processing.
+            const updatedTasks = await new Promise(resolve => {
                 setTasks(currentTasks => {
-                    // Map over tasks to create an array of API call promises
                     const promises = currentTasks.map(async (task) => {
-                        // If task is already done, just return it
                         if (task.status === 'SUCCESS' || task.status === 'FAILURE') {
-                            return task;
+                            return task; // Don't poll finished tasks.
                         }
                         
-                        allTasksFinished = false; // Found at least one unfinished task
+                        allTasksFinished = false; // Mark that polling needs to continue.
 
                         try {
                             const response = await api.getTaskStatus(task.task_id);
@@ -80,56 +77,47 @@ const UploadSuccessPopup = ({ data, onClose }) => {
                             if (status === 'FAILURE' || status === 'REVOKED') {
                                 return { ...task, status: 'FAILURE', error: message };
                             }
-
-                            // Task is PENDING, STARTED, RETRY, etc.
-                            shouldPollAgain = true; // Mark that we need to poll again
-                            return { ...task, status }; // Return updated pending status
+                            // Task is still processing (PENDING, STARTED, etc.).
+                            return { ...task, status };
 
                         } catch (err) {
                             console.error(`Failed to get status for task ${task.task_id}:`, err);
                             return { ...task, status: 'FAILURE', error: t('app.errorTaskStatus') };
                         }
                     });
-
-                    // When all API calls are done, resolve the outer promise
-                    // with the new array of task objects.
+                    
+                    // Resolve the outer promise with the array of updated task objects.
                     Promise.all(promises).then(resolve);
                     
-                    // Return currentTasks *for this render cycle*.
-                    // The .then(resolve) ensures `updatedTasks` gets the *new* array
+                    // Return the current state for this render cycle; the new state will be set below.
                     return currentTasks;
                 });
             });
 
-            // Now that all promises are resolved and `updatedTasks` has the new array,
-            // update the state *if* we are still mounted.
+            // After all API calls are complete, update the state if still mounted.
             if (isMountedRef.current) {
                 setTasks(updatedTasks);
 
-                // *** LONG POLLING FIX ***
-                // If we're not done and at least one task was still pending,
-                // call checkStatus() again immediately to start the next long poll.
-                if (!allTasksFinished && shouldPollAgain) {
-                    checkStatus();
+                // If not all tasks are finished, schedule the next poll.
+                if (!allTasksFinished) {
+                    pollTimeoutRef.current = setTimeout(checkStatus, 2000); // Poll again after a 2-second delay.
                 }
             }
         };
 
-        // Start polling only if there are tasks.
+        // Start polling only if there are tasks to process.
         if (tasks.length > 0) {
             checkStatus();
         }
 
-        // Cleanup function: This runs when the component unmounts
-        // (popup closes) or when `tasks.length` changes (new upload).
-        // This stops any in-flight polls from updating state.
+        // Cleanup function runs when component unmounts or `tasks.length` changes.
         return () => {
             isMountedRef.current = false;
+            // Clear the scheduled timeout to prevent polling after the popup is closed.
+            clearTimeout(pollTimeoutRef.current);
         };
-        // This effect's dependency MUST be tasks.length.
-        // When `data` changes, the first effect runs, `setTasks` runs,
-        // `tasks.length` changes, which triggers this effect's cleanup
-        // (stopping old polls) and then runs it again (starting new polls).
+        // Dependency is tasks.length. When `data` changes -> `tasks` changes -> `tasks.length` changes,
+        // this effect's cleanup runs (stopping old polls) and then runs again (starting new polls).
     }, [tasks.length, t]);
 
     if (!data || !data.tasks || data.tasks.length === 0) {
