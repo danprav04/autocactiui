@@ -119,6 +119,28 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
     try {
       const response = await api.getDeviceNeighbors(sourceNode.id);
       const allNeighbors = response.data.neighbors;
+      
+      // --- Preloading Enhancement ---
+      // Proactively fetch details for all potential neighbors in the background.
+      // This populates the API cache, making subsequent device additions feel instantaneous.
+      // We don't `await` these calls; they run as fire-and-forget promises.
+      allNeighbors.forEach(neighbor => {
+        if (neighbor.ip) {
+          // Preload device info (icon, model, etc.)
+          api.getDeviceInfo(neighbor.ip).catch(err => {
+            // Silently fail. If the device is un-discoverable, the error will be
+            // handled properly during the actual "add" process with a fallback node.
+            console.warn(`Preload failed for device info ${neighbor.ip}:`, err.message);
+          });
+          // Preload the next level of neighbors ("grandchildren")
+          api.getDeviceNeighbors(neighbor.ip).catch(err => {
+            // Silently fail. A user will still be able to add the node,
+            // but its own neighbors might not be preloaded if this call fails.
+            console.warn(`Preload failed for neighbors of ${neighbor.ip}:`, err.message);
+          });
+        }
+      });
+      // --- End Preloading ---
 
       setState(prev => {
         if (!prev) return prev;
@@ -218,6 +240,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
             const position = { x: sourceNode.position.x + (Math.random() * 300 - 150), y: sourceNode.position.y + 200 };
             
             try {
+                // This call will be instantaneous if data was successfully preloaded.
                 const deviceResponse = await api.getDeviceInfo(neighborIp);
                 confirmedNode = createNodeObject(deviceResponse.data, position);
             } catch (infoError) {
@@ -229,6 +252,7 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
 
         let allNeighborsOfNewNode = [];
         try {
+            // This call will be instantaneous if data was successfully preloaded.
             const neighborsResponse = await api.getDeviceNeighbors(neighborIp);
             if (neighborsResponse.data.neighbors) {
                 allNeighborsOfNewNode = neighborsResponse.data.neighbors;
