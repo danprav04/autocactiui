@@ -96,6 +96,7 @@
     "endDeviceIdentifier": "התקן קצה (ללא IP)",
     "downloadMap": "שמור מפה (JSON)",
     "downloadExcel": "ייצא לאקסל",
+    "downloadVisio": "ייצא ל-Visio",
     "importMap": "ייבא מפה"
   },
   "startup": {

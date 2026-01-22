@@ -96,6 +96,7 @@
     "endDeviceIdentifier": "End Device (No IP)",
     "downloadMap": "Save Map (JSON)",
     "downloadExcel": "Download Excel",
+    "downloadVisio": "Download Visio",
     "importMap": "Import Map"
   },
   "startup": {

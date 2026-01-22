@@ -35,7 +35,8 @@ const Sidebar = ({
   neighbors,
   onAddNeighbor,
   onDownloadConfig,
-  onDownloadExcel
+  onDownloadExcel,
+  onDownloadVisio
 }) => {
   const { t } = useTranslation();
   const { onUpdateNodeData } = useContext(NodeContext);
@@ -151,9 +152,17 @@ const Sidebar = ({
               onClick={onDownloadExcel}
               className="secondary"
               disabled={!isMapStarted}
-              style={{ marginBottom: '10px' }}
+              style={{ marginBottom: '5px' }}
             >
               {t('sidebar.downloadExcel')}
+            </button>
+            <button
+              onClick={onDownloadVisio}
+              className="secondary"
+              disabled={!isMapStarted}
+              style={{ marginBottom: '10px' }}
+            >
+              {t('sidebar.downloadVisio')}
             </button>
           </div>
 
