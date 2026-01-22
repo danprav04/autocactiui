@@ -1,5 +1,5 @@
 // frontend/src/components/Sidebar/Sidebar.js
-import React, { useContext, useRef } from 'react';
+import React, { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeContext } from '../../App';
 import MapExportControls from './MapExportControls';
@@ -35,6 +35,8 @@ const Sidebar = ({
   neighbors,
   onAddNeighbor,
   onDownloadConfig,
+  onDownloadExcel,
+  onDownloadVisio
 }) => {
   const { t } = useTranslation();
   const { onUpdateNodeData } = useContext(NodeContext);
@@ -143,9 +145,28 @@ const Sidebar = ({
            </div>
           <div className="control-group">
             <label>{t('sidebar.mapActions')}</label>
-            <button onClick={onDownloadConfig} className="secondary" disabled={!isMapStarted} style={{marginBottom: '10px'}}>
+            <button onClick={onDownloadConfig} className="secondary" disabled={!isMapStarted} style={{marginBottom: '5px'}}>
                 {t('sidebar.downloadMap')}
             </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={onDownloadExcel}
+                  className="secondary" 
+                  disabled={!isMapStarted}
+                  style={{marginBottom: '10px'}}
+                >
+                    {t('sidebar.downloadExcel')}
+                </button>
+                <button 
+                  onClick={onDownloadVisio}
+                  className="secondary" 
+                  disabled={!isMapStarted}
+                  style={{marginBottom: '10px'}}
+                >
+                    {t('sidebar.downloadVisio')}
+                </button>
+            </div>
+            
             <button onClick={handleResetClick} className="danger" disabled={!isMapStarted}>
               {t('sidebar.clearMap')}
             </button>

@@ -94,7 +94,9 @@
     "quickSelect": "Quick Select",
     "selectByType": "Select by type...",
     "endDeviceIdentifier": "End Device (No IP)",
-    "downloadMap": "Download Map",
+    "downloadMap": "Save Map (JSON)",
+    "downloadExcel": "Export to Excel",
+    "downloadVisio": "Export to VSDX",
     "importMap": "Import Map"
   },
   "startup": {

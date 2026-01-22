@@ -303,6 +303,14 @@ function App() {
     mapImportExport.downloadMapConfig(nodes, edges, mapName);
   }, [nodes, edges, mapName]);
 
+  const handleDownloadExcel = useCallback(() => {
+    mapImportExport.exportToExcel(nodes, edges, mapName);
+  }, [nodes, edges, mapName]);
+
+  const handleDownloadVisio = useCallback(() => {
+    mapImportExport.exportToVisio(nodes, edges, mapName);
+  }, [nodes, edges, mapName]);
+
   const handleImportConfig = useCallback(async (file) => {
     setIsLoading(true);
     setAppError('');
@@ -375,6 +383,8 @@ function App() {
           bringToFront={bringToFront}
           sendToBack={sendToBack}
           onDownloadConfig={handleDownloadConfig}
+          onDownloadExcel={handleDownloadExcel}
+          onDownloadVisio={handleDownloadVisio}
           neighbors={availableNeighbors}
           onAddNeighbor={(neighbor) => {
             if (selectedCustomNode) {
