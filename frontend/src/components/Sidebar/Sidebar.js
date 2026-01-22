@@ -35,8 +35,7 @@ const Sidebar = ({
   neighbors,
   onAddNeighbor,
   onDownloadConfig,
-  onDownloadExcel,
-  onDownloadVisio
+  onDownloadExcel
 }) => {
   const { t } = useTranslation();
   const { onUpdateNodeData } = useContext(NodeContext);
@@ -64,10 +63,10 @@ const Sidebar = ({
         />
       );
     }
-    
+
     if (selectionCount === 1) {
       const selected = selectedElements[0];
-      
+
       switch (selected.type) {
         case 'custom':
           return (
@@ -120,60 +119,50 @@ const Sidebar = ({
       {isMapStarted && (
         <div>
           <h3>{t('sidebar.mapTools')}</h3>
-           <div className="control-group">
-              <label>{t('sidebar.addElements')}</label>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={onAddGroup} className="secondary">{t('sidebar.addGroup')}</button>
-                <button onClick={onAddTextNode} className="secondary">{t('sidebar.addText')}</button>
-              </div>
+          <div className="control-group">
+            <label>{t('sidebar.addElements')}</label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={onAddGroup} className="secondary">{t('sidebar.addGroup')}</button>
+              <button onClick={onAddTextNode} className="secondary">{t('sidebar.addText')}</button>
+            </div>
           </div>
-           <div className="control-group">
-              <label htmlFor="type-selector-all">{t('sidebar.quickSelect')}</label>
-              <select
-                id="type-selector-all"
-                className="icon-selector"
-                onChange={(e) => selectAllByType(e.target.value)}
-                value=""
-              >
-                <option value="" disabled>{t('sidebar.selectByType')}</option>
-                {availableIcons.map((iconName) => (
-                  <option key={iconName} value={iconName}>
-                    {iconName}
-                  </option>
-                ))}
-              </select>
-           </div>
+          <div className="control-group">
+            <label htmlFor="type-selector-all">{t('sidebar.quickSelect')}</label>
+            <select
+              id="type-selector-all"
+              className="icon-selector"
+              onChange={(e) => selectAllByType(e.target.value)}
+              value=""
+            >
+              <option value="" disabled>{t('sidebar.selectByType')}</option>
+              {availableIcons.map((iconName) => (
+                <option key={iconName} value={iconName}>
+                  {iconName}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="control-group">
             <label>{t('sidebar.mapActions')}</label>
-            <button onClick={onDownloadConfig} className="secondary" disabled={!isMapStarted} style={{marginBottom: '5px'}}>
-                {t('sidebar.downloadMap')}
+            <button onClick={onDownloadConfig} className="secondary" disabled={!isMapStarted} style={{ marginBottom: '5px' }}>
+              {t('sidebar.downloadMap')}
             </button>
-            <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  onClick={onDownloadExcel}
-                  className="secondary" 
-                  disabled={!isMapStarted}
-                  style={{marginBottom: '10px'}}
-                >
-                    {t('sidebar.downloadExcel')}
-                </button>
-                <button 
-                  onClick={onDownloadVisio}
-                  className="secondary" 
-                  disabled={!isMapStarted}
-                  style={{marginBottom: '10px'}}
-                >
-                    {t('sidebar.downloadVisio')}
-                </button>
-            </div>
-            
-            <button onClick={handleResetClick} className="danger" disabled={!isMapStarted}>
-              {t('sidebar.clearMap')}
+            <button
+              onClick={onDownloadExcel}
+              className="secondary"
+              disabled={!isMapStarted}
+              style={{ marginBottom: '10px' }}
+            >
+              {t('sidebar.downloadExcel')}
             </button>
           </div>
+
+          <button onClick={handleResetClick} className="danger" disabled={!isMapStarted}>
+            {t('sidebar.clearMap')}
+          </button>
         </div>
       )}
-      
+
       <h3>{t('sidebar.session')}</h3>
       <div className="control-group">
         <button onClick={onLogout} className="secondary">{t('sidebar.logout')}</button>
@@ -184,7 +173,7 @@ const Sidebar = ({
       <div className="contextual-section">
         {renderContextualContent()}
       </div>
-    </div>
+    </div >
   );
 };
 

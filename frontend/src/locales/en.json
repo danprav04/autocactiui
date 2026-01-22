@@ -95,8 +95,7 @@
     "selectByType": "Select by type...",
     "endDeviceIdentifier": "End Device (No IP)",
     "downloadMap": "Save Map (JSON)",
-    "downloadExcel": "Export to Excel",
-    "downloadVisio": "Export to VSDX",
+    "downloadExcel": "Download Excel",
     "importMap": "Import Map"
   },
   "startup": {

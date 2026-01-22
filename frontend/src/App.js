@@ -43,7 +43,7 @@ function App() {
   const [uploadSuccessData, setUploadSuccessData] = useState(null);
   const [neighborPopup, setNeighborPopup] = useState({ isOpen: false, neighbors: [], sourceNode: null });
   const [mapInteractionLoading, setMapInteractionLoading] = useState(false); // New state for loading during map interaction
-  
+
   const { t } = useTranslation();
   const reactFlowWrapper = useRef(null);
   const reactFlowInstance = useRef(null);
@@ -97,53 +97,53 @@ function App() {
   const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode, text: TextNode }), []);
   const availableIcons = useMemo(() => Object.keys(ICONS_BY_THEME).filter(k => k !== 'Unknown'), []);
 
-  const selectedCustomNode = useMemo(() => 
+  const selectedCustomNode = useMemo(() =>
     selectedElements.length === 1 && selectedElements[0].type === 'custom' ? selectedElements[0] : null,
     [selectedElements]
   );
 
   const availableNeighbors = useMemo(() => {
-      if (!selectedCustomNode) return [];
+    if (!selectedCustomNode) return [];
 
-      // Get all existing connections for the selected node to check against.
-      const existingConnections = new Set(
-          edges
-              .filter(e => e.source === selectedCustomNode.id || e.target === selectedCustomNode.id)
-              .map(e => {
-                  const targetNode = nodes.find(n => n.id === e.target);
-                  // For end devices, create a unique key based on source, hostname, and interface.
-                  if (targetNode && !targetNode.data.ip) {
-                      return `${e.source}-${targetNode.data.hostname}-${e.data.interface}`;
-                  }
-                  // For regular devices, the IP is sufficient.
-                  return e.target;
-              })
-      );
-
-      return currentNeighbors.filter(n => {
-          if (n.ip) {
-              return !nodes.some(node => node.id === n.ip);
+    // Get all existing connections for the selected node to check against.
+    const existingConnections = new Set(
+      edges
+        .filter(e => e.source === selectedCustomNode.id || e.target === selectedCustomNode.id)
+        .map(e => {
+          const targetNode = nodes.find(n => n.id === e.target);
+          // For end devices, create a unique key based on source, hostname, and interface.
+          if (targetNode && !targetNode.data.ip) {
+            return `${e.source}-${targetNode.data.hostname}-${e.data.interface}`;
           }
-          // For end devices, check if a connection with the same signature already exists.
-          const connectionKey = `${selectedCustomNode.id}-${n.hostname}-${n.interface}`;
-          return !existingConnections.has(connectionKey);
-      });
+          // For regular devices, the IP is sufficient.
+          return e.target;
+        })
+    );
+
+    return currentNeighbors.filter(n => {
+      if (n.ip) {
+        return !nodes.some(node => node.id === n.ip);
+      }
+      // For end devices, check if a connection with the same signature already exists.
+      const connectionKey = `${selectedCustomNode.id}-${n.hostname}-${n.interface}`;
+      return !existingConnections.has(connectionKey);
+    });
   }, [selectedCustomNode, currentNeighbors, nodes, edges]);
 
 
   // Sync the hook's loading/error states with App.js for global notifications
   const setIsLoading = useCallback((value) => {
-      setMapInteractionLoading(value);
-      setMapHookLoading(value);
+    setMapInteractionLoading(value);
+    setMapHookLoading(value);
   }, [setMapHookLoading]);
 
   const setAppError = useCallback((message) => {
-      setError(message);
-      setMapHookError(message);
-      // Clear error after a delay
-      if (message) {
-          setTimeout(() => setError(''), 5000);
-      }
+    setError(message);
+    setMapHookError(message);
+    // Clear error after a delay
+    if (message) {
+      setTimeout(() => setError(''), 5000);
+    }
   }, [setMapHookError]);
 
   // --- Effect to close context menu when selection changes ---
@@ -163,7 +163,7 @@ function App() {
       return; // Do nothing if the popup is already closed.
     }
 
-    const shouldPopupBeOpen = 
+    const shouldPopupBeOpen =
       selectedElements.length === 1 && // Exactly one element must be selected
       selectedElements[0].type === 'custom' && // It must be a device
       neighborPopup.sourceNode?.id === selectedElements[0].id; // Its ID must match the source node that opened the popup
@@ -220,17 +220,17 @@ function App() {
 
   const handleStart = async (ip, initialIconName) => {
     if (!ip) { setAppError(t('app.errorStartIp')); return; }
-    
+
     setIsLoading(true); // This sets both App.js and the hook's loading state
     setAppError('');
-    
+
     try {
       const response = await api.getInitialDevice(ip);
       const newNode = createNodeObject(response.data, { x: 400, y: 150 }, initialIconName);
       setMapState({ nodes: [newNode], edges: [] });
       // Simulate click to select the first node and fetch its neighbors
       // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
-      onNodeClick(null, newNode, setIsLoading, setAppError); 
+      onNodeClick(null, newNode, setIsLoading, setAppError);
     } catch (err) {
       setAppError(t('app.errorInitialDevice'));
       resetMap();
@@ -241,7 +241,7 @@ function App() {
   const handleAddNeighborFromPopup = useCallback(async (neighborGroup) => {
     const { sourceNode } = neighborPopup;
     if (!sourceNode) return;
-    
+
     // Process a single neighbor; the popup should remain open and refresh.
     // isBatchOperation is false by default.
     await confirmNeighbor(neighborGroup, sourceNode.id, setIsLoading, setAppError, false);
@@ -250,10 +250,10 @@ function App() {
   const handleAddSelectedNeighbors = useCallback(async (selectedNeighborGroups) => {
     const { sourceNode } = neighborPopup;
     if (!sourceNode || selectedNeighborGroups.length === 0) return;
-  
+
     handleCloseNeighborPopup();
     setIsLoading(true);
-  
+
     try {
       // Process each selected neighbor sequentially. The `isBatchOperation` flag
       // prevents the popup from reopening after each addition.
@@ -274,10 +274,10 @@ function App() {
   const handleCreateMap = async () => {
     if (!reactFlowWrapper.current || nodes.length === 0) { setAppError(t('app.errorEmptyMap')); return; }
     if (!selectedCactiGroupId) { setAppError(t('app.errorSelectCacti')); return; }
-    
+
     setIsUploading(true);
     setAppError('');
-    
+
     try {
       const taskResponse = await handleUploadProcess({
         mapElement: reactFlowWrapper.current,
@@ -307,10 +307,6 @@ function App() {
     mapImportExport.exportToExcel(nodes, edges, mapName);
   }, [nodes, edges, mapName]);
 
-  const handleDownloadVisio = useCallback(() => {
-    mapImportExport.exportToVisio(nodes, edges, mapName);
-  }, [nodes, edges, mapName]);
-
   const handleImportConfig = useCallback(async (file) => {
     setIsLoading(true);
     setAppError('');
@@ -327,9 +323,9 @@ function App() {
   }, [setMapState, t]);
 
   const onNodeClickHandler = useCallback((event, node) => {
-      setContextMenu(null); // Close context menu on any node click
-      // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
-      onNodeClick(event, node, setIsLoading, setAppError); 
+    setContextMenu(null); // Close context menu on any node click
+    // Pass the *full* set of App.js-scoped setters/helpers to onNodeClick
+    onNodeClick(event, node, setIsLoading, setAppError);
   }, [onNodeClick, setIsLoading, setAppError]);
 
   const onPaneClickHandler = useCallback(() => {
@@ -359,7 +355,7 @@ function App() {
   return (
     <NodeContext.Provider value={{ onUpdateNodeData: handleUpdateNodeData }}>
       <div className="app-container">
-        <Sidebar 
+        <Sidebar
           selectedElements={selectedElements}
           onUploadMap={handleCreateMap}
           onAddGroup={handleAddGroup}
@@ -384,7 +380,6 @@ function App() {
           sendToBack={sendToBack}
           onDownloadConfig={handleDownloadConfig}
           onDownloadExcel={handleDownloadExcel}
-          onDownloadVisio={handleDownloadVisio}
           neighbors={availableNeighbors}
           onAddNeighbor={(neighbor) => {
             if (selectedCustomNode) {
@@ -405,8 +400,8 @@ function App() {
           <div className='map-container'>
             {nodes.length === 0 ? (
               <div className="startup-wrapper">
-                <StartupScreen 
-                  onStart={handleStart} 
+                <StartupScreen
+                  onStart={handleStart}
                   onImportConfig={handleImportConfig}
                   isLoading={isAuthLoading || mapInteractionLoading}
                   availableIcons={availableIcons}
@@ -414,17 +409,17 @@ function App() {
               </div>
             ) : (
               <ReactFlowProvider>
-                <Map 
-                  nodes={nodes} 
-                  edges={edges} 
+                <Map
+                  nodes={nodes}
+                  edges={edges}
                   snapLines={snapLines} // Pass snapLines to the Map
-                  onNodeClick={onNodeClickHandler} 
+                  onNodeClick={onNodeClickHandler}
                   onNodesChange={onNodesChange}
                   onPaneClick={onPaneClickHandler}
                   onSelectionChange={onSelectionChange}
                   onNodeContextMenu={handleNodeContextMenu}
                   onPaneContextMenu={onPaneContextMenu}
-                  nodeTypes={nodeTypes} 
+                  nodeTypes={nodeTypes}
                   theme={theme}
                   setReactFlowInstance={(instance) => (reactFlowInstance.current = instance)}
                 />
@@ -449,10 +444,10 @@ function App() {
                 {isUploading ? t('app.processingMap') : t('app.loading')}
               </p>
             )}
-            <UploadSuccessPopup 
+            <UploadSuccessPopup
               key={uploadSuccessData ? JSON.stringify(uploadSuccessData.tasks) : 'popup-closed'}
-              data={uploadSuccessData} 
-              onClose={() => setUploadSuccessData(null)} 
+              data={uploadSuccessData}
+              onClose={() => setUploadSuccessData(null)}
             />
             <NeighborsPopup
               isOpen={neighborPopup.isOpen}
