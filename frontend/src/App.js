@@ -7,6 +7,7 @@ import { useThemeManager } from './hooks/useThemeManager';
 import { useLocalizationManager } from './hooks/useLocalizationManager';
 import { useCacti } from './hooks/useCacti';
 import { useMapInteraction } from './hooks/useMapInteraction';
+import { useAutoLayout } from './hooks/useAutoLayout';
 
 import Map from './components/Map';
 import Sidebar from './components/Sidebar/Sidebar';
@@ -92,6 +93,8 @@ function App() {
     setError: setMapHookError, // Use setter from map hook
     setState: setMapState,
   } = useMapInteraction(theme, handleShowNeighborPopup);
+
+  const { autoLayoutNodes } = useAutoLayout();
 
   // --- Memos and Derived State (Called Unconditionally) ---
   const nodeTypes = useMemo(() => ({ custom: CustomNode, group: GroupNode, text: TextNode }), []);
@@ -307,6 +310,11 @@ function App() {
     mapImportExport.exportToExcel(nodes, edges, mapName);
   }, [nodes, edges, mapName]);
 
+  const handleAutoStructure = useCallback(() => {
+    const repositionedNodes = autoLayoutNodes(nodes, edges);
+    setMapState({ nodes: repositionedNodes, edges });
+  }, [nodes, edges, autoLayoutNodes, setMapState]);
+
   const handleImportConfig = useCallback(async (file) => {
     setIsLoading(true);
     setAppError('');
@@ -386,6 +394,7 @@ function App() {
               confirmNeighbor(neighbor, selectedCustomNode.id, setIsLoading, setAppError);
             }
           }}
+          onAutoStructure={handleAutoStructure}
         />
         <div className="main-content" ref={reactFlowWrapper}>
           <TopToolbar
