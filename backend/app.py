@@ -8,10 +8,12 @@ from functools import wraps
 from datetime import datetime, timedelta
 import threading
 import uuid
-from io import BytesIO
+from visio_router import visio_bp
 
 app = Flask(__name__)
+CORS(app)
 
+app.register_blueprint(visio_bp)
 # --- Authentication Configuration ---
 # In a real production environment, this secret key should be loaded from a secure,
 # non-version-controlled location (e.g., environment variables, a vault).

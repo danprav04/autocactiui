@@ -36,6 +36,7 @@ const Sidebar = ({
   onAddNeighbor,
   onDownloadConfig,
   onDownloadExcel,
+  onDownloadVisio,
   onAutoStructure
 }) => {
   const { t } = useTranslation();
@@ -161,6 +162,14 @@ const Sidebar = ({
               style={{ marginBottom: '10px' }}
             >
               {t('sidebar.downloadExcel')}
+            </button>
+            <button
+              onClick={onDownloadVisio}
+              className="secondary"
+              disabled={!isMapStarted}
+              style={{ marginBottom: '10px' }}
+            >
+              {t('sidebar.downloadVisio') || 'Export to Visio'}
             </button>
           </div>
 

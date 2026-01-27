@@ -310,6 +310,10 @@ function App() {
     mapImportExport.exportToExcel(nodes, edges, mapName);
   }, [nodes, edges, mapName]);
 
+  const handleDownloadVisio = useCallback(() => {
+    mapImportExport.exportToVisio(nodes, edges, mapName);
+  }, [nodes, edges, mapName]);
+
   const handleAutoStructure = useCallback(() => {
     const repositionedNodes = autoLayoutNodes(nodes, edges);
     setMapState({ nodes: repositionedNodes, edges });
@@ -388,6 +392,7 @@ function App() {
           sendToBack={sendToBack}
           onDownloadConfig={handleDownloadConfig}
           onDownloadExcel={handleDownloadExcel}
+          onDownloadVisio={handleDownloadVisio}
           neighbors={availableNeighbors}
           onAddNeighbor={(neighbor) => {
             if (selectedCustomNode) {

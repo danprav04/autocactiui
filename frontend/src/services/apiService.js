@@ -59,7 +59,7 @@ const cachedGet = (url, config = {}) => {
     if (cachedPromise) {
         return cachedPromise;
     }
-    
+
     return apiClient.get(url, config).then(response => {
         setToCache(url, response.data);
         return response;
@@ -174,3 +174,4 @@ export const getTaskStatus = (taskId) => {
     // Task status is transient and must not be cached.
     return apiClient.get(`/task-status/${taskId}`);
 };
+export default apiClient;

@@ -1,11 +1,30 @@
-import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+import apiService from './apiService'; // Ensure this import exists
 
 // --- UTILITIES ---
 
 const sanitizeFilename = (name) => (name || 'map').replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
 // --- MAIN EXPORTS ---
+
+export const exportToVisio = async (nodes, edges, mapName) => {
+    try {
+        const mapData = {
+            mapName,
+            nodes,
+            edges
+        };
+        const response = await apiService.post('/export-visio', mapData, {
+            responseType: 'blob',
+        });
+        const blob = new Blob([response.data], { type: 'application/vnd.visio' });
+        saveAs(blob, `${sanitizeFilename(mapName)}.vsdx`);
+    } catch (error) {
+        console.error("Failed to export to Visio:", error);
+        alert("Failed to export to Visio. See console for details.");
+    }
+};
 
 export const downloadMapConfig = (nodes, edges, mapName) => {
     try {
