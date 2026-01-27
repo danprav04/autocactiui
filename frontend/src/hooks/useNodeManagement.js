@@ -13,7 +13,7 @@ export const useNodeManagement = (theme, setState) => {
     if (!finalIconName) {
       finalIconName = ICONS_BY_THEME[discoveredType] ? discoveredType : 'Unknown';
     }
-    
+
     // Defensively handle potentially missing hostname to prevent crashes.
     const safeHostname = device.hostname || 'Unknown Device';
     // If IP is missing, create a unique ID to prevent collisions for end devices.
@@ -23,8 +23,8 @@ export const useNodeManagement = (theme, setState) => {
       id: nodeId,
       type: 'custom',
       position: position || { x: (Math.random() * 400) + 100, y: (Math.random() * 400) + 50 },
-      data: { 
-        hostname: safeHostname, 
+      data: {
+        hostname: safeHostname,
         ip: device.ip,
         iconType: finalIconName,
         icon: ICONS_BY_THEME[finalIconName][theme]
@@ -40,29 +40,29 @@ export const useNodeManagement = (theme, setState) => {
     const selectedIds = new Set(selectedElements.map(el => el.id));
 
     setState(prevState => {
-        // Determine if any selected node is the source of the current previews
-        const shouldClearPreviews = prevState.edges.some(e => 
-            e.data.isPreview && selectedIds.has(e.source)
-        );
+      // Determine if any selected node is the source of the current previews
+      const shouldClearPreviews = prevState.edges.some(e =>
+        e.data.isPreview && selectedIds.has(e.source)
+      );
 
-        // Filter nodes: remove selected nodes, and also remove preview nodes if their source is being deleted.
-        const nextNodes = prevState.nodes.filter(n => {
-            if (selectedIds.has(n.id)) return false;
-            if (n.data.isPreview && shouldClearPreviews) return false;
-            return true;
-        });
+      // Filter nodes: remove selected nodes, and also remove preview nodes if their source is being deleted.
+      const nextNodes = prevState.nodes.filter(n => {
+        if (selectedIds.has(n.id)) return false;
+        if (n.data.isPreview && shouldClearPreviews) return false;
+        return true;
+      });
 
-        // Filter edges: remove edges connected to selected nodes, and also remove preview edges if their source is deleted.
-        const nextEdges = prevState.edges.filter(e => {
-            if (selectedIds.has(e.source) || selectedIds.has(e.target)) return false;
-            if (e.data.isPreview && shouldClearPreviews) return false;
-            return true;
-        });
+      // Filter edges: remove edges connected to selected nodes, and also remove preview edges if their source is deleted.
+      const nextEdges = prevState.edges.filter(e => {
+        if (selectedIds.has(e.source) || selectedIds.has(e.target)) return false;
+        if (e.data.isPreview && shouldClearPreviews) return false;
+        return true;
+      });
 
-        return {
-            nodes: nextNodes,
-            edges: nextEdges,
-        };
+      return {
+        nodes: nextNodes,
+        edges: nextEdges,
+      };
     });
   }, [setState]);
 
@@ -72,10 +72,22 @@ export const useNodeManagement = (theme, setState) => {
         if (n.id === nodeId) {
           let finalData = { ...n.data, ...updatedData };
           if (n.type === 'custom') {
-              const newIconType = updatedData.iconType || n.data.iconType;
-              finalData.icon = ICONS_BY_THEME[newIconType][theme];
+            const newIconType = updatedData.iconType || n.data.iconType;
+            finalData.icon = ICONS_BY_THEME[newIconType][theme];
           }
-          return { ...n, data: finalData };
+
+          // Sync dimensions to the root node object and style for Minimap/ReactFlow compliance
+          const updates = {};
+          if (updatedData.width) {
+            updates.width = updatedData.width;
+            updates.style = { ...n.style, width: updatedData.width };
+          }
+          if (updatedData.height) {
+            updates.height = updatedData.height;
+            updates.style = { ...n.style, ...updates.style, height: updatedData.height };
+          }
+
+          return { ...n, ...updates, data: finalData };
         }
         return n;
       });
@@ -84,13 +96,18 @@ export const useNodeManagement = (theme, setState) => {
   }, [theme, setState]);
 
   const handleAddGroup = useCallback(() => {
+    const width = 400;
+    const height = 300;
     const newGroup = {
       id: `group_${Date.now()}`,
       type: 'group',
       position: { x: 200, y: 200 },
+      width,
+      height,
+      style: { width, height },
       data: {
         label: t('sidebar.newGroupName'),
-        color: '#cfe2ff', width: 400, height: 300, opacity: 0.6,
+        color: '#cfe2ff', width, height, opacity: 0.6,
         shape: 'rounded-rectangle',
         borderColor: '#8a8d91', borderStyle: 'dashed', borderWidth: 1,
       },
@@ -98,20 +115,20 @@ export const useNodeManagement = (theme, setState) => {
     };
     setState(prev => ({ ...prev, nodes: [...prev.nodes, newGroup] }));
   }, [t, setState]);
-  
+
   const handleAddTextNode = useCallback(() => {
-      const newNode = {
-          id: `text_${Date.now()}`,
-          type: 'text',
-          position: {x: 300, y: 100},
-          data: {
-              text: 'New Text',
-              fontSize: 16,
-              color: theme === 'dark' ? '#e4e6eb' : '#212529'
-          },
-          zIndex: 10
-      };
-      setState(prev => ({ ...prev, nodes: [...prev.nodes, newNode] }));
+    const newNode = {
+      id: `text_${Date.now()}`,
+      type: 'text',
+      position: { x: 300, y: 100 },
+      data: {
+        text: 'New Text',
+        fontSize: 16,
+        color: theme === 'dark' ? '#e4e6eb' : '#212529'
+      },
+      zIndex: 10
+    };
+    setState(prev => ({ ...prev, nodes: [...prev.nodes, newNode] }));
   }, [setState, theme]);
 
   return {

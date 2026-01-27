@@ -157,12 +157,22 @@ const generateDrawioXml = (nodes, edges) => {
         return '';
     };
 
-    nodes.forEach(node => {
+    // Sort nodes so that groups come first (rendered bottom-most in Draw.io)
+    const sortedNodes = [...nodes].sort((a, b) => {
+        if (a.type === 'group' && b.type !== 'group') return -1;
+        if (a.type !== 'group' && b.type === 'group') return 1;
+        return 0;
+    });
+
+    sortedNodes.forEach(node => {
         const id = escape(node.id);
         const x = Math.round(node.position.x);
         const y = Math.round(node.position.y);
-        const width = node.width || 80;
-        const height = node.height || 80;
+
+        // Prioritize dimensions from data, then root, then defaults
+        const width = node.data?.width || node.width || 80;
+        const height = node.data?.height || node.height || 80;
+
         const style = getStyle(node);
 
         let value = '';
