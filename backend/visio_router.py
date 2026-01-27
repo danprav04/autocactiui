@@ -63,12 +63,12 @@ def export_visio():
                             current_id = 1
                             page_height = 11.0 # Assume default or parse <PageProps> -> PageHeight
                             
-                            # Try to find PageHeight in PageProps
-                            # <PageSheet> <Cell N='PageHeight' V='...'/> </PageSheet>
-                            # It's usually in a separate PageSheet element or similar properties
-                            # We'll stick to 11.0 default for robustness or try to read it
-                            
-                            for node in nodes:
+                            # Sort nodes by zIndex if present, default to 0. 
+                            # Lower zIndex -> earlier in list -> drawn first -> behind others.
+                            # Standard sort is stable.
+                            sorted_nodes = sorted(nodes, key=lambda n: n.get('zIndex', 10))
+
+                            for node in sorted_nodes:
                                 new_shape = copy.deepcopy(prototype_Copy)
                                 new_shape.set('ID', str(current_id))
                                 new_shape.set('NameU', f"Sheet.{current_id}")
@@ -80,19 +80,31 @@ def export_visio():
                                 w = node.get('width', 100)
                                 h = node.get('height', 100)
                                 
+                                # Convert px to inches (approx 96 DPI)
                                 pin_x = (x + (w / 2.0)) / 96.0
                                 pin_y = page_height - ((y + (h / 2.0)) / 96.0)
-                                
+                                width_in = w / 96.0
+                                height_in = h / 96.0
+
                                 for elem in new_shape.iter():
                                      if 'Cell' in elem.tag:
                                          n = elem.get('N')
                                          if n == 'PinX': elem.set('V', str(pin_x))
                                          if n == 'PinY': elem.set('V', str(pin_y))
+                                         if n == 'Width': elem.set('V', str(width_in))
+                                         if n == 'Height': elem.set('V', str(height_in))
                                 
                                 # Text
-                                label = node['data'].get('hostname', '')
-                                ip = node['data'].get('ip', '')
-                                text_content = f"{label}\n{ip}"
+                                # Check type for correct label source
+                                node_type = node.get('type', 'custom')
+                                if node_type == 'group':
+                                     # For groups, use the label in data
+                                     text_content = node['data'].get('label', 'Group')
+                                else:
+                                     # For devices/custom
+                                     label = node['data'].get('hostname', '')
+                                     ip = node['data'].get('ip', '')
+                                     text_content = f"{label}\n{ip}"
                                 
                                 text_elem = None
                                 for elem in new_shape.iter():
