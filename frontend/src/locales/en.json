@@ -96,7 +96,6 @@
     "endDeviceIdentifier": "End Device (No IP)",
     "downloadMap": "Save Map (JSON)",
     "downloadExcel": "Download Excel",
-    "downloadVisio": "Export to Visio",
     "importMap": "Import Map",
     "autoStructure": "Auto-Structure",
     "confirmAutoStructure": "This will rearrange all devices on the map in a hierarchical layout. Continue?"
