@@ -135,29 +135,56 @@ const generateDrawioXml = (nodes, edges) => {
             .replace(/'/g, '&apos;');
     };
 
-    // Helper to get style based on node type
+    // Helper to get style based on node type - Improved Aesthetics
     const getStyle = (node) => {
         if (node.type === 'custom') {
             const iconType = node.data.iconType || 'Router';
-            // Basic shapes for standard network devices
+            // Cisco-like styles but cleaner
+            const common = 'html=1;pointerEvents=1;dashed=0;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
             switch (iconType) {
-                case 'Router': return 'shape=mxgraph.cisco.routers.router;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
-                case 'Switch': return 'shape=mxgraph.cisco.switches.layer_2_remote_switch;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
-                case 'Firewall': return 'shape=mxgraph.cisco.security.firewall_asm;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
-                case 'Server': return 'shape=mxgraph.cisco.servers.server;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
-                case 'Cloud': return 'ellipse;shape=cloud;whiteSpace=wrap;html=1;';
-                default: return 'shape=rect;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;';
+                case 'Router': return `shape=mxgraph.cisco.routers.router;${common}fillColor=#005073;`;
+                case 'Switch': return `shape=mxgraph.cisco.switches.layer_2_remote_switch;${common}fillColor=#005073;`;
+                case 'Firewall': return `shape=mxgraph.cisco.security.firewall_asm;${common}fillColor=#005073;`;
+                case 'Server': return `shape=mxgraph.cisco.servers.server;${common}fillColor=#005073;`;
+                case 'Cloud': return 'ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;';
+                default: return 'shape=rect;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;rounded=1;';
             }
         } else if (node.type === 'group') {
-            // Basic container style
-            return 'group;html=1;dashed=1;opacity=50;fillColor=#dae8fc;strokeColor=#6c8ebf;';
+            // Cleaner group style
+            return 'group;html=1;dashed=1;dashPattern=1 2;opacity=70;fillColor=#F1F3F4;strokeColor=#9AA0A6;rounded=1;arcSize=10;';
         } else if (node.type === 'text') {
-            return 'text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;';
+            return 'text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=14;';
         }
         return '';
     };
 
-    // Sort nodes so that groups come first (rendered bottom-most in Draw.io)
+    // 1. Calculate Bounding Box and Centering Offsets
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(node => {
+        const x = node.position.x;
+        const y = node.position.y;
+        const w = node.data?.width || node.width || 80;
+        const h = node.data?.height || node.height || 80;
+        if (x < minX) minX = x;
+        if (x + w > maxX) maxX = x + w;
+        if (y < minY) minY = y;
+        if (y + h > maxY) maxY = y + h;
+    });
+
+    // Check if we have valid nodes
+    if (minX === Infinity) { minX = 0; maxX = 0; minY = 0; maxY = 0; }
+
+    const contentCenterX = (minX + maxX) / 2;
+    const contentCenterY = (minY + maxY) / 2;
+
+    // Draw.io default page format (US Letter) is roughly 850x1100
+    const pageCenterX = 850 / 2;
+    const pageCenterY = 1100 / 2;
+
+    const offsetX = pageCenterX - contentCenterX;
+    const offsetY = pageCenterY - contentCenterY;
+
+    // Sort nodes (Groups first)
     const sortedNodes = [...nodes].sort((a, b) => {
         if (a.type === 'group' && b.type !== 'group') return -1;
         if (a.type !== 'group' && b.type === 'group') return 1;
@@ -166,10 +193,10 @@ const generateDrawioXml = (nodes, edges) => {
 
     sortedNodes.forEach(node => {
         const id = escape(node.id);
-        const x = Math.round(node.position.x);
-        const y = Math.round(node.position.y);
+        // Apply centering offset
+        const x = Math.round(node.position.x + offsetX);
+        const y = Math.round(node.position.y + offsetY);
 
-        // Prioritize dimensions from data, then root, then defaults
         const width = node.data?.width || node.width || 80;
         const height = node.data?.height || node.height || 80;
 
@@ -189,14 +216,68 @@ const generateDrawioXml = (nodes, edges) => {
         xml += `        </mxCell>\n`;
     });
 
-    edges.forEach(edge => {
-        const id = escape(edge.id);
-        const source = escape(edge.source);
-        const target = escape(edge.target);
+    // 2. Handle Multiple Edges (Parallel Lines)
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-        xml += `        <mxCell id="${id}" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="${source}" target="${target}">\n`;
-        xml += `          <mxGeometry relative="1" as="geometry" />\n`;
-        xml += `        </mxCell>\n`;
+    // Group edges by pair (sorted IDs ensures A-B and B-A are treated as same pair)
+    const edgeGroups = {};
+    edges.forEach(edge => {
+        const pairId = [edge.source, edge.target].sort().join('-');
+        if (!edgeGroups[pairId]) edgeGroups[pairId] = [];
+        edgeGroups[pairId].push(edge);
+    });
+
+    Object.values(edgeGroups).forEach(group => {
+        const count = group.length;
+        group.forEach((edge, index) => {
+            const id = escape(edge.id);
+            const source = escape(edge.source);
+            const target = escape(edge.target);
+
+            // Base style
+            let style = "endArrow=none;html=1;rounded=1;strokeWidth=2;strokeColor=#333333;";
+
+            // Calculate spacing for parallel edges
+            if (count > 1) {
+                const sourceNode = nodeMap.get(edge.source);
+                const targetNode = nodeMap.get(edge.target);
+
+                if (sourceNode && targetNode) {
+                    const dx = targetNode.position.x - sourceNode.position.x;
+                    const dy = targetNode.position.y - sourceNode.position.y;
+
+                    // Bundle Width: Tight grouping (0.2 width centered at 0.5)
+                    // Start at 0.4, End at 0.6
+                    const bundleWidth = 0.2;
+                    const step = bundleWidth / (count + 1);
+                    const position = 0.5 - (bundleWidth / 2) + (step * (index + 1));
+
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        // Horizontal Layout: Vary Y, Fix X
+                        if (dx > 0) {
+                            // Target is Right -> Source Exit Right (1), Target Entry Left (0)
+                            style += `exitX=1;exitY=${position.toFixed(3)};entryX=0;entryY=${position.toFixed(3)};`;
+                        } else {
+                            // Target is Left -> Source Exit Left (0), Target Entry Right (1)
+                            style += `exitX=0;exitY=${position.toFixed(3)};entryX=1;entryY=${position.toFixed(3)};`;
+                        }
+                    } else {
+                        // Vertical Layout: Vary X, Fix Y
+                        if (dy > 0) {
+                            // Target is Below -> Source Exit Bottom (1), Target Entry Top (0)
+                            style += `exitX=${position.toFixed(3)};exitY=1;entryX=${position.toFixed(3)};entryY=0;`;
+                        } else {
+                            // Target is Above -> Source Exit Top (0), Target Entry Bottom (1)
+                            style += `exitX=${position.toFixed(3)};exitY=0;entryX=${position.toFixed(3)};entryY=1;`;
+                        }
+                    }
+                }
+            }
+
+            xml += `        <mxCell id="${id}" value="" style="${style}" edge="1" parent="1" source="${source}" target="${target}">\n`;
+            xml += `          <mxGeometry relative="1" as="geometry" />\n`;
+            xml += `        </mxCell>\n`;
+        });
     });
 
     xml += '      </root>\n';
