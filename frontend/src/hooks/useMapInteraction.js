@@ -155,11 +155,35 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
 
                 const edgesToCreate = [];
 
-                neighborsToConnect.forEach(neighbor => {
-                    const edgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
-                    // Add edge only if this specific interface connection doesn't exist
-                    if (!edgesWithoutPreviews.some(e => e.id === edgeId)) {
-                        edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor.ip, neighbor, false));
+                // Group neighbors by IP to handle parallel links correctly
+                const neighborsByIp = neighborsToConnect.reduce((acc, neighbor) => {
+                    if (!acc[neighbor.ip]) acc[neighbor.ip] = [];
+                    acc[neighbor.ip].push(neighbor);
+                    return acc;
+                }, {});
+
+                Object.entries(neighborsByIp).forEach(([ip, neighborLinks]) => {
+                    // Count existing edges between source and this neighbor (undirected)
+                    const existingCount = edgesWithoutPreviews.filter(e =>
+                        (e.source === sourceNode.id && e.target === ip) ||
+                        (e.source === ip && e.target === sourceNode.id)
+                    ).length;
+
+                    const foundCount = neighborLinks.length;
+
+                    // If we found more links than currently exist, add the difference
+                    if (foundCount > existingCount) {
+                        const needed = foundCount - existingCount;
+                        // We add the first 'needed' links from the found list
+                        // This is a heuristic since we can't map 1-to-1 without remote interface info
+                        for (let i = 0; i < needed; i++) {
+                            const neighbor = neighborLinks[i];
+                            const edgeId = `e-${sourceNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
+                            // Double check specifically for this edge ID just in case, though count check should suffice
+                            if (!edgesWithoutPreviews.some(e => e.id === edgeId)) {
+                                edgesToCreate.push(createEdgeObject(sourceNode.id, neighbor.ip, neighbor, false));
+                            }
+                        }
                     }
                 });
 
@@ -278,10 +302,31 @@ export const useMapInteraction = (theme, onShowNeighborPopup) => {
                     n.ip && n.ip !== sourceNodeId && permanentNodeIdsOnMap.has(n.ip)
                 );
 
-                neighborsToConnect.forEach(neighbor => {
-                    const edgeId = `e-${confirmedNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
-                    if (!existingEdgeIds.has(edgeId)) {
-                        tempState.edges.push(createEdgeObject(confirmedNode.id, neighbor.ip, neighbor, false));
+                // Group by IP to handle counts
+                const neighborsByIp = neighborsToConnect.reduce((acc, neighbor) => {
+                    if (!acc[neighbor.ip]) acc[neighbor.ip] = [];
+                    acc[neighbor.ip].push(neighbor);
+                    return acc;
+                }, {});
+
+                Object.entries(neighborsByIp).forEach(([ip, neighborLinks]) => {
+                    // Check existing edges between the NEW confirmed node and the neighbor
+                    const existingCount = tempState.edges.filter(e =>
+                        (e.source === confirmedNode.id && e.target === ip) ||
+                        (e.source === ip && e.target === confirmedNode.id)
+                    ).length;
+
+                    const foundCount = neighborLinks.length;
+
+                    if (foundCount > existingCount) {
+                        const needed = foundCount - existingCount;
+                        for (let i = 0; i < needed; i++) {
+                            const neighbor = neighborLinks[i];
+                            const edgeId = `e-${confirmedNode.id}-${neighbor.ip}-${neighbor.interface.replace(/[/]/g, '-')}`;
+                            if (!existingEdgeIds.has(edgeId)) {
+                                tempState.edges.push(createEdgeObject(confirmedNode.id, neighbor.ip, neighbor, false));
+                            }
+                        }
                     }
                 });
 

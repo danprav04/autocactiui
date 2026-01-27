@@ -1,5 +1,5 @@
 // frontend/src/components/Map.js
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -7,79 +7,84 @@ import ReactFlow, {
   useReactFlow,
   useViewport,
 } from 'react-flow-renderer';
+import ParallelEdge from './ParallelEdge';
+
+const edgeTypes = {
+  parallel: ParallelEdge,
+};
 
 const MarqueeSelection = ({ startPos, endPos }) => {
-    if (!startPos || !endPos) return null;
+  if (!startPos || !endPos) return null;
 
-    const style = {
-        left: Math.min(startPos.x, endPos.x),
-        top: Math.min(startPos.y, endPos.y),
-        width: Math.abs(startPos.x - endPos.x),
-        height: Math.abs(startPos.y - endPos.y),
-    };
+  const style = {
+    left: Math.min(startPos.x, endPos.x),
+    top: Math.min(startPos.y, endPos.y),
+    width: Math.abs(startPos.x - endPos.x),
+    height: Math.abs(startPos.y - endPos.y),
+  };
 
-    return <div className="marquee-selection" style={style} />;
+  return <div className="marquee-selection" style={style} />;
 };
 
 const SnapLines = ({ lines }) => {
-    const { zoom, x, y } = useViewport();
-    if (!lines.length) return null;
+  const { zoom, x, y } = useViewport();
+  if (!lines.length) return null;
 
-    // Transform ReactFlow coordinates to screen coordinates
-    // ReactFlow applies: translate(x, y) scale(zoom) to the viewport
-    return (
-        <>
-            {lines.map((line, i) => {
-                if (line.type === 'vertical') {
-                    const screenX = line.x * zoom + x;
-                    const screenY1 = line.y1 * zoom + y;
-                    const screenY2 = line.y2 * zoom + y;
-                    
-                    return (
-                        <div
-                            key={i}
-                            className="snap-line vertical"
-                            style={{
-                                position: 'absolute',
-                                left: screenX,
-                                top: Math.min(screenY1, screenY2),
-                                height: Math.abs(screenY2 - screenY1),
-                                width: '1px',
-                                backgroundColor: 'var(--snap-line-color)',
-                                zIndex: 1000,
-                                pointerEvents: 'none'
-                            }}
-                        />
-                    );
-                } else {
-                    const screenY = line.y * zoom + y;
-                    const screenX1 = line.x1 * zoom + x;
-                    const screenX2 = line.x2 * zoom + x;
-                    
-                    return (
-                        <div
-                            key={i}
-                            className="snap-line horizontal"
-                            style={{
-                                position: 'absolute',
-                                top: screenY,
-                                left: Math.min(screenX1, screenX2),
-                                width: Math.abs(screenX2 - screenX1),
-                                height: '1px',
-                                backgroundColor: 'var(--snap-line-color)',
-                                zIndex: 1000,
-                                pointerEvents: 'none'
-                            }}
-                        />
-                    );
-                }
-            })}
-        </>
-    );
+  // Transform ReactFlow coordinates to screen coordinates
+  // ReactFlow applies: translate(x, y) scale(zoom) to the viewport
+  return (
+    <>
+      {lines.map((line, i) => {
+        if (line.type === 'vertical') {
+          const screenX = line.x * zoom + x;
+          const screenY1 = line.y1 * zoom + y;
+          const screenY2 = line.y2 * zoom + y;
+
+          return (
+            <div
+              key={i}
+              className="snap-line vertical"
+              style={{
+                position: 'absolute',
+                left: screenX,
+                top: Math.min(screenY1, screenY2),
+                height: Math.abs(screenY2 - screenY1),
+                width: '1px',
+                backgroundColor: 'var(--snap-line-color)',
+                zIndex: 1000,
+                pointerEvents: 'none'
+              }}
+            />
+          );
+        } else {
+          const screenY = line.y * zoom + y;
+          const screenX1 = line.x1 * zoom + x;
+          const screenX2 = line.x2 * zoom + x;
+
+          return (
+            <div
+              key={i}
+              className="snap-line horizontal"
+              style={{
+                position: 'absolute',
+                top: screenY,
+                left: Math.min(screenX1, screenX2),
+                width: Math.abs(screenX2 - screenX1),
+                height: '1px',
+                backgroundColor: 'var(--snap-line-color)',
+                zIndex: 1000,
+                pointerEvents: 'none'
+              }}
+            />
+          );
+        }
+      })}
+    </>
+  );
 };
 
-const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu, snapLines, onPaneContextMenu }) => {
-  
+const NetworkMap = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectionChange, nodeTypes, theme, setReactFlowInstance, onNodeContextMenu, snapLines, onPaneContextMenu }) => {
+
   const [marqueeStart, setMarqueeStart] = useState(null);
   const [marqueeEnd, setMarqueeEnd] = useState(null);
   const mapRef = useRef(null);
@@ -88,6 +93,38 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
   if (setReactFlowInstance) {
     setReactFlowInstance(reactFlowInstance);
   }
+
+  const processedEdges = useMemo(() => {
+    const edgeMap = new Map();
+
+    edges.forEach(edge => {
+      // Sort IDs to group connections between two nodes regardless of direction
+      const key = [edge.source, edge.target].sort().join('-');
+
+      if (!edgeMap.has(key)) {
+        edgeMap.set(key, []);
+      }
+      edgeMap.get(key).push(edge);
+    });
+
+    const newEdges = [];
+    edgeMap.forEach((groupedEdges) => {
+      const total = groupedEdges.length;
+      groupedEdges.forEach((edge, index) => {
+        newEdges.push({
+          ...edge,
+          type: 'parallel',
+          data: {
+            ...edge.data, // Preserve existing data
+            edgeIndex: index,
+            totalEdges: total
+          }
+        });
+      });
+    });
+
+    return newEdges;
+  }, [edges]);
 
   const minimapNodeColor = (node) => {
     switch (node.type) {
@@ -103,78 +140,78 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
   };
 
   const handlePaneMouseDown = (event) => {
-      // Start marquee selection only on primary button click and if not clicking a control
-      if (event.button !== 0 || event.target.closest('.react-flow__controls')) return;
+    // Start marquee selection only on primary button click and if not clicking a control
+    if (event.button !== 0 || event.target.closest('.react-flow__controls')) return;
 
-      event.preventDefault();
-      const mapBounds = mapRef.current.getBoundingClientRect();
-      setMarqueeStart({
-          x: event.clientX - mapBounds.left,
-          y: event.clientY - mapBounds.top,
-      });
-      setMarqueeEnd({
-          x: event.clientX - mapBounds.left,
-          y: event.clientY - mapBounds.top,
-      });
+    event.preventDefault();
+    const mapBounds = mapRef.current.getBoundingClientRect();
+    setMarqueeStart({
+      x: event.clientX - mapBounds.left,
+      y: event.clientY - mapBounds.top,
+    });
+    setMarqueeEnd({
+      x: event.clientX - mapBounds.left,
+      y: event.clientY - mapBounds.top,
+    });
   };
 
   const handlePaneMouseMove = (event) => {
-      if (!marqueeStart) return;
-      
-      const mapBounds = mapRef.current.getBoundingClientRect();
-      setMarqueeEnd({
-          x: event.clientX - mapBounds.left,
-          y: event.clientY - mapBounds.top,
-      });
+    if (!marqueeStart) return;
+
+    const mapBounds = mapRef.current.getBoundingClientRect();
+    setMarqueeEnd({
+      x: event.clientX - mapBounds.left,
+      y: event.clientY - mapBounds.top,
+    });
   };
-  
+
   const handlePaneMouseUp = useCallback((event) => {
-      // If the mouseup event originates from a node, edge, or their handles, do nothing here.
-      // This allows onNodeClick and other specific handlers to manage the event without
-      // it being misinterpreted as a generic pane click.
-      if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge') || event.target.closest('.react-flow__handle')) {
-          setMarqueeStart(null);
-          setMarqueeEnd(null);
-          return;
-      }
-
-      let wasMarqueeSelection = false;
-      if (marqueeStart && marqueeEnd) {
-          const selectionRect = {
-              x: Math.min(marqueeStart.x, marqueeEnd.x),
-              y: Math.min(marqueeStart.y, marqueeEnd.y),
-              width: Math.abs(marqueeStart.x - marqueeEnd.x),
-              height: Math.abs(marqueeStart.y - marqueeEnd.y),
-          };
-
-          // Only consider it a marquee selection if the box is larger than a click threshold
-          if (selectionRect.width >= 5 || selectionRect.height >= 5) {
-              const selectedNodes = reactFlowInstance.getNodes().filter(node => {
-                  const nodePosition = reactFlowInstance.project({ x: node.position.x, y: node.position.y });
-                  const nodeWidth = node.width || 100;
-                  const nodeHeight = node.height || 50;
-
-                  return (
-                      nodePosition.x + nodeWidth > selectionRect.x &&
-                      nodePosition.x < selectionRect.x + selectionRect.width &&
-                      nodePosition.y + nodeHeight > selectionRect.y &&
-                      nodePosition.y < selectionRect.y + selectionRect.height
-                  );
-              });
-              onSelectionChange({ nodes: selectedNodes, edges: [] });
-              wasMarqueeSelection = true;
-          }
-      }
-
-      // If a marquee selection wasn't performed, treat it as a standard pane click.
-      // This correctly handles simple clicks that might have a tiny bit of mouse movement.
-      // We only fire this for left-clicks, as right-clicks are handled by onPaneContextMenu.
-      if (!wasMarqueeSelection && event.button === 0) {
-        onPaneClick(event);
-      }
-      
+    // If the mouseup event originates from a node, edge, or their handles, do nothing here.
+    // This allows onNodeClick and other specific handlers to manage the event without
+    // it being misinterpreted as a generic pane click.
+    if (event.target.closest('.react-flow__node') || event.target.closest('.react-flow__edge') || event.target.closest('.react-flow__handle')) {
       setMarqueeStart(null);
       setMarqueeEnd(null);
+      return;
+    }
+
+    let wasMarqueeSelection = false;
+    if (marqueeStart && marqueeEnd) {
+      const selectionRect = {
+        x: Math.min(marqueeStart.x, marqueeEnd.x),
+        y: Math.min(marqueeStart.y, marqueeEnd.y),
+        width: Math.abs(marqueeStart.x - marqueeEnd.x),
+        height: Math.abs(marqueeStart.y - marqueeEnd.y),
+      };
+
+      // Only consider it a marquee selection if the box is larger than a click threshold
+      if (selectionRect.width >= 5 || selectionRect.height >= 5) {
+        const selectedNodes = reactFlowInstance.getNodes().filter(node => {
+          const nodePosition = reactFlowInstance.project({ x: node.position.x, y: node.position.y });
+          const nodeWidth = node.width || 100;
+          const nodeHeight = node.height || 50;
+
+          return (
+            nodePosition.x + nodeWidth > selectionRect.x &&
+            nodePosition.x < selectionRect.x + selectionRect.width &&
+            nodePosition.y + nodeHeight > selectionRect.y &&
+            nodePosition.y < selectionRect.y + selectionRect.height
+          );
+        });
+        onSelectionChange({ nodes: selectedNodes, edges: [] });
+        wasMarqueeSelection = true;
+      }
+    }
+
+    // If a marquee selection wasn't performed, treat it as a standard pane click.
+    // This correctly handles simple clicks that might have a tiny bit of mouse movement.
+    // We only fire this for left-clicks, as right-clicks are handled by onPaneContextMenu.
+    if (!wasMarqueeSelection && event.button === 0) {
+      onPaneClick(event);
+    }
+
+    setMarqueeStart(null);
+    setMarqueeEnd(null);
   }, [marqueeStart, marqueeEnd, reactFlowInstance, onSelectionChange, onPaneClick]);
 
   const handleNodeMouseUp = (event) => {
@@ -187,23 +224,24 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
   };
 
   return (
-    <div 
-        className="map-view"
-        ref={mapRef}
-        onMouseDown={handlePaneMouseDown}
-        onMouseMove={handlePaneMouseMove}
-        onMouseUp={handlePaneMouseUp}
+    <div
+      className="map-view"
+      ref={mapRef}
+      onMouseDown={handlePaneMouseDown}
+      onMouseMove={handlePaneMouseMove}
+      onMouseUp={handlePaneMouseUp}
     >
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={processedEdges}
+        edgeTypes={edgeTypes}
         onNodeClick={onNodeClick}
         onNodeMouseUp={handleNodeMouseUp}
         onNodesChange={onNodesChange}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
         // Use custom pane interaction handlers instead of onPaneClick
-        onPaneClick={undefined} 
+        onPaneClick={undefined}
         onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         fitView
@@ -219,4 +257,4 @@ const Map = ({ nodes, edges, onNodeClick, onNodesChange, onPaneClick, onSelectio
   );
 };
 
-export default Map;
+export default NetworkMap;
