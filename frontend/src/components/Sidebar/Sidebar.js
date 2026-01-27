@@ -36,6 +36,7 @@ const Sidebar = ({
   onAddNeighbor,
   onDownloadConfig,
   onDownloadExcel,
+  onDownloadDrawio,
   onAutoStructure
 }) => {
   const { t } = useTranslation();
@@ -161,6 +162,14 @@ const Sidebar = ({
               style={{ marginBottom: '10px' }}
             >
               {t('sidebar.downloadExcel')}
+            </button>
+            <button
+              onClick={onDownloadDrawio}
+              className="secondary"
+              disabled={!isMapStarted}
+              style={{ marginBottom: '10px' }}
+            >
+              {t('sidebar.downloadDrawio')}
             </button>
           </div>
 

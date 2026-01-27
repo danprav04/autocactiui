@@ -96,6 +96,7 @@
     "endDeviceIdentifier": "התקן קצה (ללא IP)",
     "downloadMap": "שמור מפה (JSON)",
     "downloadExcel": "ייצא לאקסל",
+    "downloadDrawio": "ייצא ל-Draw.io",
     "importMap": "ייבא מפה",
     "autoStructure": "סדר אוטומטי",
     "confirmAutoStructure": "פעולה זו תסדר מחדש את כל הרכיבים במפה בפריסה היררכית. להמשיך?"

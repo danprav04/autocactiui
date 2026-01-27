@@ -101,6 +101,99 @@ export const exportToExcel = (nodes, edges, mapName) => {
     }
 };
 
+export const exportToDrawio = (nodes, edges, mapName) => {
+    try {
+        const mxGraphModel = generateDrawioXml(nodes, edges);
+        const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Electron" modified="${new Date().toISOString()}" agent="AutoCactiUI" version="21.0.0" type="device">
+  <diagram id="autocacti-diagram" name="Page-1">
+    ${mxGraphModel}
+  </diagram>
+</mxfile>`;
+
+        const blob = new Blob([xmlContent], { type: 'application/xml' });
+        saveAs(blob, `${sanitizeFilename(mapName)}.drawio`);
+    } catch (error) {
+        console.error("Failed to export to Draw.io:", error);
+    }
+};
+
+const generateDrawioXml = (nodes, edges) => {
+    let xml = '<mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">\n';
+    xml += '      <root>\n';
+    xml += '        <mxCell id="0" />\n';
+    xml += '        <mxCell id="1" parent="0" />\n';
+
+    // Helper for escaping XML
+    const escape = (str) => {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    };
+
+    // Helper to get style based on node type
+    const getStyle = (node) => {
+        if (node.type === 'custom') {
+            const iconType = node.data.iconType || 'Router';
+            // Basic shapes for standard network devices
+            switch (iconType) {
+                case 'Router': return 'shape=mxgraph.cisco.routers.router;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
+                case 'Switch': return 'shape=mxgraph.cisco.switches.layer_2_remote_switch;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
+                case 'Firewall': return 'shape=mxgraph.cisco.security.firewall_asm;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
+                case 'Server': return 'shape=mxgraph.cisco.servers.server;html=1;pointerEvents=1;dashed=0;fillColor=#005073;strokeColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;';
+                case 'Cloud': return 'ellipse;shape=cloud;whiteSpace=wrap;html=1;';
+                default: return 'shape=rect;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;';
+            }
+        } else if (node.type === 'group') {
+            // Basic container style
+            return 'group;html=1;dashed=1;opacity=50;fillColor=#dae8fc;strokeColor=#6c8ebf;';
+        } else if (node.type === 'text') {
+            return 'text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;';
+        }
+        return '';
+    };
+
+    nodes.forEach(node => {
+        const id = escape(node.id);
+        const x = Math.round(node.position.x);
+        const y = Math.round(node.position.y);
+        const width = node.width || 80;
+        const height = node.height || 80;
+        const style = getStyle(node);
+
+        let value = '';
+        if (node.type === 'custom') {
+            value = escape(node.data.hostname || node.id);
+        } else if (node.type === 'group') {
+            value = escape(node.data.label || 'Group');
+        } else if (node.type === 'text') {
+            value = escape(node.data.text || 'Text');
+        }
+
+        xml += `        <mxCell id="${id}" value="${value}" style="${style}" vertex="1" parent="1">\n`;
+        xml += `          <mxGeometry x="${x}" y="${y}" width="${width}" height="${height}" as="geometry" />\n`;
+        xml += `        </mxCell>\n`;
+    });
+
+    edges.forEach(edge => {
+        const id = escape(edge.id);
+        const source = escape(edge.source);
+        const target = escape(edge.target);
+
+        xml += `        <mxCell id="${id}" value="" style="endArrow=none;html=1;rounded=0;" edge="1" parent="1" source="${source}" target="${target}">\n`;
+        xml += `          <mxGeometry relative="1" as="geometry" />\n`;
+        xml += `        </mxCell>\n`;
+    });
+
+    xml += '      </root>\n';
+    xml += '    </mxGraphModel>';
+    return xml;
+};
+
 export const importMapConfig = (file) => {
     return new Promise((resolve, reject) => {
         if (!file) return reject(new Error('No file provided.'));
